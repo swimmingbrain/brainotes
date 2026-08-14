@@ -1,6 +1,7 @@
 import { derived, get, writable } from 'svelte/store';
 import { browser } from '$app/environment';
-import { preferences } from './preferences';
+import { preferences, type PenPreset, type PenType } from './preferences';
+import type { ToolId } from '$lib/editor/tools';
 
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
 
@@ -139,4 +140,75 @@ export function toggleRightPanel() {
 export function showLeftTab(tab: LeftPanelTab) {
   leftPanelTab.set(tab);
   updatePanels((p) => ({ ...p, leftOpen: true }));
+}
+
+export const activeTool = writable<ToolId>('pen');
+
+export type InkType = Exclude<PenType, 'highlighter'>;
+export type ShapeKind = 'line' | 'arrow' | 'rectangle' | 'ellipse';
+export type EraserMode = 'stroke' | 'area';
+
+// what the options bar shows and the canvas draws with. pen and highlighter
+// keep their own color and size, so switching between them loses nothing
+export interface ToolOptions {
+  penType: InkType;
+  penColor: string;
+  penSize: number;
+  highlighterColor: string;
+  highlighterSize: number;
+  eraserMode: EraserMode;
+  eraserSize: number;
+  eraseHighlighterOnly: boolean;
+  shapeKind: ShapeKind;
+  shapeColor: string;
+  shapeSize: number;
+  textColor: string;
+  textSize: number;
+}
+
+function startOptions(): ToolOptions {
+  const prefs = get(preferences);
+  const chosen = prefs.pens.find((p) => p.id === prefs.defaultPen) ?? prefs.pens[0];
+  const ink = chosen.type !== 'highlighter' ? chosen : prefs.pens.find((p) => p.type !== 'highlighter');
+  const marker = chosen.type === 'highlighter' ? chosen : prefs.pens.find((p) => p.type === 'highlighter');
+  const inkColor = ink?.color ?? '#1f1f22';
+  return {
+    penType: ink && ink.type !== 'highlighter' ? ink.type : 'ballpoint',
+    penColor: inkColor,
+    penSize: ink?.size ?? 2.5,
+    highlighterColor: marker?.color ?? '#ffd43b',
+    highlighterSize: marker?.size ?? 18,
+    eraserMode: 'stroke',
+    eraserSize: 16,
+    eraseHighlighterOnly: false,
+    shapeKind: 'rectangle',
+    shapeColor: inkColor,
+    shapeSize: 2.5,
+    textColor: inkColor,
+    textSize: 18
+  };
+}
+
+export const toolOptions = writable<ToolOptions>(startOptions());
+
+export function setToolOption<K extends keyof ToolOptions>(key: K, value: ToolOptions[K]) {
+  toolOptions.update((o) => ({ ...o, [key]: value }));
+}
+
+// a favourite pen is a whole setup: the tool, the type, the color and the size
+export function usePen(pen: Omit<PenPreset, 'id'>) {
+  if (pen.type === 'highlighter') {
+    toolOptions.update((o) => ({ ...o, highlighterColor: pen.color, highlighterSize: pen.size }));
+    activeTool.set('highlighter');
+  } else {
+    const type = pen.type;
+    toolOptions.update((o) => ({ ...o, penType: type, penColor: pen.color, penSize: pen.size }));
+    activeTool.set('pen');
+  }
+}
+
+// the pen the options bar is showing, written as a preset
+export function currentPen(tool: ToolId, o: ToolOptions): Omit<PenPreset, 'id'> {
+  if (tool === 'highlighter') return { type: 'highlighter', color: o.highlighterColor, size: o.highlighterSize };
+  return { type: o.penType, color: o.penColor, size: o.penSize };
 }
