@@ -144,6 +144,12 @@ export function showLeftTab(tab: LeftPanelTab) {
 
 export const activeTool = writable<ToolId>('pen');
 
+// a tool hidden in the preferences is out of reach of its key as well
+export function selectTool(id: ToolId) {
+  if (!get(preferences).tools[id]) return;
+  activeTool.set(id);
+}
+
 export type InkType = Exclude<PenType, 'highlighter'>;
 export type ShapeKind = 'line' | 'arrow' | 'rectangle' | 'ellipse';
 export type EraserMode = 'stroke' | 'area';
