@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css';
+  import Toast from '$lib/ui/Toast.svelte';
   import { beforeNavigate } from '$app/navigation';
   import { updated } from '$app/state';
   import type { Snippet } from 'svelte';
@@ -17,3 +18,4 @@
 </script>
 
 {@render children()}
+<Toast />
