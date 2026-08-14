@@ -1,6 +1,6 @@
 import { derived, get, writable } from 'svelte/store';
 import { browser } from '$app/environment';
-import { preferences, type PenPreset, type PenType } from './preferences';
+import { preferences, type PaperStyle, type PenPreset, type PenType } from './preferences';
 import type { ToolId } from '$lib/editor/tools';
 
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
@@ -212,3 +212,31 @@ export function currentPen(tool: ToolId, o: ToolOptions): Omit<PenPreset, 'id'> 
   if (tool === 'highlighter') return { type: 'highlighter', color: o.highlighterColor, size: o.highlighterSize };
   return { type: o.penType, color: o.penColor, size: o.penSize };
 }
+
+// mirrors of the open notebook. the canvas and the storage write them, the
+// bars and panels only read them
+export type SaveState = 'saved' | 'saving' | 'failed';
+export type InputType = 'pen' | 'mouse' | 'touch';
+export type NotebookKind = 'paper' | 'board';
+
+export interface NotebookSummary {
+  id: string;
+  name: string;
+  kind: NotebookKind;
+  pageCount: number;
+  modifiedAt: number;
+}
+
+export const notebookOpen = writable(true);
+export const notebookName = writable('My notes');
+export const notebookKind = writable<NotebookKind>('paper');
+export const paperStyle = writable<PaperStyle>(get(preferences).paper.style);
+export const zoomPercent = writable(100);
+export const pageIndex = writable(0);
+export const pageCount = writable(1);
+export const itemCount = writable(0);
+export const selectionCount = writable(0);
+export const saveState = writable<SaveState>('saved');
+export const inputType = writable<InputType>('mouse');
+export const history = writable({ canUndo: false, canRedo: false });
+export const library = writable<NotebookSummary[]>([]);
