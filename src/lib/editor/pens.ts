@@ -39,5 +39,5 @@ export function makeDefaultPen(pen: Pen) {
     const fresh = { id: newPenId(), ...pen };
     return { ...p, pens: [...p.pens, fresh], defaultPen: fresh.id };
   });
-  addToast('New notebooks start with this pen', 'success');
+  addToast('This pen is ready every time the app opens', 'success');
 }
