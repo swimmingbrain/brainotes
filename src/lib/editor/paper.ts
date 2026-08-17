@@ -1,0 +1,32 @@
+import type { PageSize, PaperColor, PaperStyle } from '$lib/stores/preferences';
+
+export const PAPER_COLORS: Record<PaperColor, { paper: string; rule: string; label: string }> = {
+  white: { paper: '#ffffff', rule: 'rgba(60, 90, 140, 0.22)', label: 'White' },
+  cream: { paper: '#f7f1e3', rule: 'rgba(120, 90, 50, 0.22)', label: 'Cream' },
+  // the blackboard: chalk colored rules on a dark green
+  dark: { paper: '#1e2622', rule: 'rgba(255, 255, 255, 0.14)', label: 'Dark' }
+};
+
+// height over width of one page
+export const PAGE_SIZES: Record<PageSize, { ratio: number; label: string }> = {
+  a4: { ratio: 297 / 210, label: 'A4' },
+  letter: { ratio: 11 / 8.5, label: 'Letter' },
+  wide: { ratio: 9 / 16, label: '16:9' }
+};
+
+// a css background that draws the paper pattern at the given spacing in
+// pixels, used for the page tiles until there are real thumbnails
+export function paperPattern(style: PaperStyle, color: PaperColor, spacing: number): string {
+  const { paper, rule } = PAPER_COLORS[color];
+  const s = `${spacing}px ${spacing}px`;
+  if (style === 'lines') {
+    return `linear-gradient(to bottom, transparent ${spacing - 1}px, ${rule} ${spacing - 1}px) 0 0 / 100% ${spacing}px, ${paper}`;
+  }
+  if (style === 'grid') {
+    return `linear-gradient(to bottom, ${rule} 1px, transparent 1px) 0 0 / ${s}, linear-gradient(to right, ${rule} 1px, transparent 1px) 0 0 / ${s}, ${paper}`;
+  }
+  if (style === 'dots') {
+    return `radial-gradient(circle, ${rule} 1px, transparent 1.3px) 0 0 / ${s}, ${paper}`;
+  }
+  return paper;
+}
