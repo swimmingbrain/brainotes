@@ -30,7 +30,7 @@ export interface Actions {
   deleteNotebook: (id: string) => void;
   // no files means ask for them with a file picker
   importFiles: (files?: File[]) => void;
-  openReference: () => void;
+  openReference: (files?: File[]) => void;
   insertImage: () => void;
   exportNotebook: (format: ExportFormat) => void;
 }
