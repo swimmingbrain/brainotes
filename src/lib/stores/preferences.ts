@@ -160,3 +160,11 @@ function createPreferencesStore() {
 }
 
 export const preferences = createPreferencesStore();
+
+export function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]) {
+  preferences.update((p) => ({ ...p, [key]: value }));
+}
+
+export function setPaper<K extends keyof Preferences['paper']>(key: K, value: Preferences['paper'][K]) {
+  preferences.update((p) => ({ ...p, paper: { ...p.paper, [key]: value } }));
+}
