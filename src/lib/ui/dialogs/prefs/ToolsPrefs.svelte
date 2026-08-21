@@ -18,14 +18,14 @@
     {#snippet before()}
       <Icon name={tool.icon} size={14} />
     {/snippet}
-    <ToggleField
-      value={$preferences.tools[tool.id]}
-      label="Show {tool.label}"
-      disabled={$preferences.tools[tool.id] && shownCount === 1}
-      onchange={(v) => setTool(tool.id, v)} />
-    {#snippet after()}
+    <div class="control">
+      <ToggleField
+        value={$preferences.tools[tool.id]}
+        label="Show {tool.label}"
+        disabled={$preferences.tools[tool.id] && shownCount === 1}
+        onchange={(v) => setTool(tool.id, v)} />
       <kbd>{tool.shortcut}</kbd>
-    {/snippet}
+    </div>
   </Field>
 {/each}
 <p class="help">A hidden tool leaves the rail and its key does nothing. Holding space still gives the hand.</p>
@@ -41,6 +41,12 @@
     color: var(--text-muted);
     border-bottom: 1px solid var(--border);
     padding-bottom: 4px;
+  }
+
+  .control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   .help {
