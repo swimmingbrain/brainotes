@@ -56,9 +56,7 @@
     height: 400px;
     max-height: calc(100vh - 200px);
     min-height: 240px;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    margin: 0 -20px;
+    border: 1px solid var(--border);
   }
 
   .categories {
