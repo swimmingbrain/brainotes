@@ -115,7 +115,7 @@
     </button>
     <Menu items={exportItems}>
       {#snippet trigger({ toggle })}
-        <button class="action-btn accent" onclick={toggle} title="Export the notebook">
+        <button class="action-btn accent" onclick={toggle} disabled={!$notebookOpen} title="Export the notebook">
           <Icon name="export" size={14} />
           <span>Export</span>
         </button>
