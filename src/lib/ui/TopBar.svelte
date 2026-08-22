@@ -188,7 +188,9 @@
     color: var(--text-primary);
   }
 
-  .filename.muted {
+  .filename.muted,
+  .filename.muted:hover {
+    background: none;
     color: var(--text-muted);
     cursor: default;
   }
