@@ -52,7 +52,7 @@
     width: 16px;
     height: 16px;
     flex-shrink: 0;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.3);
   }
 
   .swatch:hover:not(:disabled) {

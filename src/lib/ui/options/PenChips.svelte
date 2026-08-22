@@ -57,10 +57,11 @@
     color: var(--accent);
   }
 
+  /* the ring keeps black ink visible on the dark bar */
   .dot {
     border-radius: 50%;
     flex-shrink: 0;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
   }
 
   .dot.soft {
