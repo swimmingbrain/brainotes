@@ -107,6 +107,6 @@
   }
 
   .tool-btn.on {
-    color: var(--text-primary);
+    color: var(--accent);
   }
 </style>
