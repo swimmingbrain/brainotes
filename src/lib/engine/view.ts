@@ -281,6 +281,16 @@ export class CanvasView {
 
   // pages
 
+  // is any of the page on screen
+  pageShown(index: number): boolean {
+    if (this.isBoard) return index === this.board;
+    const r = this.rects[index];
+    if (!r) return false;
+    const top = this.cam.y;
+    const bottom = top + this.height / this.cam.zoom;
+    return r.y < bottom && r.y + r.h > top;
+  }
+
   pageAtScreen(sx: number, sy: number): number {
     if (this.isBoard) return this.board;
     return pageAt(this.rects, this.cam.x + sx / this.cam.zoom, this.cam.y + sy / this.cam.zoom);
