@@ -40,6 +40,8 @@ export class Input {
   private touches = new Map<number, { x: number; y: number }>();
   private gesture: Gesture | null = null;
   private raw: boolean;
+  // some pointers never send raw updates, then pointermove has the samples
+  private rawSeen = false;
 
   constructor(
     private view: CanvasView,
@@ -86,6 +88,14 @@ export class Input {
     return { x: e.clientX - this.view.left, y: e.clientY - this.view.top, pressure: e.pressure, time: e.timeStamp };
   }
 
+  private capture(id: number) {
+    try {
+      this.view.live.setPointerCapture(id);
+    } catch {
+      // the pointer is already gone
+    }
+  }
+
   private ondown = (e: PointerEvent) => {
     const kind = kindOf(e);
     this.hooks.kind?.(kind);
@@ -103,7 +113,7 @@ export class Input {
           this.active = null;
           drawing = false;
         }
-        this.view.live.setPointerCapture(e.pointerId);
+        this.capture(e.pointerId);
         this.startGesture();
         return;
       }
@@ -120,9 +130,10 @@ export class Input {
     if (!tool) return;
 
     e.preventDefault();
-    this.view.live.setPointerCapture(e.pointerId);
+    this.capture(e.pointerId);
     if (this.view.tool && this.view.tool !== tool) this.view.tool.hover?.(null);
     this.active = { id: e.pointerId, tool, kind };
+    this.rawSeen = false;
     drawing = tool !== this.tools.hand;
     this.view.tool = tool;
     tool.down(this.sample(e), kind);
@@ -139,7 +150,10 @@ export class Input {
 
   private onraw = (e: PointerEvent) => {
     const active = this.active;
-    if (active && e.pointerId === active.id) this.feed(e, active.tool);
+    if (active && e.pointerId === active.id) {
+      this.rawSeen = true;
+      this.feed(e, active.tool);
+    }
   };
 
   private onmove = (e: PointerEvent) => {
@@ -150,7 +164,7 @@ export class Input {
     const active = this.active;
     if (active) {
       if (e.pointerId !== active.id) return;
-      if (!this.raw) this.feed(e, active.tool);
+      if (!this.rawSeen) this.feed(e, active.tool);
       if (active.tool.predict) {
         const predicted = e.getPredictedEvents?.() ?? [];
         active.tool.predict(predicted.map((p) => this.sample(p)));
