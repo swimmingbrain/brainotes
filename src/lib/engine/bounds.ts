@@ -1,3 +1,4 @@
+import { derived } from './cache';
 import type { Box, Item } from './types';
 
 export function emptyBox(): Box {
@@ -42,12 +43,11 @@ export function pointsBox(pts: Float32Array, pad: number): Box {
   return padBox(box, pad);
 }
 
-const boxes = new WeakMap<Item, Box>();
-
 // items never change in place, so the box is worked out once per item
 export function itemBox(item: Item): Box {
-  let box = boxes.get(item);
-  if (box) return box;
+  const d = derived(item);
+  if (d.box) return d.box;
+  let box: Box;
   if (item.type === 'stroke') {
     // the outline never reaches further than the pen size from the line,
     // the extra unit is room for anti aliasing
@@ -66,6 +66,6 @@ export function itemBox(item: Item): Box {
   } else {
     box = { minX: item.x, minY: item.y, maxX: item.x + item.w, maxY: item.y + item.h };
   }
-  boxes.set(item, box);
+  d.box = box;
   return box;
 }

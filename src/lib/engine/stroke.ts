@@ -1,4 +1,5 @@
 import { getStroke, type StrokeOptions } from 'perfect-freehand';
+import { derived } from './cache';
 import type { PenType, Stroke } from './types';
 
 // perfect-freehand measures a few things in absolute units (it skips the
@@ -86,19 +87,17 @@ export function traceOutline(ctx: CanvasPath, outline: number[][]) {
   ctx.closePath();
 }
 
-const paths = new WeakMap<Stroke, Path2D>();
-
 export function strokePath(stroke: Stroke): Path2D {
-  let path = paths.get(stroke);
-  if (path) return path;
-  path = new Path2D();
+  const d = derived(stroke);
+  if (d.path) return d.path;
+  const path = new Path2D();
   traceOutline(path, outlineOf(scaledPoints(stroke.pts), stroke.pen, stroke.size));
-  paths.set(stroke, path);
+  d.path = path;
   return path;
 }
 
 export function hasPath(stroke: Stroke): boolean {
-  return paths.has(stroke);
+  return derived(stroke).path !== undefined;
 }
 
 // the outline as svg path data in page units, for exports

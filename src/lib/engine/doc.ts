@@ -1,5 +1,6 @@
 import RBush from 'rbush';
 import { emptyBox, growBox, itemBox } from './bounds';
+import { derived } from './cache';
 import type { Box, Item, Notebook, NotebookKind, PageMeta, Paper } from './types';
 import type { PageSize } from '$lib/stores/preferences';
 
@@ -62,13 +63,15 @@ export function newNotebook(kind: NotebookKind, name: string, setup: PaperSetup)
   return { id: newId(), name, kind, createdAt: now, updatedAt: now, pages: [newPageMeta(kind, setup)], refs: [] };
 }
 
-const entries = new WeakMap<Item, Entry>();
-
 function makeEntry(item: Item, z: number): Entry {
   const box = itemBox(item);
   const entry = { minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY, item, z };
-  entries.set(item, entry);
+  derived(item).entry = entry;
   return entry;
+}
+
+function entryOf(item: Item): Entry | undefined {
+  return derived(item).entry;
 }
 
 export function newPageData(meta: PageMeta, items: Item[] = []): PageData {
@@ -143,7 +146,7 @@ export class Doc {
         else kept.push(items[i]);
       }
       for (const { item } of removed) {
-        const entry = entries.get(item);
+        const entry = entryOf(item);
         if (entry) page.tree.remove(entry);
         growBox(box, itemBox(item));
       }
@@ -198,7 +201,7 @@ export class Doc {
     if (!this.unordered.has(page)) return;
     const items = page.items;
     for (let i = 0; i < items.length; i++) {
-      const entry = entries.get(items[i]);
+      const entry = entryOf(items[i]);
       if (entry) entry.z = i;
     }
     this.unordered.delete(page);
