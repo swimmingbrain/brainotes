@@ -28,7 +28,7 @@ export class PenTool implements Tool {
   private shown = '';
   private size = 2;
   private follow = 0.66;
-  private sensitivity = 1;
+  private sensitivity = 0.5;
   // smoothed points in scaled page units. the newest point stays raw in
   // tip, so the line always reaches the pen
   private pts: number[][] = [];
@@ -64,7 +64,7 @@ export class PenTool implements Tool {
     this.shown = inkColor(set.color, isDark(meta.paper));
     this.size = set.size;
     this.follow = followFactor(set.smoothing);
-    this.sensitivity = set.pressure * 2;
+    this.sensitivity = set.pressure;
     this.pts = [];
     this.tip = null;
     this.tail = [];

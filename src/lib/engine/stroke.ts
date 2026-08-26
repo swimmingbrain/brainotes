@@ -50,7 +50,8 @@ export function followFactor(smoothing: number): number {
 }
 
 // light writing should already look like normal writing, the sensitivity
-// then widens or narrows the range around the middle
+// (the preference, 0.5 is normal) then widens or narrows the range around
+// the middle
 export function mapPressure(raw: number, sensitivity: number): number {
   const curved = Math.pow(Math.max(0, Math.min(1, raw)), 0.65);
   const p = 0.5 + (curved - 0.5) * sensitivity * 2;
