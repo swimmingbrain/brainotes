@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { plugActions } from './actions';
+import { actions, plugActions } from './actions';
 import type { ToolId } from './tools';
 import { Doc, newId, newNotebook, newPageData, newPageMeta, type DocChange } from '$lib/engine/doc';
 import { History, type Op } from '$lib/engine/history';
@@ -35,6 +35,7 @@ declare global {
       readonly doc: Doc | null;
       readonly history: History | null;
       newId: () => string;
+      actions: typeof actions;
     };
   }
 }
@@ -183,7 +184,8 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
       get history() {
         return history;
       },
-      newId
+      newId,
+      actions
     };
   }
 
