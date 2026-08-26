@@ -1,4 +1,4 @@
-import { getStroke, type StrokeOptions } from 'perfect-freehand';
+import { getStroke, getStrokeOutlinePoints, type StrokeOptions, type StrokePoint } from 'perfect-freehand';
 import { derived } from './cache';
 import type { PenType, Stroke } from './types';
 
@@ -66,9 +66,39 @@ export function scaledPoints(pts: Float32Array): number[][] {
   return out;
 }
 
+// what perfect-freehand's getStrokePoints makes, minus its streamline (the
+// pen tool smooths already) and minus how it drops every point within one
+// pen width of the start, which left a taper with only two outline points
+function strokePoints(points: number[][]): StrokePoint[] {
+  const out: StrokePoint[] = [];
+  let run = 0;
+  for (const p of points) {
+    const prev = out[out.length - 1];
+    if (!prev) {
+      out.push({ point: [p[0], p[1]], pressure: p[2] ?? 0.5, vector: [0, 0], distance: 0, runningLength: 0 });
+      continue;
+    }
+    const dx = prev.point[0] - p[0];
+    const dy = prev.point[1] - p[1];
+    const distance = Math.hypot(dx, dy);
+    if (distance === 0) continue;
+    run += distance;
+    out.push({
+      point: [p[0], p[1]],
+      pressure: p[2] ?? 0.5,
+      vector: [dx / distance, dy / distance],
+      distance,
+      runningLength: run
+    });
+  }
+  if (out.length > 1) out[0].vector = out[1].vector;
+  return out;
+}
+
 // the outline in scaled units, for points that are scaled already
 export function outlineOf(points: number[][], pen: PenType, size: number): number[][] {
-  return getStroke(points, penOptions(pen, size));
+  if (points.length < 2) return getStroke(points, penOptions(pen, size));
+  return getStrokeOutlinePoints(strokePoints(points), penOptions(pen, size));
 }
 
 // a closed curve through the middles of the outline edges, with the
