@@ -54,6 +54,34 @@ export function drawItem(ctx: Ctx, item: Item, dark: boolean) {
   ctx.fill(strokePath(item));
 }
 
+const dotPatterns = new WeakMap<Ctx, Map<string, CanvasPattern>>();
+
+// one dot in the middle of a tile about one step wide
+function dotPattern(ctx: Ctx, color: string, step: number, dot: number): CanvasPattern | null {
+  const size = Math.max(4, Math.min(512, Math.round(step)));
+  const r = (dot / 2) * (size / step);
+  const key = `${color}|${size}|${r.toFixed(2)}`;
+  let cache = dotPatterns.get(ctx);
+  if (!cache) {
+    cache = new Map();
+    dotPatterns.set(ctx, cache);
+  }
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const tile = new OffscreenCanvas(size, size);
+  const tctx = tile.getContext('2d')!;
+  tctx.fillStyle = color;
+  tctx.beginPath();
+  tctx.arc(size / 2, size / 2, r, 0, Math.PI * 2);
+  tctx.fill();
+  const pattern = ctx.createPattern(tile, 'repeat');
+  if (!pattern) return null;
+  // a pinch zoom makes a new one every frame, only a few are worth keeping
+  if (cache.size > 8) cache.clear();
+  cache.set(key, pattern);
+  return pattern;
+}
+
 // the pattern of the paper in device pixels. the page origin sits at
 // (ox, oy), s is device pixels per unit and x0..y1 is the part to cover.
 // a page starts its pattern one step in, a board has it everywhere
@@ -80,20 +108,17 @@ export function drawPattern(
   ctx.beginPath();
 
   if (paper.style === 'dots') {
-    // one dashed line per row: a dash of almost nothing with round caps is a dot
-    const dot = Math.max(1.5, s * 1.4);
-    ctx.lineWidth = dot;
-    ctx.lineCap = 'round';
-    ctx.setLineDash([0.001, step - 0.001]);
-    const sx = ox + kx0 * step;
-    for (let k = ky0; oy + k * step < y1; k++) {
-      const y = oy + k * step;
-      ctx.moveTo(sx, y);
-      ctx.lineTo(x1, y);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.lineCap = 'butt';
+    // thousands of dots as paths are slow to rasterize, one pattern fill is not
+    const pattern = dotPattern(ctx, PAPER_COLORS[paper.color].rule, step, Math.max(1.5, s * 1.4));
+    if (!pattern) return;
+    // the pattern tile is a whole number of pixels, the transform stretches it
+    // to the exact step so the dots never drift away from the ink
+    const k = step / Math.max(4, Math.min(512, Math.round(step)));
+    pattern.setTransform(new DOMMatrix([k, 0, 0, k, ox - step / 2, oy - step / 2]));
+    ctx.fillStyle = pattern;
+    const left = Math.max(x0, ox + (kx0 - 0.5) * step);
+    const top = Math.max(y0, oy + (ky0 - 0.5) * step);
+    ctx.fillRect(left, top, x1 - left, y1 - top);
     return;
   }
 
