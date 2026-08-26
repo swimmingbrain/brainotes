@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import ScrollIndicator from './ScrollIndicator.svelte';
   import { actions } from '$lib/editor/actions';
   import { mountCanvas } from '$lib/editor/canvas';
   import { PAPER_STYLES } from '$lib/editor/commands';
@@ -9,8 +10,9 @@
   const cursor = $derived(toolById($activeTool).cursor);
 
   let layers: HTMLDivElement;
+  let indicator: ScrollIndicator;
 
-  onMount(() => mountCanvas(layers, () => {}));
+  onMount(() => mountCanvas(layers, (start, size) => indicator.show(start, size)));
 
   function oncontextmenu(e: MouseEvent) {
     e.preventDefault();
@@ -45,6 +47,7 @@
 <div class="canvas-area" style="cursor: {cursor}" role="presentation" {oncontextmenu}>
   <!-- the engine puts its canvases in here -->
   <div class="layers" bind:this={layers}></div>
+  <ScrollIndicator bind:this={indicator} />
 </div>
 
 <style>
