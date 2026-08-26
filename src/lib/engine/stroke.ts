@@ -100,6 +100,39 @@ export function hasPath(stroke: Stroke): boolean {
   return derived(stroke).path !== undefined;
 }
 
+// device pixels under which a stroke is drawn as a plain line, at that
+// width the outline looks the same and only costs time
+export const THIN = 1.5;
+
+// the line through the points, with the ones closer than most of a pen
+// width left out
+export function strokeLine(stroke: Stroke): Path2D {
+  const d = derived(stroke);
+  if (d.line) return d.line;
+  const path = new Path2D();
+  const pts = stroke.pts;
+  const min = stroke.size * 0.75;
+  let lx = pts[0];
+  let ly = pts[1];
+  path.moveTo(lx, ly);
+  for (let i = 3; i < pts.length; i += 3) {
+    const x = pts[i];
+    const y = pts[i + 1];
+    if (i < pts.length - 3 && Math.hypot(x - lx, y - ly) < min) continue;
+    path.lineTo(x, y);
+    lx = x;
+    ly = y;
+  }
+  // a tap still leaves a dot
+  if (pts.length <= 3) path.lineTo(lx + 0.01, ly);
+  d.line = path;
+  return path;
+}
+
+export function hasLine(stroke: Stroke): boolean {
+  return derived(stroke).line !== undefined;
+}
+
 // the outline as svg path data in page units, for exports
 export function strokeSvgPath(stroke: Stroke): string {
   const outline = outlineOf(scaledPoints(stroke.pts), stroke.pen, stroke.size);
