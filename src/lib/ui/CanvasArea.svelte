@@ -1,17 +1,22 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { actions } from '$lib/editor/actions';
+  import { mountCanvas } from '$lib/editor/canvas';
   import { PAPER_STYLES } from '$lib/editor/commands';
   import { toolById } from '$lib/editor/tools';
-  import { activeTool, contextMenu, history, inputType, paperStyle, type InputType } from '$lib/stores/app';
+  import { activeTool, contextMenu, history, inputType, paperStyle } from '$lib/stores/app';
 
   const cursor = $derived(toolById($activeTool).cursor);
 
-  function onpointerdown(e: PointerEvent) {
-    inputType.set(e.pointerType as InputType);
-  }
+  let layers: HTMLDivElement;
+
+  onMount(() => mountCanvas(layers, () => {}));
 
   function oncontextmenu(e: MouseEvent) {
     e.preventDefault();
+    // a long press of the pen is a right click on windows, it must not
+    // open a menu in the middle of writing
+    if ($inputType !== 'mouse') return;
     contextMenu.set({
       x: e.clientX,
       y: e.clientY,
@@ -37,8 +42,10 @@
   }
 </script>
 
-<!-- the canvas engine mounts in here, this element only gives it its room -->
-<div class="canvas-area" style="cursor: {cursor}" role="presentation" {onpointerdown} {oncontextmenu}></div>
+<div class="canvas-area" style="cursor: {cursor}" role="presentation" {oncontextmenu}>
+  <!-- the engine puts its canvases in here -->
+  <div class="layers" bind:this={layers}></div>
+</div>
 
 <style>
   .canvas-area {
@@ -50,5 +57,12 @@
     overflow: hidden;
     background: var(--bg-deep);
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .layers {
+    position: absolute;
+    inset: 0;
   }
 </style>
