@@ -18,7 +18,8 @@ import type { Doc, DocChange, PageData } from './doc';
 import type { History } from './history';
 import { penIsDown } from './input';
 import { drawItem, drawPattern, drawSheet, HIGHLIGHTER_ALPHA, isDark, isMarker } from './render';
-import { TileLayer, type TileCtx } from './tiles';
+import { hasLine, hasPath, strokeLine, strokePath, THIN } from './stroke';
+import { TileLayer, type TileJob } from './tiles';
 import type { Tool } from './tools/tool';
 import type { Box, Item } from './types';
 import { PAPER_COLORS } from '$lib/editor/paper';
@@ -29,6 +30,13 @@ const ZOOM_SETTLE = 150;
 // time per frame for rendering missing tiles
 const BUDGET = 6;
 const BUDGET_PEN_DOWN = 3;
+
+// the items of one page inside a tile, in paint order
+interface Group {
+  rect: Rect | null;
+  dark: boolean;
+  items: Item[];
+}
 
 export interface ViewHooks {
   // the zoom or the page in the middle of the view changed
@@ -97,6 +105,9 @@ export class CanvasView {
   private shownPage = -1;
   private shownScroll = -1;
   private shownSize = -1;
+  // idle work: are the outlines near the view built, and the pending callback
+  private warm = false;
+  private idle: (() => void) | null = null;
   private offDoc: () => void;
   private observer: ResizeObserver;
   private dprQuery: MediaQueryList | null = null;
@@ -123,8 +134,8 @@ export class CanvasView {
     this.live.style.touchAction = 'none';
     host.style.isolation = 'isolate';
 
-    this.hlLayer = new TileLayer((box, open) => this.paint(box, open, true));
-    this.inkLayer = new TileLayer((box, open) => this.paint(box, open, false));
+    this.hlLayer = new TileLayer((box, scale) => this.paint(box, scale, true));
+    this.inkLayer = new TileLayer((box, scale) => this.paint(box, scale, false));
     this.offDoc = doc.on(this.onChange);
 
     this.observer = new ResizeObserver(() => this.measure());
@@ -138,6 +149,7 @@ export class CanvasView {
 
   destroy() {
     cancelAnimationFrame(this.raf);
+    this.idle?.();
     if (this.zoomTimer) clearTimeout(this.zoomTimer);
     this.offDoc();
     this.observer.disconnect();
@@ -190,6 +202,7 @@ export class CanvasView {
 
   // drops every cached tile and draws the screen again in one go
   redrawAll() {
+    this.warm = false;
     this.hlLayer.clear();
     this.inkLayer.clear();
     this.full = true;
@@ -206,6 +219,8 @@ export class CanvasView {
     const cam = this.cam;
     if (next.x === cam.x && next.y === cam.y && next.zoom === cam.zoom) return;
     if (next.zoom !== cam.zoom) {
+      // more pages may be in sight now
+      this.warm = false;
       this.zoomedAt = performance.now();
       if (this.zoomTimer) clearTimeout(this.zoomTimer);
       this.zoomTimer = setTimeout(() => this.requestFrame(), ZOOM_SETTLE + 20);
@@ -404,42 +419,60 @@ export class CanvasView {
     this.hl.style.mixBlendMode = page && isDark(page.paper) ? 'normal' : 'multiply';
   }
 
-  private paint(box: Box, open: () => TileCtx, marker: boolean) {
+  // what a tile of one layer has to draw, page by page, in a job the tile
+  // layer can spread over frames
+  private paint(box: Box, scale: number, marker: boolean): TileJob | null {
+    const groups: Group[] = [];
     if (this.isBoard) {
-      if (this.doc.pageCount > 0) this.paintPage(this.doc.pageAt(this.board), box, open, marker, null);
-      return;
+      if (this.doc.pageCount > 0) this.collect(groups, this.doc.pageAt(this.board), box, marker, null);
+    } else {
+      for (const i of this.pagesIn(box)) this.collect(groups, this.doc.pageAt(i), box, marker, this.rects[i]);
     }
-    for (const i of this.pagesIn(box)) this.paintPage(this.doc.pageAt(i), box, open, marker, this.rects[i]);
+    if (groups.length === 0) return null;
+    let g = 0;
+    let i = 0;
+    return {
+      draw: (ctx, count) => {
+        while (g < groups.length && count > 0) {
+          const group = groups[g];
+          ctx.save();
+          if (group.rect) {
+            ctx.beginPath();
+            ctx.rect(group.rect.x, group.rect.y, group.rect.w, group.rect.h);
+            ctx.clip();
+            ctx.translate(group.rect.x, group.rect.y);
+          }
+          const end = Math.min(group.items.length, i + count);
+          count -= end - i;
+          for (; i < end; i++) drawItem(ctx, group.items[i], group.dark, scale);
+          ctx.restore();
+          if (i >= group.items.length) {
+            g++;
+            i = 0;
+          }
+        }
+        return g >= groups.length;
+      }
+    };
   }
 
-  private paintPage(page: PageData, box: Box, open: () => TileCtx, marker: boolean, rect: Rect | null) {
+  private collect(groups: Group[], page: PageData, box: Box, marker: boolean, rect: Rect | null) {
     const ox = rect ? rect.x : 0;
     const oy = rect ? rect.y : 0;
     const hits = page.tree.search({ minX: box.minX - ox, minY: box.minY - oy, maxX: box.maxX - ox, maxY: box.maxY - oy });
     if (hits.length === 0) return;
     this.doc.ensureOrder(page);
     hits.sort((a, b) => a.z - b.z);
-    const dark = isDark(page.meta.paper);
-    let ctx: TileCtx | null = null;
+    const items: Item[] = [];
     for (const hit of hits) {
-      if (isMarker(hit.item) !== marker) continue;
-      if (!ctx) {
-        ctx = open();
-        ctx.save();
-        if (rect) {
-          ctx.beginPath();
-          ctx.rect(rect.x, rect.y, rect.w, rect.h);
-          ctx.clip();
-        }
-        ctx.translate(ox, oy);
-      }
-      drawItem(ctx, hit.item, dark);
+      if (isMarker(hit.item) === marker) items.push(hit.item);
     }
-    if (ctx) ctx.restore();
+    if (items.length > 0) groups.push({ rect, dark: isDark(page.meta.paper), items });
   }
 
   private onChange = (change: DocChange) => {
     if (change.type === 'items') {
+      this.warm = false;
       const index = this.doc.indexOf(change.pageId);
       if (index < 0 || (this.isBoard && index !== this.board)) return;
       const ox = this.pageX(index);
@@ -458,14 +491,14 @@ export class CanvasView {
         const dark = isDark(this.doc.pageAt(index).meta.paper);
         for (const item of change.added) {
           const layer = isMarker(item) ? this.hlLayer : this.inkLayer;
-          layer.drawInto(moveBox(itemBox(item), ox, oy), (ctx) => {
+          layer.drawInto(moveBox(itemBox(item), ox, oy), (ctx, scale) => {
             if (rect) {
               ctx.beginPath();
               ctx.rect(rect.x, rect.y, rect.w, rect.h);
               ctx.clip();
             }
             ctx.translate(ox, oy);
-            drawItem(ctx, item, dark);
+            drawItem(ctx, item, dark, scale);
           });
         }
       } else {
@@ -509,12 +542,11 @@ export class CanvasView {
     // a zoom keeps showing the old tiles stretched until it rests, or
     // right away when it went so far out that they would be too many
     const target = this.cam.zoom * this.dpr;
-    for (const layer of [this.inkLayer, this.hlLayer]) {
-      if (layer.scale === 0 || layer.scale === target) continue;
-      if (start - this.zoomedAt >= ZOOM_SETTLE || target / layer.scale < 0.5) {
-        layer.setScale(target);
-        this.inkDirty = this.hlDirty = true;
-      }
+    const scale = this.inkLayer.scale;
+    if (scale !== 0 && scale !== target && (start - this.zoomedAt >= ZOOM_SETTLE || target / scale < 0.5)) {
+      this.inkLayer.setScale(target, this.inkCtx);
+      this.hlLayer.setScale(target, this.hlCtx);
+      this.inkDirty = this.hlDirty = true;
     }
 
     if (this.bgDirty) {
@@ -541,6 +573,54 @@ export class CanvasView {
     this.report();
     this.lastFrame = performance.now() - start;
     if (this.inkDirty || this.hlDirty || this.liveDirty || this.inkLayer.busy || this.hlLayer.busy) this.requestFrame();
+    else if (!this.warm) this.warmLater();
+  };
+
+  // builds the outlines of the strokes near the view while nothing else
+  // happens, so a zoom out or a scroll finds them ready
+  private warmLater() {
+    if (this.idle) return;
+    if ('requestIdleCallback' in window) {
+      const id = requestIdleCallback(this.warmUp, { timeout: 1000 });
+      this.idle = () => cancelIdleCallback(id);
+    } else {
+      const id = setTimeout(() => this.warmUp({ didTimeout: false, timeRemaining: () => 8 }), 60);
+      this.idle = () => clearTimeout(id);
+    }
+  }
+
+  private warmUp = (deadline: IdleDeadline) => {
+    this.idle = null;
+    if (penIsDown()) {
+      this.warmLater();
+      return;
+    }
+    this.inkLayer.reserve();
+    this.hlLayer.reserve();
+    // the pages on screen and two more on each side
+    let first = this.board;
+    let last = this.board;
+    if (!this.isBoard) {
+      const [from, to] = visiblePages(this.rects, this.cam.y, this.cam.y + this.height / this.cam.zoom);
+      first = Math.max(0, from - 2);
+      last = Math.min(this.doc.pageCount - 1, to + 1);
+    }
+    const scale = this.cam.zoom * this.dpr;
+    for (let i = first; i <= last; i++) {
+      for (const item of this.doc.pageAt(i).items) {
+        if (item.type !== 'stroke') continue;
+        // the shape this zoom needs, see drawItem
+        const thin = item.size * scale < THIN;
+        if (thin ? hasLine(item) : hasPath(item)) continue;
+        if (deadline.timeRemaining() < 2) {
+          this.warmLater();
+          return;
+        }
+        if (thin) strokeLine(item);
+        else strokePath(item);
+      }
+    }
+    this.warm = true;
   };
 
   private drawBackground() {
@@ -595,7 +675,10 @@ export class CanvasView {
       const pageChanged = page !== this.shownPage;
       this.shownZoom = this.cam.zoom;
       this.shownPage = page;
-      if (pageChanged) this.updateBlend();
+      if (pageChanged) {
+        this.updateBlend();
+        this.warm = false;
+      }
       this.hooks.state?.();
     }
     if (!this.hooks.scroll) return;

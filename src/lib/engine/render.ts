@@ -1,5 +1,5 @@
 import { PAPER_COLORS } from '$lib/editor/paper';
-import { PENS, strokePath } from './stroke';
+import { PENS, strokeLine, strokePath, THIN } from './stroke';
 import type { Item, PageMeta, Paper } from './types';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -46,11 +46,22 @@ export function inkColor(color: string, dark: boolean): string {
   return shown;
 }
 
-export function drawItem(ctx: Ctx, item: Item, dark: boolean) {
+// scale is device pixels per unit, it picks the plain line for strokes
+// that are too thin on screen for their outline to matter
+export function drawItem(ctx: Ctx, item: Item, dark: boolean, scale: number) {
   // shapes, text and images get drawn once their tools exist
   if (item.type !== 'stroke') return;
   ctx.globalAlpha = PENS[item.pen].alpha;
-  ctx.fillStyle = inkColor(item.color, dark);
+  const color = inkColor(item.color, dark);
+  if (item.size * scale < THIN) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = item.size;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke(strokeLine(item));
+    return;
+  }
+  ctx.fillStyle = color;
   ctx.fill(strokePath(item));
 }
 
@@ -197,7 +208,7 @@ export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, sc
     const layer = new OffscreenCanvas(width, height);
     const lctx = layer.getContext('2d')!;
     lctx.setTransform(scale, 0, 0, scale, 0, 0);
-    for (const item of marks) drawItem(lctx, item, dark);
+    for (const item of marks) drawItem(lctx, item, dark, scale);
     ctx.globalAlpha = HIGHLIGHTER_ALPHA;
     ctx.globalCompositeOperation = dark ? 'source-over' : 'multiply';
     ctx.drawImage(layer, 0, 0);
@@ -206,7 +217,7 @@ export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, sc
 
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   for (const item of page.items) {
-    if (!isMarker(item)) drawItem(ctx, item, dark);
+    if (!isMarker(item)) drawItem(ctx, item, dark, scale);
   }
   ctx.restore();
 }

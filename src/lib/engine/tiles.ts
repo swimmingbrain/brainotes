@@ -7,6 +7,9 @@ export const TILE = 512;
 const MIN_CANVASES = 64;
 const MAX_TILES = 4096;
 const POOL = 16;
+const SPARE = 4;
+// items per step of a tile that is drawn over several frames
+const CHUNK = 48;
 
 type TileCanvas = OffscreenCanvas | HTMLCanvasElement;
 export type TileCtx = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
@@ -27,9 +30,14 @@ export interface TileRange {
   y1: number;
 }
 
-// paints what lies in box. it calls open() only when there is something to
-// draw, open hands out the tile canvas already set to world units
-export type Paint = (box: Box, open: () => TileCtx) => void;
+// the drawing of one tile. draw puts up to count more items on the tile
+// (set to world units) and says when it is through
+export interface TileJob {
+  draw(ctx: TileCtx, count: number): boolean;
+}
+
+// what lies in box at scale, null when there is nothing to draw
+export type Paint = (box: Box, scale: number) => TileJob | null;
 
 export function tileKey(tx: number, ty: number): number {
   return (tx + 1048576) * 2097152 + (ty + 1048576);
@@ -55,20 +63,31 @@ export function visibleTiles(cam: Camera, viewW: number, viewH: number, scale: n
   return out;
 }
 
-function makeCanvas(): TileCanvas {
-  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(TILE, TILE);
+function makeCanvas(size = TILE): TileCanvas {
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(size, size);
   const canvas = document.createElement('canvas');
-  canvas.width = TILE;
-  canvas.height = TILE;
+  canvas.width = size;
+  canvas.height = size;
   return canvas;
+}
+
+function inRange(tile: Tile, r: TileRange): boolean {
+  return tile.tx >= r.x0 && tile.tx <= r.x1 && tile.ty >= r.y0 && tile.ty <= r.y1;
 }
 
 export class TileLayer {
   scale = 0;
   private tiles = new Map<number, Tile>();
-  // the tiles of the scale before a zoom, shown stretched until the new
-  // ones are ready
-  private old: { scale: number; tiles: Map<number, Tile> } | null = null;
+  // tiles half way through their drawing, they only show once complete
+  private pending = new Map<number, { tile: Tile; job: TileJob }>();
+  // a copy of the screen from when the scale changed. it is shown
+  // stretched where the new tiles are not ready yet
+  private old: { x: number; y: number; scale: number } | null = null;
+  private oldCanvas: TileCanvas | null = null;
+  private oldCtx: TileCtx | null = null;
+  // the camera of the last compose, so the copy knows where it was taken
+  private shown: Camera = { x: 0, y: 0, zoom: 1 };
+  private shownScale = 0;
   private pool: TileCanvas[] = [];
   private canvases = 0;
   private stamp = 0;
@@ -76,17 +95,34 @@ export class TileLayer {
   private range: TileRange = { x0: 0, y0: 0, x1: -1, y1: -1 };
   private ring: TileRange = { x0: 0, y0: 0, x1: -1, y1: -1 };
   private scratch: TileRange = { x0: 0, y0: 0, x1: -1, y1: -1 };
+  private sink: TileCtx | null = null;
 
   constructor(private paint: Paint) {}
 
   get busy(): boolean {
-    return this.old !== null;
+    return this.old !== null || this.pending.size > 0;
   }
 
-  setScale(scale: number) {
+  // screen is the layer canvas, still showing the last frame
+  setScale(scale: number, screen: CanvasRenderingContext2D) {
     if (scale === this.scale) return;
-    if (this.old) this.releaseAll(this.tiles);
-    else if (this.tiles.size > 0) this.old = { scale: this.scale, tiles: this.tiles };
+    this.dropPending();
+    if (this.shownScale > 0 && (this.tiles.size > 0 || this.old)) {
+      const { width, height } = screen.canvas;
+      if (!this.oldCanvas || this.oldCanvas.width !== width || this.oldCanvas.height !== height) {
+        this.oldCanvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(width, height) : makeCanvas();
+        this.oldCanvas.width = width;
+        this.oldCanvas.height = height;
+        this.oldCtx = this.oldCanvas.getContext('2d') as TileCtx;
+      }
+      const ctx = this.oldCtx!;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(screen.canvas, 0, 0);
+      this.old = { x: this.shown.x, y: this.shown.y, scale: this.shownScale };
+    }
+    this.releaseAll(this.tiles);
     this.tiles = new Map();
     this.scale = scale;
   }
@@ -124,24 +160,24 @@ export class TileLayer {
       }
     }
 
-    // nearest to the middle first, at least one per frame so it never stalls
+    // nearest to the middle first, at least one step per frame so it never stalls
     const midX = (range.x0 + range.x1) / 2;
     const midY = (range.y0 + range.y1) / 2;
-    let rendered = 0;
-    while (missing.length > 0 && (rendered === 0 || performance.now() < deadline)) {
+    let first = true;
+    while (missing.length > 0 && (first || performance.now() < deadline)) {
+      first = false;
       const i = this.nearest(missing, midX, midY);
-      const tile = this.render(missing[i], missing[i + 1]);
+      const tile = this.work(missing[i], missing[i + 1], deadline);
+      if (!tile) break;
       missing.splice(i, 2);
       this.blit(ctx, tile, cam, target);
-      rendered++;
     }
 
-    if (missing.length > 0) {
-      this.drawOld(ctx, cam, target);
-    } else if (this.old) {
-      this.releaseAll(this.old.tiles);
-      this.old = null;
-    }
+    if (missing.length > 0) this.drawOld(ctx, cam, target);
+    else this.old = null;
+    this.shown.x = cam.x;
+    this.shown.y = cam.y;
+    this.shownScale = target;
 
     let more = missing.length > 0;
     if (!more && prefetch) more = this.prefetch(deadline);
@@ -150,49 +186,118 @@ export class TileLayer {
   }
 
   // a new stroke goes straight into the tiles that are already there
-  drawInto(box: Box, draw: (ctx: TileCtx) => void) {
+  drawInto(box: Box, draw: (ctx: TileCtx, scale: number) => void) {
+    this.dropPending(box);
     this.each(this.tiles, this.scale, box, (tile) => {
       const ctx = this.open(tile, this.scale);
       ctx.save();
-      draw(ctx);
+      draw(ctx, this.scale);
       ctx.restore();
     });
     const old = this.old;
-    if (old) {
-      this.each(old.tiles, old.scale, box, (tile) => {
-        const ctx = this.open(tile, old.scale);
-        ctx.save();
-        draw(ctx);
-        ctx.restore();
-      });
+    if (old && this.oldCtx) {
+      const ctx = this.oldCtx;
+      ctx.save();
+      ctx.setTransform(old.scale, 0, 0, old.scale, -old.x * old.scale, -old.y * old.scale);
+      draw(ctx, old.scale);
+      ctx.restore();
     }
   }
 
   // tiles on screen are rendered again right away so nothing flickers,
   // the others are dropped and come back when needed
   invalidate(box: Box) {
+    this.dropPending(box);
     const range = this.range;
     this.each(this.tiles, this.scale, box, (tile) => {
       this.release(tile);
       this.tiles.delete(tileKey(tile.tx, tile.ty));
-      if (tile.tx >= range.x0 && tile.tx <= range.x1 && tile.ty >= range.y0 && tile.ty <= range.y1) {
-        this.render(tile.tx, tile.ty).used = this.stamp;
-      }
+      if (inRange(tile, range)) this.work(tile.tx, tile.ty, Infinity);
     });
+    // the copy loses what changed, the fresh tiles cover the hole
     const old = this.old;
-    if (old) {
-      this.each(old.tiles, old.scale, box, (tile) => {
-        this.release(tile);
-        old.tiles.delete(tileKey(tile.tx, tile.ty));
-      });
+    if (old && this.oldCtx) {
+      const ctx = this.oldCtx;
+      const x = (box.minX - old.x) * old.scale;
+      const y = (box.minY - old.y) * old.scale;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(x - 1, y - 1, (box.maxX - box.minX) * old.scale + 2, (box.maxY - box.minY) * old.scale + 2);
+    }
+  }
+
+  // a new canvas costs a few ms the first time it is drawn on, so some are
+  // made ahead in idle time and a stroke on an empty spot never waits
+  reserve() {
+    while (this.pool.length < SPARE) {
+      const canvas = makeCanvas();
+      const ctx = canvas.getContext('2d') as TileCtx;
+      ctx.fillRect(0, 0, 1, 1);
+      ctx.clearRect(0, 0, 1, 1);
+      this.pool.push(canvas);
     }
   }
 
   clear() {
+    this.dropPending();
     this.releaseAll(this.tiles);
     this.tiles = new Map();
-    if (this.old) this.releaseAll(this.old.tiles);
     this.old = null;
+  }
+
+  // starts or goes on with the drawing of a tile. returns the tile once it
+  // is complete, null while it still needs more frames
+  private work(tx: number, ty: number, deadline: number): Tile | null {
+    const key = tileKey(tx, ty);
+    let entry = this.pending.get(key);
+    if (!entry) {
+      const span = TILE / this.scale;
+      const job = this.paint({ minX: tx * span, minY: ty * span, maxX: (tx + 1) * span, maxY: (ty + 1) * span }, this.scale);
+      const tile: Tile = { tx, ty, canvas: null, ctx: null, used: this.stamp };
+      if (!job) {
+        this.tiles.set(key, tile);
+        return tile;
+      }
+      entry = { tile, job };
+    }
+    const { tile, job } = entry;
+    let done = false;
+    if (deadline === Infinity) {
+      done = job.draw(this.open(tile, this.scale), Infinity);
+    } else {
+      // canvas draws lazily, so after each chunk the tile is made to
+      // rasterize and the clock sees what it really cost
+      while (!done) {
+        done = job.draw(this.open(tile, this.scale), CHUNK);
+        this.flush(tile);
+        if (performance.now() >= deadline) break;
+      }
+    }
+    tile.used = this.stamp;
+    if (!done) {
+      this.pending.set(key, entry);
+      return null;
+    }
+    this.pending.delete(key);
+    this.tiles.set(key, tile);
+    return tile;
+  }
+
+  private flush(tile: Tile) {
+    if (!tile.canvas) return;
+    if (!this.sink) this.sink = makeCanvas(1).getContext('2d') as TileCtx;
+    // clearing first lets the canvas forget the copies of earlier flushes
+    this.sink.clearRect(0, 0, 1, 1);
+    this.sink.drawImage(tile.canvas, 0, 0, 1, 1);
+  }
+
+  private dropPending(box?: Box) {
+    if (this.pending.size === 0) return;
+    const r = box ? tilesFor(box, this.scale, this.scratch) : null;
+    for (const [key, { tile }] of this.pending) {
+      if (r && !inRange(tile, r)) continue;
+      this.release(tile);
+      this.pending.delete(key);
+    }
   }
 
   private each(map: Map<number, Tile>, scale: number, box: Box, fn: (tile: Tile) => void) {
@@ -201,7 +306,7 @@ export class TileLayer {
     const found: Tile[] = [];
     if (count > map.size) {
       for (const tile of map.values()) {
-        if (tile.tx >= r.x0 && tile.tx <= r.x1 && tile.ty >= r.y0 && tile.ty <= r.y1) found.push(tile);
+        if (inRange(tile, r)) found.push(tile);
       }
     } else {
       for (let ty = r.y0; ty <= r.y1; ty++) {
@@ -236,30 +341,38 @@ export class TileLayer {
     else ctx.drawImage(tile.canvas, x, y, (TILE * target) / this.scale, (TILE * target) / this.scale);
   }
 
-  // the stretched tiles of the old scale, only where new ones are missing
+  // the copy of the old screen, stretched to the camera, only where new
+  // tiles are missing. one piece per tile, a clip of many rects is slow
   private drawOld(ctx: CanvasRenderingContext2D, cam: Camera, target: number) {
     const old = this.old;
-    if (!old) return;
+    const canvas = this.oldCanvas;
+    if (!old || !canvas) return;
     const span = TILE / this.scale;
     const size = (TILE * target) / this.scale;
-    ctx.save();
-    ctx.beginPath();
+    const k = old.scale / target;
     for (let i = 0; i < this.missing.length; i += 2) {
-      ctx.rect((this.missing[i] * span - cam.x) * target, (this.missing[i + 1] * span - cam.y) * target, size, size);
+      let dx = (this.missing[i] * span - cam.x) * target;
+      let dy = (this.missing[i + 1] * span - cam.y) * target;
+      let dw = size;
+      let dh = size;
+      let sx = (dx / target + cam.x - old.x) * old.scale;
+      let sy = (dy / target + cam.y - old.y) * old.scale;
+      // keep the source inside the copy, the target shrinks with it
+      if (sx < 0) {
+        dx -= sx / k;
+        dw += sx / k;
+        sx = 0;
+      }
+      if (sy < 0) {
+        dy -= sy / k;
+        dh += sy / k;
+        sy = 0;
+      }
+      dw = Math.min(dw, (canvas.width - sx) / k);
+      dh = Math.min(dh, (canvas.height - sy) / k);
+      if (dw <= 0 || dh <= 0) continue;
+      ctx.drawImage(canvas, sx, sy, dw * k, dh * k, dx, dy, dw, dh);
     }
-    ctx.clip();
-    const oldSpan = TILE / old.scale;
-    const oldSize = (TILE * target) / old.scale;
-    const w = ctx.canvas.width;
-    const h = ctx.canvas.height;
-    for (const tile of old.tiles.values()) {
-      if (!tile.canvas) continue;
-      const x = (tile.tx * oldSpan - cam.x) * target;
-      const y = (tile.ty * oldSpan - cam.y) * target;
-      if (x > w || y > h || x + oldSize < 0 || y + oldSize < 0) continue;
-      ctx.drawImage(tile.canvas, x, y, oldSize, oldSize);
-    }
-    ctx.restore();
   }
 
   // one ring of tiles around the view, so a small scroll finds them ready
@@ -275,20 +388,10 @@ export class TileLayer {
         if (tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1) continue;
         if (this.tiles.has(tileKey(tx, ty))) continue;
         if (performance.now() >= deadline) return true;
-        this.render(tx, ty).used = this.stamp;
+        this.work(tx, ty, deadline);
       }
     }
     return false;
-  }
-
-  private render(tx: number, ty: number): Tile {
-    const span = TILE / this.scale;
-    const tile: Tile = { tx, ty, canvas: null, ctx: null, used: this.stamp };
-    const box = { minX: tx * span, minY: ty * span, maxX: (tx + 1) * span, maxY: (ty + 1) * span };
-    const scale = this.scale;
-    this.paint(box, () => this.open(tile, scale));
-    this.tiles.set(tileKey(tx, ty), tile);
-    return tile;
   }
 
   private open(tile: Tile, scale: number): TileCtx {
