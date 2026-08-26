@@ -6,7 +6,7 @@ type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 // the highlighter layer is laid over the paper with this opacity, so
 // overlapping marks never get darker
-export const HIGHLIGHTER_ALPHA = 0.4;
+export const HIGHLIGHTER_ALPHA = 0.5;
 
 const PAGE_BORDER = '#2e2e33';
 
