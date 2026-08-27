@@ -20,13 +20,17 @@ export interface PageData {
   meta: PageMeta;
   items: Item[];
   tree: RBush<Entry>;
+  // false while the items are still in storage, the page shows only its paper
+  ready: boolean;
 }
 
 export type DocChange =
   | { type: 'items'; pageId: string; box: Box; added: Item[]; removed: Item[]; append: boolean }
   | { type: 'pages' }
   | { type: 'paper'; pageId: string }
-  | { type: 'name' };
+  | { type: 'name' }
+  // the items of a page came in from storage, nothing was changed
+  | { type: 'loaded'; pageId: string; box: Box };
 
 // page sizes in points, like a pdf
 export const PAGE_POINTS: Record<PageSize, { w: number; h: number }> = {
@@ -74,21 +78,24 @@ function entryOf(item: Item): Entry | undefined {
   return derived(item).entry;
 }
 
-export function newPageData(meta: PageMeta, items: Item[] = []): PageData {
+export function newPageData(meta: PageMeta, items: Item[] = [], ready = true): PageData {
   const tree = new RBush<Entry>(16);
   tree.load(items.map(makeEntry));
-  return { meta, items, tree };
+  return { meta, items, tree, ready };
 }
 
 export class Doc {
   notebook: Notebook;
-  private loaded = new Map<string, PageData>();
+  private pages = new Map<string, PageData>();
   private unordered = new Set<PageData>();
   private listeners = new Set<(change: DocChange) => void>();
 
-  constructor(notebook: Notebook, items: Record<string, Item[]> = {}) {
+  // items null means they are still in storage and come in through fill()
+  constructor(notebook: Notebook, items: Record<string, Item[]> | null = {}) {
     this.notebook = notebook;
-    for (const meta of notebook.pages) this.loaded.set(meta.id, newPageData(meta, items[meta.id]));
+    if (items) {
+      for (const meta of notebook.pages) this.pages.set(meta.id, newPageData(meta, items[meta.id]));
+    }
   }
 
   get kind(): NotebookKind {
@@ -99,19 +106,42 @@ export class Doc {
     return this.notebook.pages.length;
   }
 
+  // a page that is not loaded yet shows up empty until its items arrive
   page(id: string): PageData | undefined {
-    return this.loaded.get(id);
+    const page = this.pages.get(id);
+    if (page) return page;
+    const meta = this.notebook.pages.find((p) => p.id === id);
+    return meta ? this.placeholder(meta) : undefined;
   }
 
-  // a page that is not loaded yet shows up empty until its items arrive
   pageAt(index: number): PageData {
     const meta = this.notebook.pages[index];
-    let page = this.loaded.get(meta.id);
-    if (!page) {
-      page = newPageData(meta);
-      this.loaded.set(meta.id, page);
-    }
+    return this.pages.get(meta.id) ?? this.placeholder(meta);
+  }
+
+  isReady(id: string): boolean {
+    return this.pages.get(id)?.ready ?? false;
+  }
+
+  private placeholder(meta: PageMeta): PageData {
+    const page = newPageData(meta, [], false);
+    this.pages.set(meta.id, page);
     return page;
+  }
+
+  // the items of a page arrive from storage. ink that went on the page while
+  // it was on its way stays on top
+  fill(pageId: string, items: Item[]) {
+    const page = this.page(pageId);
+    if (!page || page.ready) return;
+    page.items = page.items.length > 0 ? items.concat(page.items) : items;
+    page.tree.clear();
+    page.tree.load(page.items.map(makeEntry));
+    this.unordered.delete(page);
+    page.ready = true;
+    const box = emptyBox();
+    for (const item of items) growBox(box, itemBox(item));
+    this.emit({ type: 'loaded', pageId, box });
   }
 
   indexOf(pageId: string): number {
@@ -124,7 +154,7 @@ export class Doc {
   }
 
   private emit(change: DocChange) {
-    this.notebook.updatedAt = Date.now();
+    if (change.type !== 'loaded') this.notebook.updatedAt = Date.now();
     for (const fn of this.listeners) fn(change);
   }
 
@@ -132,7 +162,7 @@ export class Doc {
   // the indices count in the array as it is afterwards. returns where the
   // removed items were, so the change can be undone
   changeItems(pageId: string, remove: Item[], insert: Placed[]): Placed[] {
-    const page = this.loaded.get(pageId);
+    const page = this.page(pageId);
     if (!page) return [];
     const box = emptyBox();
     const removed: Placed[] = [];
@@ -185,7 +215,7 @@ export class Doc {
   }
 
   addItems(pageId: string, items: Item[]) {
-    const page = this.loaded.get(pageId);
+    const page = this.page(pageId);
     if (!page) return;
     const start = page.items.length;
     this.changeItems(
@@ -208,7 +238,7 @@ export class Doc {
   }
 
   insertPage(index: number, page: PageData) {
-    this.loaded.set(page.meta.id, page);
+    this.pages.set(page.meta.id, page);
     this.notebook.pages.splice(index, 0, page.meta);
     this.emit({ type: 'pages' });
   }
@@ -216,7 +246,7 @@ export class Doc {
   removePage(index: number): PageData {
     const page = this.pageAt(index);
     this.notebook.pages.splice(index, 1);
-    this.loaded.delete(page.meta.id);
+    this.pages.delete(page.meta.id);
     this.emit({ type: 'pages' });
     return page;
   }
@@ -228,9 +258,9 @@ export class Doc {
   }
 
   setPaper(pageId: string, paper: Paper) {
-    const page = this.loaded.get(pageId);
-    if (!page) return;
-    page.meta.paper = { ...paper };
+    const meta = this.notebook.pages.find((p) => p.id === pageId);
+    if (!meta) return;
+    meta.paper = { ...paper };
     this.emit({ type: 'paper', pageId });
   }
 

@@ -60,6 +60,25 @@ describe('doc', () => {
     const all = page().tree.all().sort((a, b) => a.z - b.z);
     expect(all.map((e) => e.item)).toEqual(items);
   });
+
+  it('fills a page from storage under the ink drawn while it loaded', () => {
+    const doc = new Doc(newNotebook('paper', 'Test', SETUP), null);
+    const pageId = doc.notebook.pages[0].id;
+    expect(doc.isReady(pageId)).toBe(false);
+    const changes: DocChange[] = [];
+    doc.on((c) => changes.push(c));
+    const early = stroke(50, 50);
+    doc.addItems(pageId, [early]);
+    const stored = [stroke(0, 0), stroke(10, 10)];
+    doc.fill(pageId, stored);
+    expect(doc.isReady(pageId)).toBe(true);
+    expect(doc.page(pageId)!.items).toEqual([...stored, early]);
+    expect(doc.page(pageId)!.tree.all()).toHaveLength(3);
+    expect(changes.map((c) => c.type)).toEqual(['items', 'loaded']);
+    // a second fill is ignored
+    doc.fill(pageId, []);
+    expect(doc.page(pageId)!.items).toHaveLength(3);
+  });
 });
 
 describe('history', () => {
