@@ -44,7 +44,12 @@ export interface ViewHooks {
   // the scroll position of a paper notebook, as shares of the whole. a
   // size of 1 means it all fits
   scroll?: (start: number, size: number) => void;
+  // the pages on screen and two on each side, they should be in memory
+  near?: (first: number, last: number) => void;
 }
+
+// pages around the view that get loaded before they come in sight
+const NEAR = 2;
 
 function makeCanvas(host: HTMLElement, name: string): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
@@ -105,6 +110,7 @@ export class CanvasView {
   private shownPage = -1;
   private shownScroll = -1;
   private shownSize = -1;
+  private shownNear = '';
   // idle work: are the outlines near the view built, and the pending callback
   private warm = false;
   private idle: (() => void) | null = null;
@@ -169,6 +175,8 @@ export class CanvasView {
     this.board = 0;
     this.boardId = '';
     this.cameras.clear();
+    this.shownNear = '';
+    this.shownPage = -1;
     this.relayout();
     this.redrawAll();
     this.home();
@@ -509,11 +517,22 @@ export class CanvasView {
       if (marks) this.hlDirty = true;
       if (ink) this.inkDirty = true;
       this.requestFrame();
+    } else if (change.type === 'loaded') {
+      const index = this.doc.indexOf(change.pageId);
+      if (index < 0 || change.box.minX > change.box.maxX) return;
+      if (this.isBoard && index !== this.board) return;
+      this.warm = false;
+      const box = moveBox(change.box, this.pageX(index), this.pageY(index));
+      this.hlLayer.drop(box);
+      this.inkLayer.drop(box);
+      this.inkDirty = this.hlDirty = true;
+      this.requestFrame();
     } else if (change.type === 'pages') {
       this.relayout();
       this.redrawAll();
       this.setCamera(this.cam);
       this.shownPage = -1;
+      this.shownNear = '';
     } else if (change.type === 'paper') {
       // the ink color follows the paper, so the page is drawn again
       const index = this.doc.indexOf(change.pageId);
@@ -681,6 +700,7 @@ export class CanvasView {
       }
       this.hooks.state?.();
     }
+    this.reportNear();
     if (!this.hooks.scroll) return;
     let start = 0;
     let size = 1;
@@ -695,5 +715,22 @@ export class CanvasView {
       this.shownSize = size;
       this.hooks.scroll(start, size);
     }
+  }
+
+  private reportNear() {
+    if (!this.hooks.near || this.doc.pageCount === 0) return;
+    let first = this.board;
+    let last = this.board;
+    if (!this.isBoard) {
+      const [from, to] = visiblePages(this.rects, this.cam.y, this.cam.y + this.height / this.cam.zoom);
+      first = from;
+      last = to - 1;
+    }
+    first = Math.max(0, first - NEAR);
+    last = Math.min(this.doc.pageCount - 1, last + NEAR);
+    const key = `${first}:${last}`;
+    if (key === this.shownNear) return;
+    this.shownNear = key;
+    this.hooks.near(first, last);
   }
 }
