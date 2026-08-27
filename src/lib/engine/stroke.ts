@@ -58,6 +58,31 @@ export function mapPressure(raw: number, sensitivity: number): number {
   return Math.max(0.05, Math.min(1, p));
 }
 
+// points on a centripetal catmull-rom curve from b to c, about step apart,
+// for samples that came in far apart. a and d are the neighbours, b and c
+// themselves are not added. centripetal never loops or overshoots on a zigzag
+export function curveBetween(a: number[], b: number[], c: number[], d: number[], step: number, out: number[][]) {
+  const dist = Math.hypot(c[0] - b[0], c[1] - b[1]);
+  const n = Math.ceil(dist / step);
+  if (n < 2) return;
+  const t1 = Math.max(1e-4, Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])));
+  const t2 = t1 + Math.max(1e-4, Math.sqrt(dist));
+  const t3 = t2 + Math.max(1e-4, Math.sqrt(Math.hypot(d[0] - c[0], d[1] - c[1])));
+  for (let i = 1; i < n; i++) {
+    const t = t1 + ((t2 - t1) * i) / n;
+    const p = [0, 0, b[2] + ((c[2] - b[2]) * i) / n];
+    for (let k = 0; k < 2; k++) {
+      const a1 = ((t1 - t) * a[k] + t * b[k]) / t1;
+      const a2 = ((t2 - t) * b[k] + (t - t1) * c[k]) / (t2 - t1);
+      const a3 = ((t3 - t) * c[k] + (t - t2) * d[k]) / (t3 - t2);
+      const b1 = ((t2 - t) * a1 + t * a2) / t2;
+      const b2 = ((t3 - t) * a2 + (t - t1) * a3) / (t3 - t1);
+      p[k] = ((t2 - t) * b1 + (t - t1) * b2) / (t2 - t1);
+    }
+    out.push(p);
+  }
+}
+
 export function scaledPoints(pts: Float32Array): number[][] {
   const out: number[][] = new Array(pts.length / 3);
   for (let i = 0, j = 0; i < pts.length; i += 3, j++) {

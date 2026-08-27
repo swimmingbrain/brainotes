@@ -1,7 +1,7 @@
 import { itemBox } from '../bounds';
 import { newId } from '../doc';
 import { inkColor, isDark } from '../render';
-import { followFactor, mapPressure, outlineOf, PENS, PF_SCALE, strokePath, traceOutline } from '../stroke';
+import { curveBetween, followFactor, mapPressure, outlineOf, PENS, PF_SCALE, strokePath, traceOutline } from '../stroke';
 import type { Box, PenType, Stroke } from '../types';
 import type { CanvasView } from '../view';
 import type { PointerKind, Sample, Tool } from './tool';
@@ -18,6 +18,12 @@ export interface PenSettings {
 // css pixels per ms where a mouse or finger line is at its thinnest
 const FAST = 2.5;
 
+// p mirrored away from q, a made up neighbour for the ends of a line so
+// the curve leaves them at full speed
+function mirror(p: number[], q: number[]): number[] {
+  return [p[0] * 2 - q[0], p[1] * 2 - q[1], p[2]];
+}
+
 export class PenTool implements Tool {
   private on = false;
   private page = -1;
@@ -29,10 +35,14 @@ export class PenTool implements Tool {
   private size = 2;
   private follow = 0.66;
   private sensitivity = 0.5;
-  // smoothed points in scaled page units. the newest point stays raw in
-  // tip, so the line always reaches the pen
+  // all in scaled page units. keys are the smoothed samples, pts the line
+  // so far with curved points filled in where samples were far apart (it
+  // ends one key short, that gap is curved once the next key is known).
+  // the newest sample stays raw in tip, so the line always reaches the pen
+  private keys: number[][] = [];
   private pts: number[][] = [];
   private tip: number[] | null = null;
+  private step = 4;
   private tail: number[][] = [];
   private pressure = 0.5;
   private zeroStart = false;
@@ -65,6 +75,10 @@ export class PenTool implements Tool {
     this.size = set.size;
     this.follow = followFactor(set.smoothing);
     this.sensitivity = set.pressure;
+    // filled in points about half a pen width apart, closer ones the
+    // outline drops anyway
+    this.step = Math.max(0.75, set.size * 0.6) * PF_SCALE;
+    this.keys = [];
     this.pts = [];
     this.tip = null;
     this.tail = [];
@@ -87,7 +101,16 @@ export class PenTool implements Tool {
     if (!this.on) return;
     this.on = false;
     this.tail = [];
-    const all = this.tip ? [...this.pts, this.tip] : this.pts;
+    // the raw end becomes the last key and the last gaps get their curve
+    const keys = this.keys;
+    if (this.tip) this.addKey(this.tip);
+    const m = keys.length - 1;
+    if (m >= 1) {
+      const before = m >= 2 ? keys[m - 2] : mirror(keys[m - 1], keys[m]);
+      curveBetween(before, keys[m - 1], keys[m], mirror(keys[m], keys[m - 1]), this.step, this.pts);
+      this.pts.push(keys[m]);
+    }
+    const all = this.pts;
     const pts = new Float32Array(all.length * 3);
     for (let i = 0; i < all.length; i++) {
       pts[i * 3] = all[i][0] / PF_SCALE;
@@ -166,7 +189,7 @@ export class PenTool implements Tool {
       this.pressure = first ? p : this.pressure + (p - this.pressure) * 0.5;
       if (this.zeroStart && !first) {
         // some pens report 0 on the first sample, it takes the second one's
-        this.pts[0][2] = this.pressure;
+        this.keys[0][2] = this.pressure;
         this.zeroStart = false;
       }
     } else if (!first) {
@@ -180,15 +203,17 @@ export class PenTool implements Tool {
 
     const point = this.toPage(s, this.pressure);
     if (first) {
+      this.keys.push(point);
       this.pts.push(point);
     } else {
       // the old tip moves into the line, pulled towards it as much as the
-      // smoothing allows
+      // smoothing allows. smoothing is for the small jitter of a slow hand,
+      // a fast move far from the last sample has none and should not lag
       const tip = this.tip;
       if (tip) {
-        const prev = this.pts[this.pts.length - 1];
-        const f = this.follow;
-        this.pts.push([prev[0] + (tip[0] - prev[0]) * f, prev[1] + (tip[1] - prev[1]) * f, tip[2]]);
+        const prev = this.keys[this.keys.length - 1];
+        const f = this.follow + (1 - this.follow) * Math.min(1, Math.max(0, (dist - 3) / 12));
+        this.addKey([prev[0] + (tip[0] - prev[0]) * f, prev[1] + (tip[1] - prev[1]) * f, tip[2]]);
       }
       this.tip = point;
     }
@@ -199,9 +224,25 @@ export class PenTool implements Tool {
     this.request();
   }
 
+  // with the newest key known, the gap before the one ahead of it gets its curve
+  private addKey(key: number[]) {
+    const keys = this.keys;
+    keys.push(key);
+    const n = keys.length - 1;
+    if (n < 2) return;
+    const before = n >= 3 ? keys[n - 3] : mirror(keys[n - 2], keys[n - 1]);
+    curveBetween(before, keys[n - 2], keys[n - 1], key, this.step, this.pts);
+    this.pts.push(keys[n - 1]);
+  }
+
   private drawStroke(ctx: CanvasRenderingContext2D): Box | null {
     const pts = this.pts;
     let extra = 0;
+    // the newest key is not in pts yet
+    if (this.keys.length > 1) {
+      pts.push(this.keys[this.keys.length - 1]);
+      extra++;
+    }
     if (this.tip) {
       pts.push(this.tip);
       extra++;
