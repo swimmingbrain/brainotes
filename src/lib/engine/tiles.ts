@@ -225,6 +225,16 @@ export class TileLayer {
     }
   }
 
+  // forgets the tiles in box, the frames render them again in their budget.
+  // for ink that arrives from storage, where nothing on screen goes away
+  drop(box: Box) {
+    this.dropPending(box);
+    this.each(this.tiles, this.scale, box, (tile) => {
+      this.release(tile);
+      this.tiles.delete(tileKey(tile.tx, tile.ty));
+    });
+  }
+
   // a new canvas costs a few ms the first time it is drawn on, so some are
   // made ahead in idle time and a stroke on an empty spot never waits
   reserve() {
