@@ -233,9 +233,19 @@ export interface NotebookSummary {
   modifiedAt: number;
 }
 
-export const notebookOpen = writable(true);
-export const notebookName = writable('My notes');
+export interface PageInfo {
+  id: string;
+  w: number;
+  h: number;
+}
+
+// true until the library is read and the last notebook is open again
+export const starting = writable(true);
+export const notebookOpen = writable(false);
+export const notebookId = writable('');
+export const notebookName = writable('');
 export const notebookKind = writable<NotebookKind>('paper');
+export const pageList = writable<PageInfo[]>([]);
 export const paperStyle = writable<PaperStyle>(get(preferences).paper.style);
 export const zoomPercent = writable(100);
 export const pageIndex = writable(0);
