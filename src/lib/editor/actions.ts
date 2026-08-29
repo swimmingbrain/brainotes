@@ -12,11 +12,16 @@ export interface Actions {
   zoomReset: () => void;
   newPage: () => void;
   deletePage: (index: number) => void;
+  duplicatePage: (index: number) => void;
   movePage: (from: number, to: number) => void;
   goToPage: (index: number) => void;
   nextPage: () => void;
   previousPage: () => void;
+  // the page on screen
   setPaperStyle: (style: PaperStyle) => void;
+  setPagePaper: (index: number, style: PaperStyle) => void;
+  // the paper of page index goes on every page
+  paperOnAllPages: (index: number) => void;
   deleteSelection: () => void;
   duplicateSelection: () => void;
   recolorSelection: (color: string) => void;
@@ -49,11 +54,14 @@ export const actions: Actions = {
   zoomReset: nothing,
   newPage: nothing,
   deletePage: nothing,
+  duplicatePage: nothing,
   movePage: nothing,
   goToPage: nothing,
   nextPage: nothing,
   previousPage: nothing,
   setPaperStyle: (style) => paperStyle.set(style),
+  setPagePaper: nothing,
+  paperOnAllPages: nothing,
   deleteSelection: nothing,
   duplicateSelection: nothing,
   recolorSelection: nothing,
