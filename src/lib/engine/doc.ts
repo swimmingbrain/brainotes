@@ -84,6 +84,20 @@ export function newPageData(meta: PageMeta, items: Item[] = [], ready = true): P
   return { meta, items, tree, ready };
 }
 
+// the same item under a new id, nothing shared with the original
+export function copyItem(item: Item): Item {
+  if (item.type === 'stroke') return { ...item, id: newId(), pts: item.pts.slice() };
+  if (item.type === 'image' && item.source) return { ...item, id: newId(), source: { ...item.source } };
+  return { ...item, id: newId() };
+}
+
+// for duplicating a page: same size, paper, background and ink
+export function copyPage(page: PageData): PageData {
+  const meta: PageMeta = { ...page.meta, id: newId(), paper: { ...page.meta.paper } };
+  if (page.meta.pdf) meta.pdf = { ...page.meta.pdf };
+  return newPageData(meta, page.items.map(copyItem));
+}
+
 export class Doc {
   notebook: Notebook;
   private pages = new Map<string, PageData>();
