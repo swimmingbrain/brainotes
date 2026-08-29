@@ -108,6 +108,8 @@ export class Saver {
   };
 
   private async write(final: boolean) {
+    // a deleted notebook must not come back with a late write
+    if (this.closed) return;
     const notebook = this.doc.notebook;
     const ids = notebook.pages.map((p) => p.id);
     const current = new Set(ids);
