@@ -1,39 +1,52 @@
 import { get } from 'svelte/store';
 import { actions, plugActions } from './actions';
 import type { ToolId } from './tools';
-import { Doc, newId, newNotebook, newPageData, newPageMeta, type DocChange } from '$lib/engine/doc';
+import { copyPage, Doc, newId, newPageData, newPageMeta, type DocChange, type PageData } from '$lib/engine/doc';
 import { History, type Op } from '$lib/engine/history';
 import { Input, penIsDown } from '$lib/engine/input';
 import { EraserTool } from '$lib/engine/tools/eraser';
 import { HandTool } from '$lib/engine/tools/hand';
 import { PenTool } from '$lib/engine/tools/pen';
+import type { PageMeta } from '$lib/engine/types';
 import { CanvasView } from '$lib/engine/view';
+import * as storage from '$lib/storage/db';
+import type { PageLoader } from '$lib/storage/loader';
+import type { Saver } from '$lib/storage/saver';
 import {
   activeTool,
-  addToast,
   history as historyState,
   inputType,
   itemCount,
+  notebookId,
   notebookKind,
   notebookName,
-  notebookOpen,
   pageCount,
   pageIndex,
+  pageList,
   paperStyle,
   toolOptions,
   zoomPercent,
-  type NotebookKind,
   type ToolOptions
 } from '$lib/stores/app';
-import { preferences, type Preferences } from '$lib/stores/preferences';
+import { preferences, type PaperStyle, type Preferences } from '$lib/stores/preferences';
 
-// in dev the view is reachable from the console and from browser tests
+// the open notebook with what keeps it in storage
+export interface Session {
+  doc: Doc;
+  loader: PageLoader;
+  saver: Saver;
+}
+
+// in dev the open notebook is reachable from the console and from browser tests
 declare global {
   interface Window {
     brainotes?: {
-      view: CanvasView;
+      readonly view: CanvasView | null;
       readonly doc: Doc | null;
       readonly history: History | null;
+      readonly loader: PageLoader | null;
+      readonly saver: Saver | null;
+      storage: typeof storage;
       newId: () => string;
       actions: typeof actions;
     };
@@ -41,7 +54,8 @@ declare global {
 }
 
 // the open notebook lives here, outside of any component, so closing the
-// canvas and opening it again keeps it. storage takes over in a later step
+// canvas and opening it again keeps it
+let session: Session | null = null;
 let doc: Doc | null = null;
 let history: History | null = null;
 let view: CanvasView | null = null;
@@ -70,6 +84,10 @@ function syncPage() {
   syncCount();
 }
 
+function syncPages() {
+  pageList.set(doc ? doc.notebook.pages.map((p) => ({ id: p.id, w: p.w, h: p.h })) : []);
+}
+
 function syncHistory() {
   historyState.set({ canUndo: history?.canUndo ?? false, canRedo: history?.canRedo ?? false });
   syncCount();
@@ -80,24 +98,48 @@ function onDocChange(change: DocChange) {
   // change that brings them up to date
   if (change.type === 'items') {
     if (!penIsDown()) syncCount();
+  } else if (change.type === 'loaded') {
+    syncCount();
   } else if (change.type === 'name') {
     notebookName.set(doc?.notebook.name ?? '');
+  } else if (change.type === 'pages') {
+    syncPages();
+    syncPage();
   } else {
     syncPage();
   }
 }
 
-function startNotebook(kind: NotebookKind, name: string) {
-  doc = new Doc(newNotebook(kind, name, prefs.paper));
-  history = new History(doc);
-  history.onchange = syncHistory;
+// a notebook from the library takes over the canvas, null closes it
+export function showNotebook(next: Session | null) {
   offDoc?.();
-  offDoc = doc.on(onDocChange);
-  notebookKind.set(kind);
-  notebookName.set(name);
-  view?.setDoc(doc, history);
+  offDoc = null;
+  session = next;
+  doc = next?.doc ?? null;
+  history = doc ? new History(doc) : null;
+  if (doc && history) {
+    history.onchange = syncHistory;
+    offDoc = doc.on(onDocChange);
+    notebookId.set(doc.notebook.id);
+    notebookKind.set(doc.kind);
+    notebookName.set(doc.notebook.name);
+    view?.setDoc(doc, history);
+  } else {
+    notebookId.set('');
+  }
   syncHistory();
+  syncPages();
   syncPage();
+}
+
+export function openDoc(): Doc | null {
+  return doc;
+}
+
+// a page with all its items, read from storage when it is not in memory yet
+export async function loadPage(id: string): Promise<PageData | undefined> {
+  if (!session) return undefined;
+  return session.loader.ensure(id);
 }
 
 // after an undo or redo the change should be in sight
@@ -135,13 +177,14 @@ export function scrollCanvas(fraction: number) {
 }
 
 export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: number) => void): () => void {
-  if (!doc || !history) startNotebook('paper', 'My notes');
-  const v = new CanvasView(host, doc!, history!, {
+  if (!doc || !history) return () => {};
+  const v = new CanvasView(host, doc, history, {
     state: () => {
       zoomPercent.set(Math.round(v.cam.zoom * 100));
       syncPage();
     },
-    scroll: onscroll
+    scroll: onscroll,
+    near: (first, last) => session?.loader.near(first, last)
   });
   view = v;
 
@@ -171,30 +214,101 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
       tool = t;
       input.toolChanged();
     }),
-    toolOptions.subscribe((o) => (options = o)),
-    preferences.subscribe((p) => (prefs = p))
+    toolOptions.subscribe((o) => (options = o))
   ];
-
-  if (import.meta.env.DEV) {
-    window.brainotes = {
-      view: v,
-      get doc() {
-        return doc;
-      },
-      get history() {
-        return history;
-      },
-      newId,
-      actions
-    };
-  }
 
   return () => {
     for (const unsub of unsubs) unsub();
     input.destroy();
     v.destroy();
     if (view === v) view = null;
-    if (import.meta.env.DEV) delete window.brainotes;
+  };
+}
+
+// a new page looks like the one on screen, without its pdf
+function blankLike(meta: PageMeta | undefined): PageData {
+  if (!doc || !meta) return newPageData(newPageMeta(doc?.kind ?? 'paper', prefs.paper));
+  return newPageData({ id: newId(), w: meta.w, h: meta.h, paper: { ...meta.paper } });
+}
+
+// the undo of a page op keeps the page in memory, so its ink has to be
+// read before the page can go
+async function deletePage(index: number) {
+  const d = doc;
+  const h = history;
+  const meta = d?.notebook.pages[index];
+  if (!d || !h || !meta) return;
+  const page = await loadPage(meta.id);
+  const at = d.indexOf(meta.id);
+  if (d !== doc || !page?.ready || at < 0) return;
+  if (d.pageCount === 1) {
+    // the last page makes room for a fresh one
+    const fresh = newPageData(newPageMeta(d.kind, prefs.paper));
+    h.run({
+      type: 'batch',
+      ops: [
+        { type: 'page-remove', index: 0, page },
+        { type: 'page-add', index: 0, page: fresh }
+      ]
+    });
+    return;
+  }
+  h.run({ type: 'page-remove', index: at, page });
+}
+
+async function duplicatePage(index: number) {
+  const d = doc;
+  const h = history;
+  const meta = d?.notebook.pages[index];
+  if (!d || !h || !meta) return;
+  const page = await loadPage(meta.id);
+  const at = d.indexOf(meta.id);
+  if (d !== doc || !page?.ready || at < 0) return;
+  h.run({ type: 'page-add', index: at + 1, page: copyPage(page) });
+  view?.goToPage(at + 1);
+}
+
+function setPagePaper(index: number, style: PaperStyle) {
+  const meta = doc?.notebook.pages[index];
+  if (!history || !meta || meta.paper.style === style) return;
+  history.run({ type: 'paper', pageId: meta.id, before: { ...meta.paper }, after: { ...meta.paper, style } });
+}
+
+function paperOnAllPages(index: number) {
+  const source = doc?.notebook.pages[index];
+  if (!doc || !history || !source) return;
+  const paper = source.paper;
+  const ops: Op[] = [];
+  for (const meta of doc.notebook.pages) {
+    const p = meta.paper;
+    if (p.style === paper.style && p.spacing === paper.spacing && p.color === paper.color) continue;
+    ops.push({ type: 'paper', pageId: meta.id, before: { ...p }, after: { ...paper } });
+  }
+  if (ops.length > 0) history.run({ type: 'batch', ops });
+}
+
+preferences.subscribe((p) => (prefs = p));
+
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  window.brainotes = {
+    get view() {
+      return view;
+    },
+    get doc() {
+      return doc;
+    },
+    get history() {
+      return history;
+    },
+    get loader() {
+      return session?.loader ?? null;
+    },
+    get saver() {
+      return session?.saver ?? null;
+    },
+    storage,
+    newId,
+    actions
   };
 }
 
@@ -214,17 +328,11 @@ plugActions({
     if (!doc || !history) return;
     // after the page on screen, a board gets a fresh board and goes there
     const index = doc.pageCount === 0 ? 0 : current() + 1;
-    history.run({ type: 'page-add', index, page: newPageData(newPageMeta(doc.kind, prefs.paper)) });
+    history.run({ type: 'page-add', index, page: blankLike(doc.notebook.pages[current()]) });
     view?.goToPage(index);
   },
-  deletePage: (index) => {
-    if (!doc || !history || index < 0 || index >= doc.pageCount) return;
-    if (doc.pageCount === 1) {
-      addToast(doc.kind === 'board' ? 'A whiteboard keeps at least one board' : 'A notebook keeps at least one page');
-      return;
-    }
-    history.run({ type: 'page-remove', index, page: doc.pageAt(index) });
-  },
+  deletePage: (index) => void deletePage(index),
+  duplicatePage: (index) => void duplicatePage(index),
   movePage: (from, to) => {
     if (!doc || !history || from === to) return;
     if (from < 0 || to < 0 || from >= doc.pageCount || to >= doc.pageCount) return;
@@ -235,18 +343,8 @@ plugActions({
   nextPage: () => view?.goToPage(current() + 1),
   previousPage: () => view?.goToPage(current() - 1),
   setPaperStyle: (style) => {
-    if (!doc || !history || doc.pageCount === 0) return;
-    const meta = doc.notebook.pages[current()];
-    if (meta.paper.style === style) return;
-    history.run({ type: 'paper', pageId: meta.id, before: { ...meta.paper }, after: { ...meta.paper, style } });
+    if (doc && doc.pageCount > 0) setPagePaper(current(), style);
   },
-  newNotebook: (kind) => {
-    startNotebook(kind, kind === 'board' ? 'Whiteboard' : 'My notes');
-    notebookOpen.set(true);
-  },
-  renameNotebook: (name, id) => {
-    if (id) return;
-    doc?.rename(name);
-    notebookName.set(name);
-  }
+  setPagePaper,
+  paperOnAllPages
 });
