@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Doc, newNotebook, newPageData, newPageMeta, type DocChange, type PaperSetup } from './doc';
+import { copyPage, Doc, newNotebook, newPageData, newPageMeta, type DocChange, type PaperSetup } from './doc';
 import { History, HISTORY_LIMIT } from './history';
 import type { Stroke } from './types';
 
@@ -78,6 +78,37 @@ describe('doc', () => {
     // a second fill is ignored
     doc.fill(pageId, []);
     expect(doc.page(pageId)!.items).toHaveLength(3);
+  });
+
+  it('duplicates a page with new ids and its own copy of the ink', () => {
+    const { doc, history, pageId, page } = setup();
+    const ink = [stroke(0, 0), stroke(30, 30)];
+    doc.addItems(pageId, ink);
+    doc.setPaper(pageId, { style: 'grid', spacing: 16, color: 'dark' });
+    page().meta.pdf = { assetId: 'a1', page: 4, x: 0, y: 0, w: 595, h: 842 };
+
+    const copy = copyPage(page());
+    expect(copy.meta.id).not.toBe(pageId);
+    expect(copy.meta.paper).toEqual(page().meta.paper);
+    expect(copy.meta.paper).not.toBe(page().meta.paper);
+    expect(copy.meta.pdf).toEqual(page().meta.pdf);
+    expect(copy.ready).toBe(true);
+    expect(copy.items).toHaveLength(2);
+    copy.items.forEach((item, i) => {
+      const original = ink[i];
+      expect(item.id).not.toBe(original.id);
+      if (item.type !== 'stroke') throw new Error('not a stroke');
+      expect(Array.from(item.pts)).toEqual(Array.from(original.pts));
+      expect(item.pts).not.toBe(original.pts);
+      expect({ ...item, id: '', pts: null }).toEqual({ ...original, id: '', pts: null });
+    });
+    expect(copy.tree.all()).toHaveLength(2);
+
+    history.run({ type: 'page-add', index: 1, page: copy });
+    expect(doc.notebook.pages.map((p) => p.id)).toEqual([pageId, copy.meta.id]);
+    history.undo();
+    expect(doc.pageCount).toBe(1);
+    expect(page().items).toEqual(ink);
   });
 });
 
