@@ -2,10 +2,17 @@
   import Logo from './Logo.svelte';
   import Icon from './Icon.svelte';
   import { actions } from '$lib/editor/actions';
+  import { notebookMenu } from '$lib/editor/commands';
   import { countPages, timeAgo } from '$lib/format';
-  import { library } from '$lib/stores/app';
+  import { contextMenu, library, type NotebookSummary } from '$lib/stores/app';
 
-  const recents = $derived([...$library].sort((a, b) => b.modifiedAt - a.modifiedAt).slice(0, 6));
+  // with nothing open this is the whole library, newest first
+  const recents = $derived([...$library].sort((a, b) => b.modifiedAt - a.modifiedAt));
+
+  function openMenu(e: MouseEvent, notebook: NotebookSummary) {
+    e.preventDefault();
+    contextMenu.set({ x: e.clientX, y: e.clientY, items: notebookMenu(notebook) });
+  }
 </script>
 
 <div class="welcome-state">
@@ -32,13 +39,18 @@
     {#if recents.length > 0}
       <div class="recents">
         <h2 class="recents-heading">Recent</h2>
-        {#each recents as recent (recent.id)}
-          <button class="recent" onclick={() => actions.openNotebook(recent.id)}>
-            <Icon name={recent.kind === 'board' ? 'board' : 'notebook'} size={14} />
-            <span class="recent-name">{recent.name}</span>
-            <span class="recent-when">{countPages(recent.pageCount, recent.kind)} &middot; {timeAgo(recent.modifiedAt)}</span>
-          </button>
-        {/each}
+        <div class="recents-list">
+          {#each recents as recent (recent.id)}
+            <button
+              class="recent"
+              onclick={() => actions.openNotebook(recent.id)}
+              oncontextmenu={(e) => openMenu(e, recent)}>
+              <Icon name={recent.kind === 'board' ? 'board' : 'notebook'} size={14} />
+              <span class="recent-name">{recent.name}</span>
+              <span class="recent-when">{countPages(recent.pageCount, recent.kind)} &middot; {timeAgo(recent.modifiedAt)}</span>
+            </button>
+          {/each}
+        </div>
       </div>
     {/if}
 
@@ -141,6 +153,11 @@
     color: var(--text-muted);
     padding: 6px 10px;
     border-bottom: 1px solid var(--border);
+  }
+
+  .recents-list {
+    max-height: 264px;
+    overflow-y: auto;
   }
 
   .recent {
