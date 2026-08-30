@@ -13,6 +13,7 @@
     notebookOpen,
     saveState,
     showLeftTab,
+    starting,
     workspace,
     WORKSPACES,
     type MenuItem
@@ -47,7 +48,7 @@
           class:failed={$saveState === 'failed'}
           title={saveTitles[$saveState]}></span>
       </div>
-    {:else}
+    {:else if !$starting}
       <span class="filename muted">No notebook</span>
     {/if}
   </div>
@@ -65,7 +66,12 @@
   </div>
 
   <div class="topbar-actions">
-    <button class="action-btn" onclick={() => showLeftTab('notebooks')} title="Your notebooks in this browser">
+    <!-- with nothing open the start screen is the library -->
+    <button
+      class="action-btn"
+      onclick={() => showLeftTab('notebooks')}
+      disabled={!$notebookOpen}
+      title="Your notebooks in this browser">
       <Icon name="library" size={14} />
       <span>Library</span>
     </button>

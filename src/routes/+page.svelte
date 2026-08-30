@@ -15,8 +15,9 @@
   import DropOverlay from '$lib/ui/DropOverlay.svelte';
   import { buildCommands } from '$lib/editor/commands';
   import { installShortcuts } from '$lib/editor/shortcuts';
+  import { startLibrary } from '$lib/editor/library';
   import { watchFullscreen } from '$lib/editor/present';
-  import { MIN_LEFT, MIN_RIGHT, notebookName, notebookOpen, panels, updatePanels } from '$lib/stores/app';
+  import { MIN_LEFT, MIN_RIGHT, notebookName, notebookOpen, panels, starting, updatePanels } from '$lib/stores/app';
   import { preferences } from '$lib/stores/preferences';
 
   const RAIL = 34;
@@ -61,7 +62,9 @@
   onMount(() => {
     const removeShortcuts = installShortcuts();
     const removeFullscreen = watchFullscreen();
+    const stopLibrary = startLibrary();
     return () => {
+      stopLibrary();
       removeFullscreen();
       removeShortcuts();
     };
@@ -98,6 +101,8 @@
         </div>
       {/if}
     </main>
+  {:else if $starting}
+    <div class="main-area"></div>
   {:else}
     <Welcome />
   {/if}
