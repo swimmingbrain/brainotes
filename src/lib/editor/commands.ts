@@ -11,7 +11,9 @@ import {
   toggleLeftPanel,
   toggleRightPanel,
   workspace,
-  WORKSPACES
+  WORKSPACES,
+  type MenuItem,
+  type NotebookSummary
 } from '$lib/stores/app';
 import type { PaperStyle } from '$lib/stores/preferences';
 
@@ -32,6 +34,31 @@ export const PAPER_STYLES: { id: PaperStyle; label: string }[] = [
 
 export function renameNotebook() {
   dialog.set({ kind: 'rename', target: 'notebook', name: get(notebookName) });
+}
+
+export function confirmDeleteNotebook(notebook: NotebookSummary) {
+  const what = notebook.kind === 'board' ? 'boards' : 'pages';
+  dialog.set({
+    kind: 'confirm',
+    title: notebook.kind === 'board' ? 'Delete whiteboard' : 'Delete notebook',
+    message: `"${notebook.name}" goes away with all its ${what}. This can't be undone.`,
+    confirm: 'Delete',
+    danger: true,
+    onconfirm: () => actions.deleteNotebook(notebook.id)
+  });
+}
+
+// the menu of a notebook in the library and on the start screen
+export function notebookMenu(notebook: NotebookSummary): MenuItem[] {
+  return [
+    { label: 'Open', action: () => actions.openNotebook(notebook.id) },
+    {
+      label: 'Rename',
+      action: () => dialog.set({ kind: 'rename', target: 'notebook', id: notebook.id, name: notebook.name })
+    },
+    { separator: true, label: '' },
+    { label: 'Delete', danger: true, action: () => confirmDeleteNotebook(notebook) }
+  ];
 }
 
 // everything the palette lists. the shortcut strings are for people, the
@@ -62,6 +89,7 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
     c('new-page', 'New page', 'Pages', () => actions.newPage(), 'Ctrl+Enter'),
     c('next-page', 'Next page', 'Pages', () => actions.nextPage(), 'PageDown'),
     c('previous-page', 'Previous page', 'Pages', () => actions.previousPage(), 'PageUp'),
+    c('duplicate-page', 'Duplicate this page', 'Pages', () => actions.duplicatePage(get(pageIndex))),
     c('delete-page', 'Delete this page', 'Pages', () => actions.deletePage(get(pageIndex))),
 
     // edit
