@@ -27,7 +27,8 @@ export type Dialog =
   | { kind: 'preferences'; category?: PreferencesCategory }
   | { kind: 'shortcuts' }
   // no id means the notebook that is open right now
-  | { kind: 'rename'; target: 'notebook'; id?: string; name: string };
+  | { kind: 'rename'; target: 'notebook'; id?: string; name: string }
+  | { kind: 'confirm'; title: string; message: string; confirm: string; danger?: boolean; onconfirm: () => void };
 
 export const dialog = writable<Dialog | null>(null);
 

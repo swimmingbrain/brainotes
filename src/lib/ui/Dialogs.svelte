@@ -2,6 +2,7 @@
   import PreferencesDialog from './dialogs/PreferencesDialog.svelte';
   import ShortcutsDialog from './dialogs/ShortcutsDialog.svelte';
   import RenameDialog from './dialogs/RenameDialog.svelte';
+  import ConfirmDialog from './dialogs/ConfirmDialog.svelte';
   import { dialog } from '$lib/stores/app';
 
   // every dialog the app can open, in one switch, so the page never has to
@@ -19,6 +20,14 @@
       <ShortcutsDialog onclose={close} />
     {:else if $dialog.kind === 'rename'}
       <RenameDialog id={$dialog.id} name={$dialog.name} onclose={close} />
+    {:else if $dialog.kind === 'confirm'}
+      <ConfirmDialog
+        title={$dialog.title}
+        message={$dialog.message}
+        confirm={$dialog.confirm}
+        danger={$dialog.danger}
+        onconfirm={$dialog.onconfirm}
+        onclose={close} />
     {/if}
   {/key}
 {/if}
