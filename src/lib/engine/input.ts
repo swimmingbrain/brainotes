@@ -4,6 +4,11 @@ import type { CanvasView } from './view';
 
 let drawing = false;
 
+// ms of finger movement that count for the speed of a fling
+const TRACK = 100;
+// px per ms, a slower lift just stops
+const MIN_FLING = 0.3;
+
 // true while a pen, a mouse or a finger is putting something on the page.
 // heavy work (pdf pages, far tiles, thumbnails, saving) waits for it
 export function penIsDown(): boolean {
@@ -39,6 +44,8 @@ export class Input {
   private active: { id: number; tool: Tool; kind: PointerKind } | null = null;
   private touches = new Map<number, { x: number; y: number }>();
   private gesture: Gesture | null = null;
+  // where the fingers were lately, for the speed they had when they lifted
+  private track: { x: number; y: number; t: number }[] = [];
   private raw: boolean;
   // some pointers never send raw updates, then pointermove has the samples
   private rawSeen = false;
@@ -99,6 +106,8 @@ export class Input {
   private ondown = (e: PointerEvent) => {
     const kind = kindOf(e);
     this.hooks.kind?.(kind);
+    // the page stands still before anything lands on it
+    this.view.settle();
     const focused = document.activeElement;
     if (focused instanceof HTMLElement) focused.blur();
 
@@ -183,8 +192,12 @@ export class Input {
 
   private finish(e: PointerEvent, cancel: boolean) {
     if (this.touches.delete(e.pointerId) && this.gesture) {
-      if (this.touches.size > 0) this.startGesture();
-      else this.gesture = null;
+      if (this.touches.size > 0) {
+        this.startGesture();
+      } else {
+        this.gesture = null;
+        if (!cancel) this.flingOut();
+      }
     }
     const active = this.active;
     if (!active || e.pointerId !== active.id) return;
@@ -221,11 +234,17 @@ export class Input {
       this.view.zoomAt(e.clientX - this.view.left, e.clientY - this.view.top, this.view.cam.zoom * factor);
       return;
     }
+    // a mouse wheel moves in whole steps of 100 or so and those glide, a
+    // touchpad sends small pixel steps that follow the fingers directly
+    const stepped =
+      e.deltaMode !== 0 ||
+      ((dx === 0 || dy === 0) && Math.abs(dx + dy) >= 50 && Number.isInteger(dx) && Number.isInteger(dy));
     if (e.shiftKey && dx === 0) {
       dx = dy;
       dy = 0;
     }
-    this.view.panBy(-dx, -dy);
+    if (stepped) this.view.glide(-dx, -dy);
+    else this.view.panBy(-dx, -dy);
   };
 
   private centre(): { x: number; y: number; dist: number } {
@@ -240,6 +259,7 @@ export class Input {
 
   // every time a finger comes or goes the gesture starts over from here
   private startGesture() {
+    this.track = [];
     const c = this.centre();
     const cam = this.view.cam;
     this.gesture = { cam: { ...cam }, wx: cam.x + c.x / cam.zoom, wy: cam.y + c.y / cam.zoom, dist: c.dist };
@@ -255,5 +275,23 @@ export class Input {
       this.view.fitted = false;
     }
     this.view.setCamera({ x: g.wx - c.x / zoom, y: g.wy - c.y / zoom, zoom });
+    const now = performance.now();
+    this.track.push({ x: c.x, y: c.y, t: now });
+    while (this.track.length > 2 && now - this.track[0].t > TRACK) this.track.shift();
+  }
+
+  // a pan that was still moving when the fingers lifted goes on for a bit
+  private flingOut() {
+    const track = this.track;
+    this.track = [];
+    if (track.length < 2) return;
+    const first = track[0];
+    const last = track[track.length - 1];
+    const dt = last.t - first.t;
+    // fingers that stood still before they lifted do not throw the page
+    if (dt < 10 || performance.now() - last.t > 60) return;
+    const vx = (last.x - first.x) / dt;
+    const vy = (last.y - first.y) / dt;
+    if (Math.hypot(vx, vy) >= MIN_FLING) this.view.fling(vx, vy);
   }
 }
