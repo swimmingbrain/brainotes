@@ -1,61 +1,134 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import { actions } from '$lib/editor/actions';
-  import { PAGE_SIZES, paperPattern } from '$lib/editor/paper';
-  import { contextMenu, notebookKind, pageCount, pageIndex, paperStyle } from '$lib/stores/app';
-  import { preferences } from '$lib/stores/preferences';
+  import { openDoc } from '$lib/editor/canvas';
+  import { PAPER_STYLES } from '$lib/editor/commands';
+  import { Thumbs } from '$lib/editor/thumbs';
+  import { contextMenu, notebookKind, pageIndex, pageList } from '$lib/stores/app';
 
-  const pages = $derived(Array.from({ length: $pageCount }, (_, i) => i));
+  const thumbs = new Thumbs();
+  $effect(() => () => thumbs.destroy());
+
+  let list = $state<HTMLDivElement | null>(null);
+  // the page being dragged and the gap it would land in, -1 while no drag
+  let dragFrom = $state(-1);
+  let dropAt = $state(-1);
+
   const board = $derived($notebookKind === 'board');
-  // boards are wide, paper pages follow the page size from the preferences
-  const ratio = $derived(board ? 10 / 16 : PAGE_SIZES[$preferences.paper.size].ratio);
-  const background = $derived(paperPattern($paperStyle, $preferences.paper.color, 8));
+  const word = $derived(board ? 'board' : 'page');
+  const Word = $derived(board ? 'Board' : 'Page');
+
+  function thumb(canvas: HTMLCanvasElement, id: string) {
+    thumbs.add(canvas, id, canvas.closest('.pages'));
+    return {
+      destroy: () => thumbs.remove(canvas)
+    };
+  }
+
+  // the list keeps the page on screen in sight while the notes scroll
+  $effect(() => {
+    const index = $pageIndex;
+    if (!list || dragFrom >= 0) return;
+    const el = list.querySelectorAll('.page')[index];
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const box = list.getBoundingClientRect();
+    if (r.top < box.top) list.scrollTop += r.top - box.top - 8;
+    else if (r.bottom > box.bottom) list.scrollTop += r.bottom - box.bottom + 8;
+  });
 
   function openMenu(e: MouseEvent, index: number) {
     e.preventDefault();
+    const style = openDoc()?.notebook.pages[index]?.paper.style;
+    const last = $pageList.length - 1;
     contextMenu.set({
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: 'Go to page', action: () => actions.goToPage(index) },
-        { label: 'New page', shortcut: 'Ctrl+Enter', action: () => actions.newPage() },
-        { separator: true, label: '' },
+        { label: `Duplicate ${word}`, action: () => actions.duplicatePage(index) },
         { label: 'Move up', disabled: index === 0, action: () => actions.movePage(index, index - 1) },
-        { label: 'Move down', disabled: index === $pageCount - 1, action: () => actions.movePage(index, index + 1) },
+        { label: 'Move down', disabled: index === last, action: () => actions.movePage(index, index + 1) },
         { separator: true, label: '' },
-        { label: 'Delete page', danger: true, action: () => actions.deletePage(index) }
+        {
+          label: 'Paper',
+          children: PAPER_STYLES.map((paper) => ({
+            label: paper.label,
+            checked: style === paper.id,
+            action: () => actions.setPagePaper(index, paper.id)
+          }))
+        },
+        { label: `Use this paper on all ${word}s`, disabled: last === 0, action: () => actions.paperOnAllPages(index) },
+        { separator: true, label: '' },
+        { label: `Delete ${word}`, danger: true, action: () => actions.deletePage(index) }
       ]
     });
   }
+
+  function ondragstart(e: DragEvent, index: number) {
+    dragFrom = index;
+    if (!e.dataTransfer) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', `${Word} ${index + 1}`);
+  }
+
+  // over a gap or the add button the last gap stays marked
+  function ondragover(e: DragEvent) {
+    if (dragFrom < 0) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    const page = (e.target as Element).closest<HTMLElement>('.page');
+    if (!page) return;
+    const index = Number(page.dataset.index);
+    const r = page.getBoundingClientRect();
+    dropAt = e.clientY < r.top + r.height / 2 ? index : index + 1;
+  }
+
+  function ondrop(e: DragEvent) {
+    if (dragFrom < 0) return;
+    e.preventDefault();
+    const from = dragFrom;
+    const at = dropAt;
+    dragFrom = -1;
+    dropAt = -1;
+    if (at < 0) return;
+    const to = at > from ? at - 1 : at;
+    if (to !== from) actions.movePage(from, to);
+  }
+
+  function ondragend() {
+    dragFrom = -1;
+    dropAt = -1;
+  }
 </script>
 
-{#if $pageCount === 0}
-  <div class="empty">
-    <Icon name="page" size={22} />
-    <p class="empty-title">No pages yet</p>
-    <button class="empty-btn" onclick={() => actions.newPage()}>
-      <Icon name="plus" size={13} />
-      Add a page
-    </button>
-  </div>
-{:else}
-  <div class="pages">
-    {#each pages as index (index)}
+<div class="pages" bind:this={list} {ondragover} {ondrop} role="list">
+  {#each $pageList as page, index (page.id)}
+    <div
+      class="page"
+      class:active={index === $pageIndex}
+      class:dragged={index === dragFrom}
+      class:drop-before={dropAt === index && dragFrom >= 0}
+      class:drop-after={dropAt === index + 1 && index === $pageList.length - 1 && dragFrom >= 0}
+      data-index={index}
+      role="listitem">
       <button
-        class="page"
-        class:active={index === $pageIndex}
+        class="sheet"
+        draggable="true"
         onclick={() => actions.goToPage(index)}
         oncontextmenu={(e) => openMenu(e, index)}
-        title="{board ? 'Board' : 'Page'} {index + 1}">
-        <span class="sheet" style="aspect-ratio: 1 / {ratio}; background: {background}"></span>
-        <span class="number">{index + 1}</span>
+        ondragstart={(e) => ondragstart(e, index)}
+        {ondragend}
+        title="{Word} {index + 1}"
+        aria-label="{Word} {index + 1}">
+        <canvas use:thumb={page.id} style="aspect-ratio: {page.w} / {page.h}"></canvas>
       </button>
-    {/each}
-    <button class="add" onclick={() => actions.newPage()} title="New page (Ctrl+Enter)">
-      <Icon name="plus" size={14} />
-    </button>
-  </div>
-{/if}
+      <span class="number">{index + 1}</span>
+    </div>
+  {/each}
+  <button class="add" onclick={() => actions.newPage()} title="New {word} (Ctrl+Enter)" aria-label="New {word}">
+    <Icon name="plus" size={14} />
+  </button>
+</div>
 
 <style>
   .pages {
@@ -70,28 +143,60 @@
   }
 
   .page {
+    position: relative;
     width: 100%;
     max-width: 150px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 5px;
+    flex-shrink: 0;
   }
 
   .sheet {
     display: block;
     width: 100%;
+    padding: 0;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    background: var(--bg-hover);
     border: 1px solid var(--border);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   }
 
-  .page:hover .sheet {
+  .sheet:hover canvas {
     border-color: var(--text-muted);
   }
 
-  .page.active .sheet {
+  .page.active canvas {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+
+  .page.dragged {
+    opacity: 0.4;
+  }
+
+  /* the gap a dragged page would land in */
+  .page.drop-before::before,
+  .page.drop-after::after {
+    content: '';
+    position: absolute;
+    left: -6px;
+    right: -6px;
+    height: 2px;
+    background: var(--accent);
+  }
+
+  .page.drop-before::before {
+    top: -6px;
+  }
+
+  .page.drop-after::after {
+    bottom: -6px;
   }
 
   .number {
@@ -119,38 +224,5 @@
   .add:hover {
     color: var(--accent);
     border-color: var(--accent);
-  }
-
-  .empty {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 24px 16px;
-    color: var(--text-muted);
-    text-align: center;
-  }
-
-  .empty-title {
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
-
-  .empty-btn {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 5px 10px;
-    font-size: 11.5px;
-    color: var(--text-secondary);
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-  }
-
-  .empty-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
   }
 </style>
