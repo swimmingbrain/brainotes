@@ -50,6 +50,12 @@ export interface ViewHooks {
 
 // pages around the view that get loaded before they come in sight
 const NEAR = 2;
+// ms, a wheel step glides most of its way in about three times this
+const GLIDE = 40;
+// ms, how fast a flung page slows down after the fingers lifted
+const FRICTION = 260;
+// px per ms, slower than this a fling has ended
+const FLING_STOP = 0.02;
 
 function makeCanvas(host: HTMLElement, name: string): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
@@ -111,6 +117,13 @@ export class CanvasView {
   private shownScroll = -1;
   private shownSize = -1;
   private shownNear = '';
+  // screen px a wheel step still has to move the pages, and the speed in
+  // px per ms of a touch pan that goes on after the fingers lifted
+  private glideX = 0;
+  private glideY = 0;
+  private flingX = 0;
+  private flingY = 0;
+  private movedAt = 0;
   // idle work: are the outlines near the view built, and the pending callback
   private warm = false;
   private idle: (() => void) | null = null;
@@ -175,6 +188,7 @@ export class CanvasView {
     this.board = 0;
     this.boardId = '';
     this.cameras.clear();
+    this.halt();
     this.shownNear = '';
     this.shownPage = -1;
     this.relayout();
@@ -244,6 +258,68 @@ export class CanvasView {
     this.setCamera({ x: x - dx / zoom, y: y - dy / zoom, zoom });
   }
 
+  // a mouse wheel step moves the pages by dx, dy in a short ease
+  glide(dx: number, dy: number) {
+    this.flingX = this.flingY = 0;
+    this.glideX += dx;
+    this.glideY += dy;
+    this.requestFrame();
+  }
+
+  // the pages keep moving at this speed (px per ms) and slow down
+  fling(vx: number, vy: number) {
+    this.glideX = this.glideY = 0;
+    this.flingX = vx;
+    this.flingY = vy;
+    this.movedAt = 0;
+    this.requestFrame();
+  }
+
+  // something touched the page: a glide lands where it was going right
+  // away, a fling stops where it is
+  settle() {
+    if (this.glideX !== 0 || this.glideY !== 0) this.panBy(this.glideX, this.glideY);
+    this.halt();
+  }
+
+  // a jump somewhere else drops what was left of a glide or a fling
+  private halt() {
+    this.glideX = this.glideY = this.flingX = this.flingY = 0;
+    this.movedAt = 0;
+  }
+
+  private get moving(): boolean {
+    return this.glideX !== 0 || this.glideY !== 0 || this.flingX !== 0 || this.flingY !== 0;
+  }
+
+  // one step of a glide or a fling, from the frame loop
+  private move(now: number) {
+    const dt = this.movedAt ? Math.min(50, now - this.movedAt) : 16;
+    this.movedAt = now;
+    const before = this.cam;
+    if (this.glideX !== 0 || this.glideY !== 0) {
+      const k = 1 - Math.exp(-dt / GLIDE);
+      let sx = this.glideX * k;
+      let sy = this.glideY * k;
+      if (Math.abs(this.glideX - sx) < 0.5 && Math.abs(this.glideY - sy) < 0.5) {
+        sx = this.glideX;
+        sy = this.glideY;
+      }
+      this.glideX -= sx;
+      this.glideY -= sy;
+      this.panBy(sx, sy);
+    } else {
+      this.panBy(this.flingX * dt, this.flingY * dt);
+      const decay = Math.exp(-dt / FRICTION);
+      this.flingX *= decay;
+      this.flingY *= decay;
+      // at the end of the pages there is nowhere left to go
+      if (Math.hypot(this.flingX, this.flingY) < FLING_STOP || this.cam === before) this.flingX = this.flingY = 0;
+    }
+    if (this.moving) this.requestFrame();
+    else this.movedAt = 0;
+  }
+
   zoomAt(sx: number, sy: number, zoom: number) {
     this.fitted = false;
     this.setCamera(zoomAt(this.cam, sx, sy, zoom));
@@ -278,6 +354,7 @@ export class CanvasView {
 
   goToPage(index: number) {
     if (index < 0 || index >= this.doc.pageCount) return;
+    this.halt();
     if (this.isBoard) {
       if (index === this.board) return;
       const id = this.doc.notebook.pages[this.board]?.id;
@@ -297,6 +374,7 @@ export class CanvasView {
   // fraction 0..1 of the whole scroll range, for the scroll indicator
   scrollTo(fraction: number) {
     if (this.isBoard) return;
+    this.halt();
     const m = MARGIN / this.cam.zoom;
     const total = this.content.h + m * 2;
     this.setCamera({ x: this.cam.x, y: this.content.y - m + fraction * total, zoom: this.cam.zoom });
@@ -554,6 +632,7 @@ export class CanvasView {
   private frame = () => {
     this.raf = 0;
     const start = performance.now();
+    if (this.moving) this.move(start);
     const tool = this.tool;
     tool?.frame?.();
     if (this.sizeDirty) this.applySize();
