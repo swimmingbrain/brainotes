@@ -5,10 +5,10 @@
   import PagesPanel from './PagesPanel.svelte';
   import NotebooksPanel from './NotebooksPanel.svelte';
   import { actions } from '$lib/editor/actions';
-  import { leftPanelTab, library, pageCount, type LeftPanelTab, type MenuItem } from '$lib/stores/app';
+  import { leftPanelTab, library, notebookId, notebookKind, pageCount, type LeftPanelTab, type MenuItem } from '$lib/stores/app';
 
   const tabs = $derived([
-    { id: 'pages', label: 'Pages', badge: $pageCount },
+    { id: 'pages', label: $notebookKind === 'board' ? 'Boards' : 'Pages', badge: $pageCount },
     { id: 'notebooks', label: 'Notebooks', badge: $library.length }
   ]);
 
@@ -22,7 +22,11 @@
   <PanelTabs {tabs} active={$leftPanelTab} onchange={(id) => leftPanelTab.set(id as LeftPanelTab)}>
     {#snippet right()}
       {#if $leftPanelTab === 'pages'}
-        <button class="head-btn" onclick={() => actions.newPage()} title="New page (Ctrl+Enter)" aria-label="New page">
+        <button
+          class="head-btn"
+          onclick={() => actions.newPage()}
+          title="New {$notebookKind === 'board' ? 'board' : 'page'} (Ctrl+Enter)"
+          aria-label="New page">
           <Icon name="plus" size={14} />
         </button>
       {:else}
@@ -38,7 +42,10 @@
   </PanelTabs>
   <div class="body">
     {#if $leftPanelTab === 'pages'}
-      <PagesPanel />
+      <!-- the thumbnails belong to one notebook, another one starts over -->
+      {#key $notebookId}
+        <PagesPanel />
+      {/key}
     {:else}
       <NotebooksPanel />
     {/if}
