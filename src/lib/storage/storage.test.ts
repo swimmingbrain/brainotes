@@ -2,9 +2,10 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Doc, newNotebook, newPageData, newPageMeta, type PaperSetup } from '$lib/engine/doc';
 import { History } from '$lib/engine/history';
-import type { Stroke } from '$lib/engine/types';
+import type { Item, Shape, Stroke } from '$lib/engine/types';
 import { deleteNotebook, getAsset, getNotebook, getPage, importNotebook, listAssets, listNotebooks, putAsset } from './db';
 import { PageLoader } from './loader';
+import { packItems, unpackItems } from './pack';
 import { SAVE_DELAY, Saver } from './saver';
 
 const SETUP: PaperSetup = { style: 'lines', spacing: 24, color: 'cream', size: 'a4' };
@@ -21,15 +22,46 @@ function stroke(x: number, y: number): Stroke {
   };
 }
 
+async function record(id: string, notebookId: string, items: Item[] = []) {
+  return { id, notebookId, ...(await packItems(items)) };
+}
+
+// what is in storage for a page, as items again
+async function stored(id: string): Promise<Item[] | undefined> {
+  const found = await getPage(id);
+  return found ? unpackItems(found) : undefined;
+}
+
 // a notebook with some pages, written to storage the way a new one is
 async function storedDoc(pages: number) {
   const notebook = newNotebook('paper', 'Test', SETUP);
   for (let i = 1; i < pages; i++) notebook.pages.push(newPageMeta('paper', SETUP));
   const doc = new Doc(notebook);
-  const records = notebook.pages.map((p) => ({ id: p.id, notebookId: notebook.id, items: [] }));
+  const records = await Promise.all(notebook.pages.map((p) => record(p.id, notebook.id)));
   await importNotebook(structuredClone(notebook), records);
   return { doc, ids: notebook.pages.map((p) => p.id) };
 }
+
+describe('pack', () => {
+  it('packs strokes and other items and unpacks them as they were', async () => {
+    const shape: Shape = { id: 'r1', type: 'shape', kind: 'rect', x1: 1, y1: 2, x2: 30, y2: 40, color: '#d63a3a', size: 2 };
+    const items: Item[] = [stroke(0, 0), shape, stroke(5, 5), stroke(9, 1)];
+    // a pause after every slice must not change the result
+    const packed = await packItems(items, () => Promise.resolve());
+    expect(packed.pts.size).toBe(27 * 4);
+    const back = await unpackItems(packed);
+    expect(back).toHaveLength(4);
+    expect(back[1]).toEqual(shape);
+    back.forEach((item, i) => {
+      const original = items[i];
+      if (item.type !== 'stroke' || original.type !== 'stroke') return;
+      expect(item.pts).toBeInstanceOf(Float32Array);
+      expect(Array.from(item.pts)).toEqual(Array.from(original.pts));
+      expect({ ...item, pts: null }).toEqual({ ...original, pts: null });
+    });
+    expect(await unpackItems(await packItems([]))).toEqual([]);
+  });
+});
 
 describe('storage', () => {
   it('reads back a notebook with its strokes', async () => {
@@ -37,7 +69,7 @@ describe('storage', () => {
     const pageId = doc.notebook.pages[0].id;
     const items = [stroke(0, 0), stroke(40, 80)];
     doc.addItems(pageId, items);
-    await importNotebook(doc.notebook, [{ id: pageId, notebookId: doc.notebook.id, items: doc.page(pageId)!.items }]);
+    await importNotebook(doc.notebook, [await record(pageId, doc.notebook.id, doc.page(pageId)!.items)]);
 
     const notebook = await getNotebook(doc.notebook.id);
     expect(notebook).toEqual(doc.notebook);
@@ -94,8 +126,8 @@ describe('saver', () => {
     await wait(saver);
     expect(saver.last).toEqual({ pages: [ids[1]], deleted: [], notebook: false });
     expect(saver.state).toBe('saved');
-    expect((await getPage(ids[1]))!.items).toHaveLength(2);
-    expect((await getPage(ids[0]))!.items).toHaveLength(0);
+    expect(await stored(ids[1])).toHaveLength(2);
+    expect(await stored(ids[0])).toHaveLength(0);
     saver.close();
   });
 
@@ -115,12 +147,12 @@ describe('saver', () => {
     history.run({ type: 'page-remove', index: 0, page: doc.pageAt(0) });
     await wait(saver);
     expect(saver.last).toEqual({ pages: [], deleted: [ids[0]], notebook: true });
-    expect(await getPage(ids[0])).toBeUndefined();
+    expect(await stored(ids[0])).toBeUndefined();
 
     history.undo();
     await wait(saver);
     expect(saver.last).toEqual({ pages: [ids[0]], deleted: [], notebook: true });
-    expect((await getPage(ids[0]))!.items).toHaveLength(1);
+    expect(await stored(ids[0])).toHaveLength(1);
     expect((await getNotebook(doc.notebook.id))!.pages.map((p) => p.id)).toEqual([ids[0], ids[1], added.meta.id]);
     saver.close();
   });
@@ -153,12 +185,12 @@ describe('saver', () => {
     await wait(saver);
     expect(saver.last).toBeNull();
     expect(saver.state).toBe('saving');
-    expect((await getPage(ids[0]))!.items).toHaveLength(2);
+    expect(await stored(ids[0])).toHaveLength(2);
 
     await new PageLoader(lazy).ensure(ids[0]);
     await wait(saver);
     expect(saver.last!.pages).toEqual([ids[0]]);
-    expect((await getPage(ids[0]))!.items.map((i) => i.id)).toEqual(lazy.page(ids[0])!.items.map((i) => i.id));
+    expect((await stored(ids[0]))!.map((i) => i.id)).toEqual(lazy.page(ids[0])!.items.map((i) => i.id));
     expect(saver.state).toBe('saved');
     saver.close();
   });
