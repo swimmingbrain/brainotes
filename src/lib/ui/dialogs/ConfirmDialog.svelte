@@ -17,9 +17,10 @@
     onclose: () => void;
   } = $props();
 
+  // the action first, closing takes the props away with the dialog
   function apply() {
-    onclose();
     onconfirm();
+    onclose();
   }
 </script>
 
