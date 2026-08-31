@@ -1,6 +1,8 @@
 import type { Doc, DocChange } from '$lib/engine/doc';
 import { penIsDown } from '$lib/engine/input';
+import type { Item } from '$lib/engine/types';
 import { writeChanges, type PageRecord } from './db';
+import { packItems } from './pack';
 
 export type SaveState = 'saved' | 'saving' | 'failed';
 
@@ -23,6 +25,17 @@ const RETRY = 5000;
 // new ink alone does not touch the notebook record, only its date is
 // refreshed now and then so the library knows when it was last changed
 const TOUCH_EVERY = 60000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// between two slices of packing a frame gets through, and while the pen
+// is down the packing waits
+async function breather() {
+  await sleep(0);
+  while (penIsDown()) await sleep(PEN_WAIT);
+}
 
 // writes the open notebook by itself. only the pages that changed are
 // written, the notebook record only when its page list, name or paper did
@@ -114,7 +127,7 @@ export class Saver {
     const ids = notebook.pages.map((p) => p.id);
     const current = new Set(ids);
     const deleted = [...this.stored].filter((id) => !current.has(id));
-    const pages: PageRecord[] = [];
+    const pages: { id: string; items: Item[] }[] = [];
     const later = new Set<string>();
     for (const id of ids) {
       if (this.stored.has(id) && !this.dirty.has(id)) continue;
@@ -124,7 +137,8 @@ export class Saver {
         later.add(id);
         continue;
       }
-      pages.push({ id, notebookId: notebook.id, items: page.items });
+      // new ink is pushed onto the same list, the copy stays as it is now
+      pages.push({ id, items: page.items.slice() });
     }
     const now = Date.now();
     const touch = this.touched && (final || now - this.touchedAt >= TOUCH_EVERY);
@@ -144,7 +158,15 @@ export class Saver {
       this.touchedAt = now;
     }
     try {
-      await writeChanges({ notebook: withNotebook ? notebook : undefined, pages, deleted });
+      const records: PageRecord[] = [];
+      for (const page of pages) {
+        // a flush packs in one go, the tab may be on its way out
+        const packed = await packItems(page.items, final ? undefined : breather);
+        records.push({ id: page.id, notebookId: notebook.id, ...packed });
+      }
+      // deleted while it was packing
+      if (this.closed) return;
+      await writeChanges({ notebook: withNotebook ? notebook : undefined, pages: records, deleted });
     } catch {
       for (const page of pages) this.dirty.add(page.id);
       if (withNotebook) this.notebookDirty = true;

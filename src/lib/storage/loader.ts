@@ -1,6 +1,8 @@
 import type { Doc, PageData } from '$lib/engine/doc';
 import { penIsDown } from '$lib/engine/input';
-import { getPages, type PageRecord } from './db';
+import type { Item } from '$lib/engine/types';
+import { getPages } from './db';
+import { unpackItems } from './pack';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,9 +50,10 @@ export class PageLoader {
   }
 
   private async read(ids: string[]) {
-    let records: (PageRecord | undefined)[];
+    let lists: Item[][];
     try {
-      records = await getPages(ids);
+      const records = await getPages(ids);
+      lists = await Promise.all(records.map((record) => (record ? unpackItems(record) : [])));
     } catch {
       // the pages stay as they are and the next try reads them again
       return;
@@ -58,6 +61,6 @@ export class PageLoader {
     // indexing a page full of ink is real work, it waits for the pen to lift
     while (penIsDown() && !this.closed) await sleep(100);
     if (this.closed) return;
-    ids.forEach((id, i) => this.doc.fill(id, records[i]?.items ?? []));
+    ids.forEach((id, i) => this.doc.fill(id, lists[i]));
   }
 }

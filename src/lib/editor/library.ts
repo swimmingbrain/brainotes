@@ -5,6 +5,7 @@ import { Doc, newNotebook } from '$lib/engine/doc';
 import type { Notebook, NotebookKind } from '$lib/engine/types';
 import { deleteNotebook, getNotebook, importNotebook, listNotebooks, putNotebook } from '$lib/storage/db';
 import { PageLoader } from '$lib/storage/loader';
+import { packItems } from '$lib/storage/pack';
 import { Saver } from '$lib/storage/saver';
 import {
   activeTool,
@@ -115,7 +116,8 @@ function hide() {
 
 async function create(kind: NotebookKind, name: string) {
   const notebook = newNotebook(kind, name, get(preferences).paper);
-  const pages = notebook.pages.map((p) => ({ id: p.id, notebookId: notebook.id, items: [] }));
+  const empty = await packItems([]);
+  const pages = notebook.pages.map((p) => ({ id: p.id, notebookId: notebook.id, ...empty }));
   await importNotebook(notebook, pages);
   library.update((list) => [summary(notebook), ...list]);
   start(notebook, true);

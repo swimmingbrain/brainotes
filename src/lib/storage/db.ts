@@ -1,10 +1,11 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Item, Notebook } from '$lib/engine/types';
+import type { Notebook } from '$lib/engine/types';
+import type { PackedItems } from './pack';
 
-export interface PageRecord {
+// the items of a page are packed, see pack.ts
+export interface PageRecord extends PackedItems {
   id: string;
   notebookId: string;
-  items: Item[];
 }
 
 export type AssetKind = 'pdf' | 'image';
