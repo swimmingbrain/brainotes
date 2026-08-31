@@ -186,19 +186,30 @@ export function drawSheet(
   );
 }
 
+export interface Frame {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 // a whole page with its ink, drawn at the top left of the canvas at scale
-// device pixels per unit. thumbnails and the png export use it
-export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number) {
-  const { w, h, paper } = page.meta;
+// device pixels per unit. a board has no edges, frame is the part of it to
+// draw. thumbnails and the png export use it
+export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
+  const paper = page.meta.paper;
+  const part = frame ?? { x: 0, y: 0, w: page.meta.w, h: page.meta.h };
   const dark = isDark(paper);
-  const width = Math.ceil(w * scale);
-  const height = Math.ceil(h * scale);
+  const width = Math.ceil(part.w * scale);
+  const height = Math.ceil(part.h * scale);
+  const ox = -part.x * scale;
+  const oy = -part.y * scale;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.fillStyle = PAPER_COLORS[paper.color].paper;
   ctx.fillRect(0, 0, width, height);
-  drawPattern(ctx, paper, 0, 0, scale, 0, 0, width, height);
+  drawPattern(ctx, paper, ox, oy, scale, 0, 0, width, height, frame !== undefined);
   ctx.beginPath();
   ctx.rect(0, 0, width, height);
   ctx.clip();
@@ -207,7 +218,7 @@ export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, sc
   if (marks.length > 0) {
     const layer = new OffscreenCanvas(width, height);
     const lctx = layer.getContext('2d')!;
-    lctx.setTransform(scale, 0, 0, scale, 0, 0);
+    lctx.setTransform(scale, 0, 0, scale, ox, oy);
     for (const item of marks) drawItem(lctx, item, dark, scale);
     ctx.globalAlpha = HIGHLIGHTER_ALPHA;
     ctx.globalCompositeOperation = dark ? 'source-over' : 'multiply';
@@ -215,7 +226,7 @@ export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, sc
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.setTransform(scale, 0, 0, scale, ox, oy);
   for (const item of page.items) {
     if (!isMarker(item)) drawItem(ctx, item, dark, scale);
   }
