@@ -1,4 +1,4 @@
-import { itemBox, moveBox } from './bounds';
+import { boxesTouch, emptyBox, growBox, itemBox, moveBox } from './bounds';
 import {
   clampCamera,
   contentRect,
@@ -14,10 +14,11 @@ import {
   type Camera,
   type Rect
 } from './camera';
-import type { Doc, DocChange, PageData } from './doc';
+import { imagesOf, type Doc, type DocChange, type PageData } from './doc';
 import type { History } from './history';
+import { onBitmap } from './images';
 import { penIsDown } from './input';
-import { drawItem, drawPattern, drawSheet, HIGHLIGHTER_ALPHA, isDark, isMarker } from './render';
+import { drawImageItem, drawItem, drawPattern, drawSheet, HIGHLIGHTER_ALPHA, isDark, isMarker } from './render';
 import { hasLine, hasPath, strokeLine, strokePath, THIN } from './stroke';
 import { TileLayer, type TileJob } from './tiles';
 import type { Tool } from './tools/tool';
@@ -46,6 +47,8 @@ export interface ViewHooks {
   scroll?: (start: number, size: number) => void;
   // the pages on screen and two on each side, they should be in memory
   near?: (first: number, last: number) => void;
+  // the camera moved, for things laid over the canvas
+  camera?: () => void;
 }
 
 // pages around the view that get loaded before they come in sight
@@ -127,7 +130,12 @@ export class CanvasView {
   // idle work: are the outlines near the view built, and the pending callback
   private warm = false;
   private idle: (() => void) | null = null;
+  // items a tool holds (a selection on the move, a text being edited) are
+  // left out of the layers until they come back
+  private hidden: Set<Item> | null = null;
+  private hiddenPage = -1;
   private offDoc: () => void;
+  private offBitmap: () => void;
   private observer: ResizeObserver;
   private dprQuery: MediaQueryList | null = null;
 
@@ -156,6 +164,11 @@ export class CanvasView {
     this.hlLayer = new TileLayer((box, scale) => this.paint(box, scale, true));
     this.inkLayer = new TileLayer((box, scale) => this.paint(box, scale, false));
     this.offDoc = doc.on(this.onChange);
+    // a picture that finished decoding shows up on the paper layer
+    this.offBitmap = onBitmap(() => {
+      this.bgDirty = true;
+      this.requestFrame();
+    });
 
     this.observer = new ResizeObserver(() => this.measure());
     this.observer.observe(host);
@@ -171,6 +184,7 @@ export class CanvasView {
     this.idle?.();
     if (this.zoomTimer) clearTimeout(this.zoomTimer);
     this.offDoc();
+    this.offBitmap();
     this.observer.disconnect();
     window.removeEventListener('resize', this.measure);
     this.dprQuery?.removeEventListener('change', this.onDpr);
@@ -187,6 +201,7 @@ export class CanvasView {
     this.offDoc = doc.on(this.onChange);
     this.board = 0;
     this.boardId = '';
+    this.hidden = null;
     this.cameras.clear();
     this.halt();
     this.shownNear = '';
@@ -251,6 +266,7 @@ export class CanvasView {
     this.bgDirty = this.inkDirty = this.hlDirty = true;
     if (this.tool) this.liveDirty = true;
     this.requestFrame();
+    this.hooks.camera?.();
   }
 
   panBy(dx: number, dy: number) {
@@ -433,6 +449,42 @@ export class CanvasView {
     };
   }
 
+  // takes items of page index off the layers, a tool draws them itself for a while
+  hide(index: number, items: Item[]) {
+    this.unhide(true);
+    this.hidden = new Set(items);
+    this.hiddenPage = index;
+    this.refresh(index, items);
+  }
+
+  // the hidden items come back. no redraw when a change of the doc that
+  // follows right away draws their place anyway
+  unhide(redraw: boolean) {
+    const hidden = this.hidden;
+    this.hidden = null;
+    if (hidden && redraw) this.refresh(this.hiddenPage, [...hidden]);
+  }
+
+  // draws the place of these items again on the layers they are on
+  private refresh(index: number, items: Item[]) {
+    if (index < 0 || index >= this.doc.pageCount) return;
+    const box = emptyBox();
+    let marks = false;
+    let ink = false;
+    for (const item of items) {
+      growBox(box, itemBox(item));
+      if (item.type === 'image') this.bgDirty = true;
+      else if (isMarker(item)) marks = true;
+      else ink = true;
+    }
+    const world = moveBox(box, this.pageX(index), this.pageY(index));
+    if (marks) this.hlLayer.invalidate(world);
+    if (ink) this.inkLayer.invalidate(world);
+    this.hlDirty ||= marks;
+    this.inkDirty ||= ink;
+    this.requestFrame();
+  }
+
   // the pages that reach into a box of world units
   pagesIn(box: Box): number[] {
     if (this.isBoard) return [this.board];
@@ -550,8 +602,13 @@ export class CanvasView {
     this.doc.ensureOrder(page);
     hits.sort((a, b) => a.z - b.z);
     const items: Item[] = [];
+    const hidden = this.hidden;
     for (const hit of hits) {
-      if (isMarker(hit.item) === marker) items.push(hit.item);
+      const item = hit.item;
+      // pictures are on the paper layer
+      if (item.type === 'image' || isMarker(item) !== marker) continue;
+      if (hidden && hidden.has(item)) continue;
+      items.push(item);
     }
     if (items.length > 0) groups.push({ rect, dark: isDark(page.meta.paper), items });
   }
@@ -567,7 +624,8 @@ export class CanvasView {
       let marks = false;
       let ink = false;
       const sort = (item: Item) => {
-        if (isMarker(item)) marks = true;
+        if (item.type === 'image') this.bgDirty = true;
+        else if (isMarker(item)) marks = true;
         else ink = true;
       };
       change.added.forEach(sort);
@@ -576,6 +634,7 @@ export class CanvasView {
       if (change.append) {
         const dark = isDark(this.doc.pageAt(index).meta.paper);
         for (const item of change.added) {
+          if (item.type === 'image') continue;
           const layer = isMarker(item) ? this.hlLayer : this.inkLayer;
           layer.drawInto(moveBox(itemBox(item), ox, oy), (ctx, scale) => {
             if (rect) {
@@ -733,6 +792,7 @@ export class CanvasView {
       ctx.fillStyle = PAPER_COLORS[paper.color].paper;
       ctx.fillRect(0, 0, w, h);
       drawPattern(ctx, paper, -this.cam.x * s, -this.cam.y * s, s, 0, 0, w, h, true);
+      this.drawImages(ctx, this.board);
       return;
     }
     ctx.fillStyle = BG_DEEP;
@@ -742,7 +802,32 @@ export class CanvasView {
       const r = this.rects[i];
       const paper = this.doc.notebook.pages[i].paper;
       drawSheet(ctx, paper, (r.x - this.cam.x) * s, (r.y - this.cam.y) * s, r.w * s, r.h * s, s, w, h);
+      this.drawImages(ctx, i);
     }
+  }
+
+  // the pictures of a page that are on screen, over its paper
+  private drawImages(ctx: CanvasRenderingContext2D, index: number) {
+    const page = this.doc.pageAt(index);
+    const images = imagesOf(page);
+    if (images.length === 0) return;
+    const ox = this.pageX(index);
+    const oy = this.pageY(index);
+    const z = this.cam.zoom;
+    const seen = {
+      minX: this.cam.x - ox,
+      minY: this.cam.y - oy,
+      maxX: this.cam.x + this.width / z - ox,
+      maxY: this.cam.y + this.height / z - oy
+    };
+    const dark = isDark(page.meta.paper);
+    ctx.save();
+    this.applyPage(ctx, index);
+    for (const image of images) {
+      if (this.hidden?.has(image) || !boxesTouch(itemBox(image), seen)) continue;
+      drawImageItem(ctx, image, dark);
+    }
+    ctx.restore();
   }
 
   private drawLive() {

@@ -1,7 +1,7 @@
 import RBush from 'rbush';
 import { emptyBox, growBox, itemBox } from './bounds';
 import { derived } from './cache';
-import type { Box, Item, Notebook, NotebookKind, PageMeta, Paper } from './types';
+import type { Box, ImageItem, Item, Notebook, NotebookKind, PageMeta, Paper } from './types';
 import type { PageSize } from '$lib/stores/preferences';
 
 // what the spatial index holds. z is the place of the item in the page,
@@ -89,6 +89,18 @@ export function copyItem(item: Item): Item {
   if (item.type === 'stroke') return { ...item, id: newId(), pts: item.pts.slice() };
   if (item.type === 'image' && item.source) return { ...item, id: newId(), source: { ...item.source } };
   return { ...item, id: newId() };
+}
+
+const imageLists = new WeakMap<PageData, { items: Item[]; count: number; images: ImageItem[] }>();
+
+// the pictures of a page in paint order. the items only change as a new
+// list or by a push at the end, so the list and its length say when to look again
+export function imagesOf(page: PageData): ImageItem[] {
+  const cached = imageLists.get(page);
+  if (cached && cached.items === page.items && cached.count === page.items.length) return cached.images;
+  const images = page.items.filter((item): item is ImageItem => item.type === 'image');
+  imageLists.set(page, { items: page.items, count: page.items.length, images });
+  return images;
 }
 
 // for duplicating a page: same size, paper, background and ink
