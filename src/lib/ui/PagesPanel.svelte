@@ -9,10 +9,57 @@
   const thumbs = new Thumbs();
   $effect(() => () => thumbs.destroy());
 
+  // only the rows near the visible part of the list exist, a notebook with
+  // hundreds of pages would take long to open otherwise. every row has a
+  // known height, the rest of the list is two spacers
+  const PAD = 14;
+  const GAP = 10;
+  // the gap under a sheet and its number
+  const LABEL = 18;
+  // px of rows kept above and below what is in sight
+  const AHEAD = 600;
+
   let list = $state<HTMLDivElement | null>(null);
+  let listWidth = $state(220);
+  let listHeight = $state(600);
+  let scrollTop = $state(0);
   // the page being dragged and the gap it would land in, -1 while no drag
   let dragFrom = $state(-1);
   let dropAt = $state(-1);
+
+  const sheetWidth = $derived(Math.max(40, Math.min(150, listWidth - 32)));
+
+  function sheetHeight(page: { w: number; h: number }): number {
+    return Math.round((sheetWidth * page.h) / page.w);
+  }
+
+  // where every row starts, and one more for the end of the last
+  const tops = $derived.by(() => {
+    const out: number[] = [];
+    let y = PAD;
+    for (const page of $pageList) {
+      out.push(y);
+      y += sheetHeight(page) + LABEL + GAP;
+    }
+    out.push(y);
+    return out;
+  });
+
+  // the first row whose bottom is below y
+  function rowAt(y: number): number {
+    let lo = 0;
+    let hi = $pageList.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (tops[mid + 1] <= y) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  const from = $derived(rowAt(scrollTop - AHEAD));
+  const to = $derived(Math.min($pageList.length, rowAt(scrollTop + listHeight + AHEAD) + 1));
+  const shown = $derived($pageList.slice(from, to));
 
   const board = $derived($notebookKind === 'board');
   const word = $derived(board ? 'board' : 'page');
@@ -28,13 +75,11 @@
   // the list keeps the page on screen in sight while the notes scroll
   $effect(() => {
     const index = $pageIndex;
-    if (!list || dragFrom >= 0) return;
-    const el = list.querySelectorAll('.page')[index];
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const box = list.getBoundingClientRect();
-    if (r.top < box.top) list.scrollTop += r.top - box.top - 8;
-    else if (r.bottom > box.bottom) list.scrollTop += r.bottom - box.bottom + 8;
+    if (!list || dragFrom >= 0 || index + 1 >= tops.length) return;
+    const top = tops[index] - 8;
+    const bottom = tops[index + 1] - GAP + 8;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
   });
 
   function openMenu(e: MouseEvent, index: number) {
@@ -101,8 +146,18 @@
   }
 </script>
 
-<div class="pages" bind:this={list} {ondragover} {ondrop} role="list">
-  {#each $pageList as page, index (page.id)}
+<div
+  class="pages"
+  bind:this={list}
+  bind:clientWidth={listWidth}
+  bind:clientHeight={listHeight}
+  onscroll={() => (scrollTop = list?.scrollTop ?? 0)}
+  {ondragover}
+  {ondrop}
+  role="list">
+  <div class="spacer" style="height: {tops[from] - PAD}px"></div>
+  {#each shown as page, k (page.id)}
+    {@const index = from + k}
     <div
       class="page"
       class:active={index === $pageIndex}
@@ -110,6 +165,7 @@
       class:drop-before={dropAt === index && dragFrom >= 0}
       class:drop-after={dropAt === index + 1 && index === $pageList.length - 1 && dragFrom >= 0}
       data-index={index}
+      style="height: {sheetHeight(page) + LABEL}px"
       role="listitem">
       <button
         class="sheet"
@@ -120,11 +176,12 @@
         {ondragend}
         title="{Word} {index + 1}"
         aria-label="{Word} {index + 1}">
-        <canvas use:thumb={page.id} style="aspect-ratio: {page.w} / {page.h}"></canvas>
+        <canvas use:thumb={page.id} style="height: {sheetHeight(page)}px"></canvas>
       </button>
       <span class="number">{index + 1}</span>
     </div>
   {/each}
+  <div class="spacer" style="height: {tops[$pageList.length] - tops[to]}px"></div>
   <button class="add" onclick={() => actions.newPage()} title="New {word} (Ctrl+Enter)" aria-label="New {word}">
     <Icon name="plus" size={14} />
   </button>
@@ -135,10 +192,6 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
     padding: 14px 16px;
   }
 
@@ -146,11 +199,11 @@
     position: relative;
     width: 100%;
     max-width: 150px;
+    margin: 0 auto 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 5px;
-    flex-shrink: 0;
   }
 
   .sheet {
@@ -202,6 +255,7 @@
   .number {
     font-family: var(--font-editor);
     font-size: 10px;
+    line-height: 13px;
     color: var(--text-muted);
   }
 
@@ -213,6 +267,7 @@
     width: 100%;
     max-width: 150px;
     height: 32px;
+    margin: 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
