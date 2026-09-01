@@ -1,3 +1,7 @@
+import { boxesTouch, itemBox } from './bounds';
+import { shapeLines } from './shapes';
+import type { Box, Item } from './types';
+
 export function distToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax;
   const dy = by - ay;
@@ -158,4 +162,100 @@ export function cutStroke(
   close();
 
   return touched ? pieces : null;
+}
+
+// does the polyline (x, y, x, y, ...) come closer than r to the segment a to b
+function linesNear(lines: number[][], ax: number, ay: number, bx: number, by: number, r: number): boolean {
+  for (const line of lines) {
+    for (let i = 2; i < line.length; i += 2) {
+      if (segmentsDistance(line[i - 2], line[i - 1], line[i], line[i + 1], ax, ay, bx, by) < r) return true;
+    }
+  }
+  return false;
+}
+
+// does the ink of a stroke or a shape come closer than r to the segment a to b
+export function inkNear(item: Item, ax: number, ay: number, bx: number, by: number, r: number): boolean {
+  if (item.type === 'stroke') return strokeNear(item.pts, ax, ay, bx, by, r + item.size / 2);
+  if (item.type === 'shape') return linesNear(shapeLines(item), ax, ay, bx, by, r + item.size / 2);
+  return false;
+}
+
+// is the point on the item. r is how close counts, in page units
+export function itemNear(item: Item, x: number, y: number, r: number): boolean {
+  const box = itemBox(item);
+  if (x < box.minX - r || x > box.maxX + r || y < box.minY - r || y > box.maxY + r) return false;
+  // a text or a picture is hit anywhere in its box, ink only on the line
+  if (item.type === 'text' || item.type === 'image') return true;
+  return inkNear(item, x, y, x, y, r);
+}
+
+// the topmost item at the point
+export function itemAt(items: Item[], x: number, y: number, r: number): Item | null {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (itemNear(items[i], x, y, r)) return items[i];
+  }
+  return null;
+}
+
+const SAMPLES = 24;
+
+// points spread over an item, the lasso counts how many it holds
+export function itemSamples(item: Item): number[] {
+  const out: number[] = [];
+  if (item.type === 'stroke') {
+    const n = item.pts.length / 3;
+    const step = Math.max(1, n / SAMPLES);
+    for (let i = 0; i < n; i += step) {
+      const k = Math.floor(i) * 3;
+      out.push(item.pts[k], item.pts[k + 1]);
+    }
+    out.push(item.pts[(n - 1) * 3], item.pts[(n - 1) * 3 + 1]);
+  } else if (item.type === 'shape') {
+    // a few points on every edge, a line alone only has its two ends
+    for (const line of shapeLines(item)) {
+      for (let i = 2; i < line.length; i += 2) {
+        for (let t = 0; t < 4; t++) {
+          out.push(line[i - 2] + ((line[i] - line[i - 2]) * t) / 4, line[i - 1] + ((line[i + 1] - line[i - 1]) * t) / 4);
+        }
+      }
+      out.push(line[line.length - 2], line[line.length - 1]);
+    }
+  } else {
+    const w = item.w;
+    const box = itemBox(item);
+    const h = box.maxY - box.minY;
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) out.push(item.x + (w * (i + 0.5)) / 3, box.minY + (h * (j + 0.5)) / 3);
+    }
+  }
+  return out;
+}
+
+function polyBox(poly: ArrayLike<number>): Box {
+  const box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  for (let i = 0; i < poly.length; i += 2) {
+    box.minX = Math.min(box.minX, poly[i]);
+    box.minY = Math.min(box.minY, poly[i + 1]);
+    box.maxX = Math.max(box.maxX, poly[i]);
+    box.maxY = Math.max(box.maxY, poly[i + 1]);
+  }
+  return box;
+}
+
+// the items the lasso (x, y, x, y, ...) holds at least half of
+export function lassoHits(items: Item[], poly: ArrayLike<number>): Item[] {
+  if (poly.length < 6) return [];
+  const box = polyBox(poly);
+  const out: Item[] = [];
+  for (const item of items) {
+    if (!boxesTouch(itemBox(item), box)) continue;
+    const pts = itemSamples(item);
+    let inside = 0;
+    for (let i = 0; i < pts.length; i += 2) {
+      if (pointInPolygon(pts[i], pts[i + 1], poly)) inside++;
+    }
+    if (inside * 2 >= pts.length / 2) out.push(item);
+  }
+  return out;
 }
