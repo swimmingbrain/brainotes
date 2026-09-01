@@ -114,13 +114,15 @@ function hide() {
   remember('');
 }
 
-async function create(kind: NotebookKind, name: string) {
+// a new notebook goes into storage before anything else changes, so a
+// failed write leaves the open one as it was
+async function create(kind: NotebookKind, name: string): Promise<Notebook> {
   const notebook = newNotebook(kind, name, get(preferences).paper);
   const empty = await packItems([]);
   const pages = notebook.pages.map((p) => ({ id: p.id, notebookId: notebook.id, ...empty }));
   await importNotebook(notebook, pages);
   library.update((list) => [summary(notebook), ...list]);
-  start(notebook, true);
+  return notebook;
 }
 
 // reads the library and opens the notebook from last time. the very first
@@ -143,7 +145,7 @@ export function startLibrary(): () => void {
       library.set(all);
       const last = lastOpened();
       if (all.length === 0 && last === null) {
-        await create('paper', 'My notes');
+        start(await create('paper', 'My notes'), true);
         activeTool.set('pen');
       } else {
         // no note of the last one means its record got lost, the newest will do
@@ -171,8 +173,9 @@ export function startLibrary(): () => void {
 plugActions({
   newNotebook: (kind) => {
     void run(async () => {
+      const notebook = await create(kind, uniqueName(kind === 'board' ? 'Whiteboard' : 'Notebook'));
       await stop();
-      await create(kind, uniqueName(kind === 'board' ? 'Whiteboard' : 'Notebook'));
+      start(notebook, true);
     });
   },
   openNotebook: (id) => {
