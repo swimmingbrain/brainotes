@@ -1,4 +1,5 @@
 import { PAPER_COLORS } from '$lib/editor/paper';
+import { shapePath } from './shapes';
 import { PENS, strokeLine, strokePath, THIN } from './stroke';
 import type { Item, PageMeta, Paper } from './types';
 
@@ -49,7 +50,16 @@ export function inkColor(color: string, dark: boolean): string {
 // scale is device pixels per unit, it picks the plain line for strokes
 // that are too thin on screen for their outline to matter
 export function drawItem(ctx: Ctx, item: Item, dark: boolean, scale: number) {
-  // shapes, text and images get drawn once their tools exist
+  if (item.type === 'shape') {
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = inkColor(item.color, dark);
+    ctx.lineWidth = item.size;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke(shapePath(item));
+    return;
+  }
+  // images sit on the paper layer, see drawImageItem
   if (item.type !== 'stroke') return;
   ctx.globalAlpha = PENS[item.pen].alpha;
   const color = inkColor(item.color, dark);

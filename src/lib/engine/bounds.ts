@@ -1,4 +1,5 @@
 import { derived } from './cache';
+import { shapePad } from './shapes';
 import type { Box, Item } from './types';
 
 export function emptyBox(): Box {
@@ -53,7 +54,7 @@ export function itemBox(item: Item): Box {
     // the extra unit is room for anti aliasing
     box = pointsBox(item.pts, item.size + 1);
   } else if (item.type === 'shape') {
-    const pad = item.kind === 'arrow' ? item.size * 5 + 1 : item.size + 1;
+    const pad = shapePad(item);
     box = {
       minX: Math.min(item.x1, item.x2) - pad,
       minY: Math.min(item.y1, item.y2) - pad,
