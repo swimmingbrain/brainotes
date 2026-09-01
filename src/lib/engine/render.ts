@@ -1,8 +1,9 @@
 import { PAPER_COLORS } from '$lib/editor/paper';
+import { bitmapFor } from './images';
 import { shapePath } from './shapes';
 import { PENS, strokeLine, strokePath, THIN } from './stroke';
 import { fontOf, LINE_HEIGHT, textLayout } from './text';
-import type { Item, PageMeta, Paper } from './types';
+import type { ImageItem, Item, PageMeta, Paper } from './types';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -18,6 +19,20 @@ export function isDark(paper: Paper): boolean {
 
 export function isMarker(item: Item): boolean {
   return item.type === 'stroke' && item.pen === 'highlighter';
+}
+
+// a picture waits on a quiet box until it is decoded
+export function drawImageItem(ctx: Ctx, item: ImageItem, dark: boolean) {
+  const bitmap = bitmapFor(item.assetId);
+  ctx.globalAlpha = 1;
+  if (!bitmap) {
+    ctx.fillStyle = dark ? '#2a2a2e' : '#ececee';
+    ctx.fillRect(item.x, item.y, item.w, item.h);
+    return;
+  }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, item.x, item.y, item.w, item.h);
 }
 
 function luminance(color: string): number {
@@ -229,8 +244,9 @@ export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale
   const height = Math.ceil(part.h * scale);
   const ox = -part.x * scale;
   const oy = -part.y * scale;
+  const images = page.items.filter((item): item is ImageItem => item.type === 'image');
   const marks = page.items.filter(isMarker);
-  const ink = page.items.filter((item) => !isMarker(item));
+  const ink = page.items.filter((item) => !isMarker(item) && item.type !== 'image');
   const layer = marks.length > 0 ? new OffscreenCanvas(width, height).getContext('2d') : null;
   let started = false;
   let i = 0;
@@ -246,6 +262,12 @@ export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale
         ctx.fillStyle = PAPER_COLORS[paper.color].paper;
         ctx.fillRect(0, 0, width, height);
         drawPattern(ctx, paper, ox, oy, scale, 0, 0, width, height, frame !== undefined);
+        // pictures lie on the paper, under all the ink
+        ctx.beginPath();
+        ctx.rect(0, 0, width, height);
+        ctx.clip();
+        ctx.setTransform(scale, 0, 0, scale, ox, oy);
+        for (const image of images) drawImageItem(ctx, image, dark);
         ctx.restore();
       }
       // the highlighter goes on its own layer first, then under the ink
