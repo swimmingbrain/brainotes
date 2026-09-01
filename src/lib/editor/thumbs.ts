@@ -2,24 +2,31 @@ import { loadPage, openDoc } from './canvas';
 import { emptyBox, growBox, isEmpty, itemBox } from '$lib/engine/bounds';
 import type { Doc, DocChange, PageData } from '$lib/engine/doc';
 import { penIsDown } from '$lib/engine/input';
-import { renderPage, type Frame } from '$lib/engine/render';
+import { pageJob, type Frame } from '$lib/engine/render';
 
 // css pixels, the panel never shows a thumbnail wider than this
 export const THUMB_WIDTH = 150;
 // a page that changed gets its new thumbnail this long after the last change
 const REFRESH = 600;
 const PEN_WAIT = 250;
+// items drawn between two looks at the clock
+const STEP = 100;
+// ms of drawing per idle turn, even when the browser offers more
+const BUDGET = 8;
 
 interface Thumb {
   id: string;
   canvas: HTMLCanvasElement;
   visible: boolean;
   stale: boolean;
+  // a drawing on its way, it shows once it is complete
+  job: { step: (count: number) => boolean } | null;
+  buffer: OffscreenCanvas | null;
 }
 
 // the part of a board a thumbnail shows: all of its ink, never closer
 // than the board frame itself
-function boardFrame(page: PageData): Frame {
+function boardFrame(page: { meta: PageData['meta']; items: PageData['items'] }): Frame {
   const { w, h } = page.meta;
   const box = emptyBox();
   for (const item of page.items) growBox(box, itemBox(item));
@@ -41,6 +48,7 @@ export class Thumbs {
   private observer: IntersectionObserver | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private cancelIdle: (() => void) | null = null;
+  private sink: OffscreenCanvasRenderingContext2D | null = null;
   private off: () => void;
 
   constructor() {
@@ -52,7 +60,7 @@ export class Thumbs {
     if (!this.observer) {
       this.observer = new IntersectionObserver(this.onIntersect, { root, rootMargin: '200px 0px' });
     }
-    const thumb: Thumb = { id, canvas, visible: false, stale: true };
+    const thumb: Thumb = { id, canvas, visible: false, stale: true, job: null, buffer: null };
     this.byId.set(id, thumb);
     this.byCanvas.set(canvas, thumb);
     this.observer.observe(canvas);
@@ -88,6 +96,7 @@ export class Thumbs {
     const thumb = this.byId.get(change.pageId);
     if (!thumb) return;
     thumb.stale = true;
+    thumb.job = null;
     // ink that just arrived from storage shows at once, an edit waits a moment
     this.schedule(change.type === 'loaded' ? 0 : REFRESH);
   };
@@ -111,26 +120,49 @@ export class Thumbs {
     }
   }
 
+  // a page with thousands of strokes takes many idle turns, a frame never waits for it
   private work = (deadline: IdleDeadline) => {
     this.cancelIdle = null;
     if (penIsDown()) {
       this.schedule(PEN_WAIT);
       return;
     }
-    let drawn = 0;
+    const end = performance.now() + BUDGET;
+    const busy = () => performance.now() >= end || deadline.timeRemaining() < 2;
     for (const thumb of this.byId.values()) {
-      if (!thumb.visible || !thumb.stale) continue;
-      // at least one per turn, more while the browser has time to spare
-      if (drawn > 0 && deadline.timeRemaining() < 4) {
+      if (!thumb.visible || (!thumb.stale && !thumb.job)) continue;
+      if (!thumb.job) this.start(thumb);
+      const job = thumb.job;
+      if (!job) continue;
+      let done = false;
+      do {
+        done = job.step(STEP);
+        this.flush(thumb.buffer);
+      } while (!done && !busy());
+      if (!done) {
         this.whenIdle();
         return;
       }
-      this.draw(thumb);
-      drawn++;
+      thumb.job = null;
+      this.show(thumb);
+      if (busy()) {
+        this.whenIdle();
+        return;
+      }
     }
   };
 
-  private draw(thumb: Thumb) {
+  // a canvas only records what it is told to draw and paints it later, all
+  // at once. drawing it small somewhere makes it paint now, so the clock
+  // sees what a step really cost
+  private flush(buffer: OffscreenCanvas | null) {
+    if (!buffer) return;
+    if (!this.sink) this.sink = new OffscreenCanvas(1, 1).getContext('2d');
+    this.sink?.clearRect(0, 0, 1, 1);
+    this.sink?.drawImage(buffer, 0, 0, 1, 1);
+  }
+
+  private start(thumb: Thumb) {
     thumb.stale = false;
     const page = this.doc?.page(thumb.id);
     if (!page) return;
@@ -139,16 +171,27 @@ export class Thumbs {
     const dpr = window.devicePixelRatio || 1;
     const width = Math.round(THUMB_WIDTH * dpr);
     const height = Math.round((width * page.meta.h) / page.meta.w);
-    const canvas = thumb.canvas;
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
-    const ctx = canvas.getContext('2d');
+    const buffer = new OffscreenCanvas(width, height);
+    const ctx = buffer.getContext('2d');
     if (!ctx) return;
+    // new ink is pushed onto the same list, the job keeps the list as it is now
+    const snapshot = { meta: page.meta, items: page.items.slice() };
     if (this.doc?.kind === 'board') {
-      const frame = boardFrame(page);
-      renderPage(ctx, page, width / frame.w, frame);
+      const frame = boardFrame(snapshot);
+      thumb.job = pageJob(ctx, snapshot, width / frame.w, frame);
     } else {
-      renderPage(ctx, page, width / page.meta.w);
+      thumb.job = pageJob(ctx, snapshot, width / page.meta.w);
     }
+    thumb.buffer = buffer;
+  }
+
+  private show(thumb: Thumb) {
+    const buffer = thumb.buffer;
+    thumb.buffer = null;
+    if (!buffer) return;
+    const canvas = thumb.canvas;
+    if (canvas.width !== buffer.width) canvas.width = buffer.width;
+    if (canvas.height !== buffer.height) canvas.height = buffer.height;
+    canvas.getContext('2d')?.drawImage(buffer, 0, 0);
   }
 }
