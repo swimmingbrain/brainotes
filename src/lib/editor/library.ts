@@ -2,8 +2,15 @@ import { get } from 'svelte/store';
 import { plugActions } from './actions';
 import { showNotebook, type Session } from './canvas';
 import { Doc, newNotebook } from '$lib/engine/doc';
-import type { Notebook, NotebookKind } from '$lib/engine/types';
-import { deleteNotebook, getNotebook, importNotebook, listNotebooks, putNotebook } from '$lib/storage/db';
+import type { Item, Notebook, NotebookKind } from '$lib/engine/types';
+import {
+  deleteNotebook,
+  getNotebook,
+  importNotebook,
+  listNotebooks,
+  putNotebook,
+  type AssetRecord
+} from '$lib/storage/db';
 import { PageLoader } from '$lib/storage/loader';
 import { packItems } from '$lib/storage/pack';
 import { Saver } from '$lib/storage/saver';
@@ -121,15 +128,32 @@ function hide() {
   remember('');
 }
 
+// items by page id, pages left out start empty
+async function store(notebook: Notebook, items: Record<string, Item[]> = {}, assets: AssetRecord[] = []) {
+  const pages = [];
+  for (const meta of notebook.pages) {
+    pages.push({ id: meta.id, notebookId: notebook.id, ...(await packItems(items[meta.id] ?? [])) });
+  }
+  await importNotebook(notebook, pages, assets);
+}
+
 // a new notebook goes into storage before anything else changes, so a
 // failed write leaves the open one as it was
 async function create(kind: NotebookKind, name: string): Promise<Notebook> {
   const notebook = newNotebook(kind, name, get(preferences).paper);
-  const empty = await packItems([]);
-  const pages = notebook.pages.map((p) => ({ id: p.id, notebookId: notebook.id, ...empty }));
-  await importNotebook(notebook, pages);
+  await store(notebook);
   library.update((list) => [summary(notebook), ...list]);
   return notebook;
+}
+
+// a whole notebook made somewhere else (a pdf to write on, a file) goes
+// into storage with its pages and files, then it opens
+export function addNotebook(notebook: Notebook, items: Record<string, Item[]> = {}, assets: AssetRecord[] = []) {
+  return run(async () => {
+    await store(notebook, items, assets);
+    await stop();
+    start(notebook, false);
+  });
 }
 
 // reads the library and opens the notebook from last time. the very first
