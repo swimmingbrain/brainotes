@@ -1,6 +1,7 @@
 import { PAPER_COLORS } from '$lib/editor/paper';
 import { shapePath } from './shapes';
 import { PENS, strokeLine, strokePath, THIN } from './stroke';
+import { fontOf, LINE_HEIGHT, textLayout } from './text';
 import type { Item, PageMeta, Paper } from './types';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -57,6 +58,19 @@ export function drawItem(ctx: Ctx, item: Item, dark: boolean, scale: number) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke(shapePath(item));
+    return;
+  }
+  if (item.type === 'text') {
+    const layout = textLayout(item);
+    const step = item.size * LINE_HEIGHT;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = inkColor(item.color, dark);
+    ctx.font = fontOf(item.size);
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    for (let i = 0; i < layout.lines.length; i++) {
+      ctx.fillText(layout.lines[i], item.x, item.y + layout.baseline + i * step);
+    }
     return;
   }
   // images sit on the paper layer, see drawImageItem

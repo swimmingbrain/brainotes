@@ -1,3 +1,4 @@
+import type { TextLayout } from './text';
 import type { Box, Item } from './types';
 
 // what the engine works out for an item once: its box, its place in the
@@ -9,6 +10,7 @@ export interface Derived {
   entry?: Box & { item: Item; z: number };
   path?: Path2D;
   line?: Path2D;
+  text?: TextLayout;
 }
 
 const KEY = Symbol('derived');

@@ -1,5 +1,6 @@
 import { derived } from './cache';
 import { shapePad } from './shapes';
+import { textHeight } from './text';
 import type { Box, Item } from './types';
 
 export function emptyBox(): Box {
@@ -62,8 +63,14 @@ export function itemBox(item: Item): Box {
       maxY: Math.max(item.y1, item.y2) + pad
     };
   } else if (item.type === 'text') {
-    const lines = item.text.split('\n').length;
-    box = { minX: item.x, minY: item.y, maxX: item.x + item.w, maxY: item.y + lines * item.size * 1.4 };
+    // letters like j and f can reach a little past the box of the lines
+    const pad = item.size * 0.15;
+    box = {
+      minX: item.x - pad,
+      minY: item.y,
+      maxX: item.x + item.w + pad,
+      maxY: item.y + textHeight(item) + pad
+    };
   } else {
     box = { minX: item.x, minY: item.y, maxX: item.x + item.w, maxY: item.y + item.h };
   }
