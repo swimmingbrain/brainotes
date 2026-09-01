@@ -8,16 +8,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// the items of a page are read from storage when the page gets near the
-// view, then they stay in memory while the notebook is open. so a notebook
-// with hundreds of pages opens as fast as one with a single page
+// pages are read when they get near the view and then stay in memory, so
+// hundreds of pages open as fast as one
 export class PageLoader {
   private waiting = new Map<string, Promise<void>>();
   private closed = false;
 
   constructor(private doc: Doc) {}
 
-  // pages first to last (indices) should be in memory soon
   near(first: number, last: number) {
     const pages = this.doc.notebook.pages;
     const ids: string[] = [];
@@ -28,7 +26,6 @@ export class PageLoader {
     if (ids.length > 0) this.load(ids);
   }
 
-  // the page with its items, for work that needs all of them
   async ensure(id: string): Promise<PageData | undefined> {
     if (!this.doc.isReady(id)) {
       if (!this.waiting.has(id)) this.load([id]);

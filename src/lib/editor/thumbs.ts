@@ -19,7 +19,6 @@ interface Thumb {
   canvas: HTMLCanvasElement;
   visible: boolean;
   stale: boolean;
-  // a drawing on its way, it shows once it is complete
   job: { step: (count: number) => boolean } | null;
   buffer: OffscreenCanvas | null;
 }
@@ -38,9 +37,8 @@ function boardFrame(page: { meta: PageData['meta']; items: PageData['items'] }):
   return { x: (box.minX + box.maxX - fw) / 2, y: (box.minY + box.maxY - fh) / 2, w: fw, h: fh };
 }
 
-// the thumbnails of the pages panel. each one is drawn with the page
-// renderer once it scrolls into sight, and again a moment after its page
-// changed. never while the pen is down, the pen comes first
+// the thumbnails of the pages panel, drawn when they scroll into sight and
+// a moment after their page changed. never while the pen is down
 export class Thumbs {
   private doc: Doc | null = openDoc();
   private byId = new Map<string, Thumb>();
@@ -120,7 +118,6 @@ export class Thumbs {
     }
   }
 
-  // a page with thousands of strokes takes many idle turns, a frame never waits for it
   private work = (deadline: IdleDeadline) => {
     this.cancelIdle = null;
     if (penIsDown()) {
@@ -152,9 +149,8 @@ export class Thumbs {
     }
   };
 
-  // a canvas only records what it is told to draw and paints it later, all
-  // at once. drawing it small somewhere makes it paint now, so the clock
-  // sees what a step really cost
+  // a canvas paints what it recorded later and all at once. drawing it
+  // small somewhere makes it paint now, so the clock sees the real cost
   private flush(buffer: OffscreenCanvas | null) {
     if (!buffer) return;
     if (!this.sink) this.sink = new OffscreenCanvas(1, 1).getContext('2d');

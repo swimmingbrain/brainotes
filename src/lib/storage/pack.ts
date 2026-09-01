@@ -1,17 +1,14 @@
 import type { Item, Stroke } from '$lib/engine/types';
 
-// a page as it is stored: the points of every stroke one after the other
-// as 32 bit floats, everything else as json, both as blobs. the browser
-// copies whatever goes into storage in one go on the main thread, a list
-// of 10,000 strokes as objects took it about 75 ms. blobs are put
-// together from small ones made slice by slice, so nothing big is copied
-// at once
+// a page as it is stored: all points as 32 bit floats and the rest as json,
+// both blobs made of small ones. storing 10,000 strokes as objects made the
+// browser copy them in one go for about 75 ms
 export interface PackedItems {
   items: Blob;
   pts: Blob;
 }
 
-// ms of packing before the next slice
+// ms of packing per slice
 const SLICE = 4;
 const CHUNK = 500;
 

@@ -6,7 +6,6 @@ import { packItems } from './pack';
 
 export type SaveState = 'saved' | 'saving' | 'failed';
 
-// what one write put into storage
 export interface SaveReport {
   pages: string[];
   deleted: string[];
@@ -30,8 +29,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// between two slices of packing a frame gets through, and while the pen
-// is down the packing waits
+// a frame gets through between two slices, and nothing goes on while the pen is down
 async function breather() {
   await sleep(0);
   while (penIsDown()) await sleep(PEN_WAIT);
@@ -73,7 +71,6 @@ export class Saver {
     return this.queue;
   }
 
-  // resolves once the writes asked for so far are through
   settled(): Promise<void> {
     return this.queue;
   }
