@@ -67,11 +67,17 @@ async function refresh() {
   library.set(newestFirst(all.map(summary)));
 }
 
-// the open notebook's row follows what is in memory
+// for code that writes notebooks into storage on its own, like an import
+export function refreshLibrary(): Promise<void> {
+  return run(refresh);
+}
+
+// the open notebook's row follows what is in memory, it is added when it
+// came into storage some other way
 function updateRow() {
   if (!session) return;
   const row = summary(session.doc.notebook);
-  library.update((list) => newestFirst(list.map((n) => (n.id === row.id ? row : n))));
+  library.update((list) => newestFirst([row, ...list.filter((n) => n.id !== row.id)]));
 }
 
 function uniqueName(base: string): string {
@@ -93,6 +99,7 @@ function start(notebook: Notebook, ready: boolean) {
   });
   session = { doc, loader, saver };
   saveState.set('saved');
+  updateRow();
   showNotebook(session);
   notebookOpen.set(true);
   remember(notebook.id);
