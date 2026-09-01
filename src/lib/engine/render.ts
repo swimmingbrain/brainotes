@@ -193,10 +193,11 @@ export interface Frame {
   h: number;
 }
 
-// a whole page with its ink, drawn at the top left of the canvas at scale
-// device pixels per unit. a board has no edges, frame is the part of it to
-// draw. thumbnails and the png export use it
-export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
+// a whole page drawn a few items at a time: step(count) draws up to count
+// more and says when the page is done. the page sits at the top left of
+// the canvas at scale device pixels per unit. a board has no edges, frame
+// is the part of it to draw. nothing else may draw on ctx in between
+export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
   const paper = page.meta.paper;
   const part = frame ?? { x: 0, y: 0, w: page.meta.w, h: page.meta.h };
   const dark = isDark(paper);
@@ -204,31 +205,55 @@ export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, sc
   const height = Math.ceil(part.h * scale);
   const ox = -part.x * scale;
   const oy = -part.y * scale;
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = PAPER_COLORS[paper.color].paper;
-  ctx.fillRect(0, 0, width, height);
-  drawPattern(ctx, paper, ox, oy, scale, 0, 0, width, height, frame !== undefined);
-  ctx.beginPath();
-  ctx.rect(0, 0, width, height);
-  ctx.clip();
-
   const marks = page.items.filter(isMarker);
-  if (marks.length > 0) {
-    const layer = new OffscreenCanvas(width, height);
-    const lctx = layer.getContext('2d')!;
-    lctx.setTransform(scale, 0, 0, scale, ox, oy);
-    for (const item of marks) drawItem(lctx, item, dark, scale);
-    ctx.globalAlpha = HIGHLIGHTER_ALPHA;
-    ctx.globalCompositeOperation = dark ? 'source-over' : 'multiply';
-    ctx.drawImage(layer, 0, 0);
-    ctx.globalCompositeOperation = 'source-over';
-  }
+  const ink = page.items.filter((item) => !isMarker(item));
+  const layer = marks.length > 0 ? new OffscreenCanvas(width, height).getContext('2d') : null;
+  let started = false;
+  let i = 0;
+  let j = 0;
 
-  ctx.setTransform(scale, 0, 0, scale, ox, oy);
-  for (const item of page.items) {
-    if (!isMarker(item)) drawItem(ctx, item, dark, scale);
-  }
-  ctx.restore();
+  return {
+    step(count: number): boolean {
+      if (!started) {
+        started = true;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = PAPER_COLORS[paper.color].paper;
+        ctx.fillRect(0, 0, width, height);
+        drawPattern(ctx, paper, ox, oy, scale, 0, 0, width, height, frame !== undefined);
+        ctx.restore();
+      }
+      // the highlighter goes on its own layer first, then under the ink
+      if (layer && i < marks.length) {
+        layer.setTransform(scale, 0, 0, scale, ox, oy);
+        const end = Math.min(marks.length, i + count);
+        count -= end - i;
+        for (; i < end; i++) drawItem(layer, marks[i], dark, scale);
+        if (i < marks.length) return false;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = HIGHLIGHTER_ALPHA;
+        ctx.globalCompositeOperation = dark ? 'source-over' : 'multiply';
+        ctx.drawImage(layer.canvas, 0, 0);
+        ctx.restore();
+      }
+      if (count <= 0 && j < ink.length) return false;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.beginPath();
+      ctx.rect(0, 0, width, height);
+      ctx.clip();
+      ctx.setTransform(scale, 0, 0, scale, ox, oy);
+      const end = Math.min(ink.length, j + count);
+      for (; j < end; j++) drawItem(ctx, ink[j], dark, scale);
+      ctx.restore();
+      return j >= ink.length;
+    }
+  };
+}
+
+// a whole page with its ink in one go, for the png export
+export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
+  pageJob(ctx, page, scale, frame).step(Infinity);
 }
