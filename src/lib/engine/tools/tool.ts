@@ -8,6 +8,8 @@ export interface Sample {
   y: number;
   pressure: number;
   time: number;
+  // shift keeps shapes straight and square
+  shift?: boolean;
 }
 
 // every tool (pen, eraser, hand and later select, shape, text, laser) has

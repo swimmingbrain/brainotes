@@ -92,7 +92,13 @@ export class Input {
   }
 
   private sample(e: PointerEvent): Sample {
-    return { x: e.clientX - this.view.left, y: e.clientY - this.view.top, pressure: e.pressure, time: e.timeStamp };
+    return {
+      x: e.clientX - this.view.left,
+      y: e.clientY - this.view.top,
+      pressure: e.pressure,
+      time: e.timeStamp,
+      shift: e.shiftKey
+    };
   }
 
   private capture(id: number) {
