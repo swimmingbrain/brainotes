@@ -1,6 +1,6 @@
 import { newId, type Placed } from '../doc';
 import type { Op } from '../history';
-import { cutStroke, strokeNear } from '../hit';
+import { cutStroke, inkNear, strokeNear } from '../hit';
 import type { Box, Item, Stroke } from '../types';
 import type { CanvasView } from '../view';
 import type { Sample, Tool } from './tool';
@@ -163,10 +163,15 @@ export class EraserTool implements Tool {
         maxY: world.maxY - oy
       });
 
-      const remove: Stroke[] = [];
-      const pieces = new Map<Stroke, Stroke[]>();
+      const remove: Item[] = [];
+      const pieces = new Map<Item, Stroke[]>();
       for (const hit of hits) {
         const item = hit.item;
+        // a shape can not be cut, it goes as a whole in both modes
+        if (item.type === 'shape' && !this.markersOnly) {
+          if (inkNear(item, lax, lay, lbx, lby, r)) remove.push(item);
+          continue;
+        }
         if (item.type !== 'stroke') continue;
         if (this.markersOnly && item.pen !== 'highlighter') continue;
         const reach = r + item.size / 2;
