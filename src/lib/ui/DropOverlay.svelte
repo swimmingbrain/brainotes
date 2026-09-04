@@ -47,7 +47,7 @@
     const files = Array.from(e.dataTransfer.files);
     if (files.length === 0) return;
     if (onReference(e.target)) actions.openReference(files);
-    else actions.importFiles(files);
+    else actions.importFiles(files, { x: e.clientX, y: e.clientY });
   }
 </script>
 
