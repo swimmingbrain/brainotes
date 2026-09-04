@@ -8,6 +8,7 @@ import {
   commandPaletteOpen,
   contextMenu,
   dialog,
+  selectionCount,
   selectTool,
   toggleLeftPanel,
   toggleRightPanel,
@@ -52,12 +53,19 @@ function bind(fn: () => unknown): KeybindingHandler {
   };
 }
 
-// the arrows only turn pages on the board, where nothing else wants them
-function onBoard(fn: () => unknown): KeybindingHandler {
+// the arrows move a selection, with shift in bigger steps. without one
+// they only turn pages on the board, where nothing else wants them
+function arrow(dx: number, dy: number, page: () => unknown): KeybindingHandler {
   return (e) => {
-    if (get(workspace) !== 'board') return;
+    if (get(selectionCount) > 0) {
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+      actions.nudgeSelection(dx * step, dy * step);
+      return;
+    }
+    if (get(workspace) !== 'board' || e.shiftKey) return;
     e.preventDefault();
-    void fn();
+    void page();
   };
 }
 
@@ -108,15 +116,20 @@ export function installShortcuts(target: Window = window): () => void {
     Delete: bind(() => actions.deleteSelection()),
     Backspace: bind(() => actions.deleteSelection()),
     Escape: bind(escape),
+    // copy, cut and paste come as clipboard events, see clipboard.ts
 
     // pages
     '$mod+Enter': bind(() => actions.newPage()),
     PageDown: bind(() => actions.nextPage()),
     PageUp: bind(() => actions.previousPage()),
-    ArrowRight: onBoard(() => actions.nextPage()),
-    ArrowDown: onBoard(() => actions.nextPage()),
-    ArrowLeft: onBoard(() => actions.previousPage()),
-    ArrowUp: onBoard(() => actions.previousPage()),
+    ArrowRight: arrow(1, 0, () => actions.nextPage()),
+    ArrowDown: arrow(0, 1, () => actions.nextPage()),
+    ArrowLeft: arrow(-1, 0, () => actions.previousPage()),
+    ArrowUp: arrow(0, -1, () => actions.previousPage()),
+    'Shift+ArrowRight': arrow(1, 0, () => {}),
+    'Shift+ArrowDown': arrow(0, 1, () => {}),
+    'Shift+ArrowLeft': arrow(-1, 0, () => {}),
+    'Shift+ArrowUp': arrow(0, -1, () => {}),
 
     // view
     '$mod+=': bind(() => actions.zoomIn()),
