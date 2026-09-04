@@ -9,6 +9,8 @@ export const LINE_HEIGHT = 1.4;
 export type Measure = (text: string) => number;
 
 export interface TextLayout {
+  // layouts from before the font loaded are made again
+  epoch: number;
   lines: string[];
   // the widest line, never more than the width it was laid out in
   width: number;
@@ -61,6 +63,12 @@ export function fontOf(size: number): string {
 }
 
 let ctx: CanvasRenderingContext2D | null = null;
+let epoch = 0;
+
+// the font came in, text measured with the fallback font is measured again
+export function fontLoaded() {
+  epoch++;
+}
 
 function context(): CanvasRenderingContext2D | null {
   if (!ctx && typeof document !== 'undefined') ctx = document.createElement('canvas').getContext('2d');
@@ -100,10 +108,11 @@ const SLACK = 0.5;
 
 export function textLayout(item: TextItem): TextLayout {
   const d = derived(item);
-  if (d.text) return d.text;
+  if (d.text && d.text.epoch === epoch) return d.text;
   const measure = measurer(item.size);
   const lines = layoutText(item.text, item.w + SLACK, measure);
-  const layout = { lines, width: textWidth(lines, item.w + SLACK, measure), baseline: firstBaseline(item.size) };
+  const width = textWidth(lines, item.w + SLACK, measure);
+  const layout = { epoch, lines, width, baseline: firstBaseline(item.size) };
   d.text = layout;
   return layout;
 }
