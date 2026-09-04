@@ -3,30 +3,51 @@
   import ScrollIndicator from './ScrollIndicator.svelte';
   import { actions } from '$lib/editor/actions';
   import { mountCanvas } from '$lib/editor/canvas';
+  import { installClipboard } from '$lib/editor/clipboard';
   import { PAPER_STYLES } from '$lib/editor/commands';
   import { toolById } from '$lib/editor/tools';
-  import { activeTool, contextMenu, history, inputType, paperStyle } from '$lib/stores/app';
+  import { activeTool, contextMenu, history, inputType, paperStyle, selectionCount, type MenuItem } from '$lib/stores/app';
 
   const cursor = $derived(toolById($activeTool).cursor);
 
   let layers: HTMLDivElement;
   let indicator: ScrollIndicator;
 
-  onMount(() => mountCanvas(layers, (start, size) => indicator.show(start, size)));
+  onMount(() => {
+    const unmount = mountCanvas(layers, (start, size) => indicator.show(start, size));
+    const removeClipboard = installClipboard();
+    return () => {
+      removeClipboard();
+      unmount();
+    };
+  });
 
   function oncontextmenu(e: MouseEvent) {
     e.preventDefault();
     // a long press of the pen is a right click on windows, it must not
     // open a menu in the middle of writing
     if ($inputType !== 'mouse') return;
+    const at = { x: e.clientX, y: e.clientY };
+    const selected: MenuItem[] =
+      $selectionCount > 0
+        ? [
+            { label: 'Copy', shortcut: 'Ctrl+C', action: () => actions.copySelection() },
+            { label: 'Cut', shortcut: 'Ctrl+X', action: () => actions.cutSelection() },
+            { label: 'Duplicate', shortcut: 'Ctrl+D', action: () => actions.duplicateSelection() },
+            { label: 'Delete', shortcut: 'Delete', danger: true, action: () => actions.deleteSelection() },
+            { separator: true, label: '' }
+          ]
+        : [];
     contextMenu.set({
       x: e.clientX,
       y: e.clientY,
       items: [
+        ...selected,
+        { label: 'Paste', shortcut: 'Ctrl+V', action: () => actions.paste(at) },
+        { label: 'Select all', shortcut: 'Ctrl+A', action: () => actions.selectAll() },
+        { separator: true, label: '' },
         { label: 'Undo', shortcut: 'Ctrl+Z', disabled: !$history.canUndo, action: () => actions.undo() },
         { label: 'Redo', shortcut: 'Ctrl+Shift+Z', disabled: !$history.canRedo, action: () => actions.redo() },
-        { separator: true, label: '' },
-        { label: 'Select all', shortcut: 'Ctrl+A', action: () => actions.selectAll() },
         { separator: true, label: '' },
         {
           label: 'Paper',
