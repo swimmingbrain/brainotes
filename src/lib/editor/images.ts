@@ -1,0 +1,170 @@
+import { get } from 'svelte/store';
+import { plugActions, type Point } from './actions';
+import { editor, spotAt } from './canvas';
+import { newId } from '$lib/engine/doc';
+import { rememberBitmap } from '$lib/engine/images';
+import type { ImageItem, ImageSource } from '$lib/engine/types';
+import { putAsset } from '$lib/storage/db';
+import { activeTool, addToast, notebookId } from '$lib/stores/app';
+
+// a photo is made smaller once when it comes in, longer sides than this
+// only cost memory
+export const MAX_SIDE = 2400;
+// share of the page width a new picture takes
+const SHARE = 0.6;
+
+export interface ImageAsset {
+  assetId: string;
+  // pixels of the stored picture
+  w: number;
+  h: number;
+}
+
+// the picture goes into storage for the open notebook, made smaller first
+// when it is big. png stays png, the rest becomes jpeg. null when the
+// browser can not read it
+export async function storeImage(blob: Blob, name = 'image'): Promise<ImageAsset | null> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(blob);
+  } catch {
+    return null;
+  }
+  let out = blob;
+  const long = Math.max(bitmap.width, bitmap.height);
+  if (long > MAX_SIDE) {
+    const k = MAX_SIDE / long;
+    const w = Math.max(1, Math.round(bitmap.width * k));
+    const h = Math.max(1, Math.round(bitmap.height * k));
+    const canvas = new OffscreenCanvas(w, h);
+    const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    const type = blob.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    out = await canvas.convertToBlob({ type, quality: 0.9 });
+    bitmap = canvas.transferToImageBitmap();
+  }
+  const assetId = newId();
+  await putAsset({
+    id: assetId,
+    notebookId: get(notebookId),
+    kind: 'image',
+    name,
+    type: out.type,
+    blob: out,
+    w: bitmap.width,
+    h: bitmap.height
+  });
+  rememberBitmap(assetId, bitmap);
+  return { assetId, w: bitmap.width, h: bitmap.height };
+}
+
+// an image item for the asset, centred on (cx, cy) of page index, about 60
+// percent of the page wide and never bigger than the page. a small picture
+// keeps its own size
+export function imageItemFor(asset: ImageAsset, index: number, cx: number, cy: number, source?: ImageSource): ImageItem | null {
+  const ed = editor();
+  if (!ed) return null;
+  const { view, doc } = ed;
+  const meta = doc.notebook.pages[index];
+  // a board has no edges, the part of it on screen counts as the page
+  const pageW = view.isBoard ? view.width / view.cam.zoom : meta.w;
+  const pageH = view.isBoard ? view.height / view.cam.zoom : meta.h;
+  let w = Math.min(asset.w, pageW * SHARE);
+  let h = (w * asset.h) / asset.w;
+  if (h > pageH * 0.9) {
+    h = pageH * 0.9;
+    w = (h * asset.w) / asset.h;
+  }
+  let x = cx - w / 2;
+  let y = cy - h / 2;
+  if (!view.isBoard) {
+    x = Math.max(0, Math.min(x, meta.w - w));
+    y = Math.max(0, Math.min(y, meta.h - h));
+  }
+  const item: ImageItem = { id: newId(), type: 'image', assetId: asset.assetId, x, y, w, h };
+  if (source) item.source = { ...source };
+  return item;
+}
+
+// pictures from files or the clipboard, put down around a point of the
+// window, the pointer or the middle of the view. they end up selected
+export async function insertImages(blobs: Blob[], at: Point | null, centre = false) {
+  // the spot is taken now, the pointer may move on while the files are read
+  const spot = spotAt(at, centre);
+  if (!spot) return;
+  const placed: ImageItem[] = [];
+  for (const blob of blobs) {
+    const asset = await storeImage(blob, blob instanceof File ? blob.name : 'image');
+    if (!asset) {
+      addToast('That picture could not be read', 'warning');
+      continue;
+    }
+    // more than one picture fan out a little
+    const step = placed.length * 24;
+    const item = imageItemFor(asset, spot.index, spot.x + step, spot.y + step);
+    if (item) placed.push(item);
+  }
+  const ed = editor();
+  if (!ed || placed.length === 0 || spot.index >= ed.doc.pageCount) return;
+  activeTool.set('select');
+  ed.select.insert(spot.index, placed);
+}
+
+// for code that makes pictures itself (a snip of a pdf page): one picture
+// from a blob, centred on a point of page index in page units
+export async function insertImageBlob(
+  blob: Blob,
+  index: number,
+  cx: number,
+  cy: number,
+  source?: ImageSource
+): Promise<ImageItem | null> {
+  const asset = await storeImage(blob);
+  const ed = editor();
+  if (!asset || !ed) return null;
+  const item = imageItemFor(asset, index, cx, cy, source);
+  if (!item) return null;
+  activeTool.set('select');
+  ed.select.insert(index, [item]);
+  return item;
+}
+
+export function isImage(file: Blob): boolean {
+  return file.type.startsWith('image/') && file.type !== 'image/svg+xml';
+}
+
+// a file picker that resolves with what was picked, nothing when it was closed
+export function pickFiles(accept: string, multiple = true): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.multiple = multiple;
+    input.addEventListener('change', () => resolve(Array.from(input.files ?? [])));
+    input.addEventListener('cancel', () => resolve([]));
+    input.click();
+  });
+}
+
+// the next phase reads pdfs and .brainotes files, until then only pictures come in
+function importAll(files: File[], at: Point | null) {
+  const images = files.filter(isImage);
+  if (images.length > 0) void insertImages(images, at);
+  if (images.length < files.length) addToast('Only pictures can be imported for now', 'info');
+}
+
+plugActions({
+  insertImage: (at) => {
+    void pickFiles('image/*').then((files) => {
+      const images = files.filter(isImage);
+      if (images.length > 0) void insertImages(images, at ?? null, true);
+    });
+  },
+  importFiles: (files, at) => {
+    if (files) importAll(files, at ?? null);
+    else void pickFiles('image/*,application/pdf,.brainotes').then((picked) => importAll(picked, at ?? null));
+  }
+});
