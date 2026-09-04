@@ -3,6 +3,12 @@ import type { PaperStyle } from '$lib/stores/preferences';
 
 export type ExportFormat = 'pdf' | 'png' | 'brainotes';
 
+// a point of the window in css pixels, like clientX and clientY
+export interface Point {
+  x: number;
+  y: number;
+}
+
 export interface Actions {
   undo: () => void;
   redo: () => void;
@@ -25,18 +31,25 @@ export interface Actions {
   deleteSelection: () => void;
   duplicateSelection: () => void;
   recolorSelection: (color: string) => void;
+  // in page units
+  nudgeSelection: (dx: number, dy: number) => void;
   selectAll: () => void;
   clearSelection: () => void;
+  copySelection: () => void;
+  cutSelection: () => void;
+  // at the point, else at the pointer or the middle of the view
+  paste: (at?: Point) => void;
   newNotebook: (kind: NotebookKind) => void;
   openNotebook: (id: string) => void;
   closeNotebook: () => void;
   // no id means the notebook that is open
   renameNotebook: (name: string, id?: string) => void;
   deleteNotebook: (id: string) => void;
-  // no files means ask for them with a file picker
-  importFiles: (files?: File[]) => void;
+  // no files means ask for them with a file picker. pictures land at the point
+  importFiles: (files?: File[], at?: Point) => void;
   openReference: (files?: File[]) => void;
-  insertImage: () => void;
+  // picks pictures and puts them at the point or the middle of the view
+  insertImage: (at?: Point) => void;
   exportNotebook: (format: ExportFormat) => void;
 }
 
@@ -65,8 +78,12 @@ export const actions: Actions = {
   deleteSelection: nothing,
   duplicateSelection: nothing,
   recolorSelection: nothing,
+  nudgeSelection: nothing,
   selectAll: nothing,
   clearSelection: nothing,
+  copySelection: nothing,
+  cutSelection: nothing,
+  paste: nothing,
   newNotebook: (kind) => {
     notebookKind.set(kind);
     notebookName.set(kind === 'board' ? 'Whiteboard' : 'My notes');
