@@ -1,8 +1,10 @@
 import { itemBox } from '../bounds';
 import { newId } from '../doc';
 import { inkColor, isDark } from '../render';
+import { shapePath } from '../shapes';
+import { recognize } from '../snap';
 import { curveBetween, followFactor, mapPressure, outlineOf, PENS, PF_SCALE, strokePath, traceOutline } from '../stroke';
-import type { Box, PenType, Stroke } from '../types';
+import type { Box, Item, PenType, Shape, Stroke } from '../types';
 import type { CanvasView } from '../view';
 import type { PointerKind, Sample, Tool } from './tool';
 
@@ -13,10 +15,17 @@ export interface PenSettings {
   // the preferences, both 0..1
   pressure: number;
   smoothing: number;
+  holdToSnap: boolean;
 }
 
 // css pixels per ms where a mouse or finger line is at its thinnest
 const FAST = 2.5;
+// a pen that rests this long (ms) within this many css pixels turns its
+// line into a clean shape
+const HOLD = 500;
+const HOLD_MOVE = 3;
+// css pixels, smaller lines are writing, not shapes
+const SNAP_MIN = 28;
 
 // p mirrored away from q, a made up neighbour for the ends of a line so
 // the curve leaves them at full speed
@@ -51,9 +60,21 @@ export class PenTool implements Tool {
   private lastTime = 0;
   // a finished stroke stays on the live canvas for one more frame, until
   // the ink canvas surely shows it
-  private ghost: Stroke | null = null;
+  private ghost: Item | null = null;
   private ghostPage = 0;
   private ghostColor = '';
+  // draw and hold: where the pen rests since when, and the shape it became.
+  // after the snap the pen moves the end of a line by as much as it moves
+  private snapping = false;
+  private holdX = 0;
+  private holdY = 0;
+  private holdSince = 0;
+  private holdTimer: ReturnType<typeof setTimeout> | null = null;
+  private snapped: Shape | null = null;
+  private snapX = 0;
+  private snapY = 0;
+  private snapEndX = 0;
+  private snapEndY = 0;
 
   constructor(
     private view: CanvasView,
@@ -84,7 +105,51 @@ export class PenTool implements Tool {
     this.tail = [];
     this.pressure = 0.5;
     this.zeroStart = kind === 'pen' && s.pressure === 0;
+    this.snapped = null;
+    this.snapping = set.holdToSnap && set.pen !== 'highlighter';
+    this.holdX = s.x;
+    this.holdY = s.y;
+    this.holdSince = performance.now();
+    if (this.snapping) this.armHold(HOLD);
     this.add(s, true);
+  }
+
+  private armHold(delay: number) {
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer = setTimeout(this.checkHold, delay);
+  }
+
+  private stopHold() {
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer = null;
+  }
+
+  // one timer for the whole stroke, it looks again when the pen moved since
+  private checkHold = () => {
+    this.holdTimer = null;
+    if (!this.on || this.snapped) return;
+    const wait = HOLD - (performance.now() - this.holdSince);
+    if (wait > 10) {
+      this.armHold(wait);
+      return;
+    }
+    this.snap();
+  };
+
+  private snap() {
+    const all = this.pts.concat(this.keys.length > 1 ? [this.keys[this.keys.length - 1]] : []);
+    if (this.tip) all.push(this.tip);
+    const xy: number[] = [];
+    for (const p of all) xy.push(p[0] / PF_SCALE, p[1] / PF_SCALE);
+    const found = recognize(xy, SNAP_MIN / this.view.cam.zoom);
+    if (!found) return;
+    const end = all[all.length - 1];
+    this.snapX = end[0] / PF_SCALE;
+    this.snapY = end[1] / PF_SCALE;
+    this.snapEndX = found.x2;
+    this.snapEndY = found.y2;
+    this.snapped = { id: newId(), type: 'shape', color: this.color, size: this.size, ...found };
+    this.view.requestLive();
   }
 
   move(s: Sample) {
@@ -101,6 +166,20 @@ export class PenTool implements Tool {
     if (!this.on) return;
     this.on = false;
     this.tail = [];
+    this.stopHold();
+    const shape = this.snapped;
+    if (shape) {
+      this.snapped = null;
+      const page = this.view.doc.page(this.pageId);
+      if (page) {
+        this.view.history.run({ type: 'items', pageId: this.pageId, removed: [], added: [{ item: shape, index: page.items.length }] });
+      }
+      this.ghost = shape;
+      this.ghostPage = this.page;
+      this.ghostColor = this.shown;
+      this.request();
+      return;
+    }
     // the raw end becomes the last key and the last gaps get their curve
     const keys = this.keys;
     if (this.tip) this.addKey(this.tip);
@@ -138,6 +217,8 @@ export class PenTool implements Tool {
   cancel() {
     this.on = false;
     this.tail = [];
+    this.snapped = null;
+    this.stopHold();
     this.request();
   }
 
@@ -147,15 +228,32 @@ export class PenTool implements Tool {
       this.ghost = null;
       if (this.ghostPage >= this.view.doc.pageCount) return null;
       this.view.applyPage(ctx, this.ghostPage);
-      ctx.globalAlpha = PENS[ghost.pen].alpha;
-      ctx.fillStyle = this.ghostColor;
-      ctx.fill(strokePath(ghost));
+      if (ghost.type === 'shape') this.drawShape(ctx, ghost, this.ghostColor);
+      else if (ghost.type === 'stroke') {
+        ctx.globalAlpha = PENS[ghost.pen].alpha;
+        ctx.fillStyle = this.ghostColor;
+        ctx.fill(strokePath(ghost));
+      }
       // one more frame to wipe it
       this.view.requestLive();
       return this.view.toDevice(this.ghostPage, itemBox(ghost));
     }
     if (!this.on || this.pen === 'highlighter') return null;
+    if (this.snapped) {
+      this.view.applyPage(ctx, this.page);
+      this.drawShape(ctx, this.snapped, this.shown);
+      return this.view.toDevice(this.page, itemBox(this.snapped));
+    }
     return this.drawStroke(ctx);
+  }
+
+  private drawShape(ctx: CanvasRenderingContext2D, shape: Shape, color: string) {
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = shape.size;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke(shapePath(shape));
   }
 
   drawUnder(ctx: CanvasRenderingContext2D): Box | null {
@@ -181,6 +279,24 @@ export class PenTool implements Tool {
     const dist = Math.hypot(dx, dy);
     // samples closer than half a device pixel add nothing but noise
     if (!first && dist < 0.5 / this.view.dpr) return;
+
+    if (this.snapped) {
+      // a snapped line or arrow follows the pen with its end
+      const kind = this.snapped.kind;
+      if (kind === 'line' || kind === 'arrow') {
+        const [px, py] = this.toPage(s, 0);
+        const x2 = this.snapEndX + px / PF_SCALE - this.snapX;
+        const y2 = this.snapEndY + py / PF_SCALE - this.snapY;
+        this.snapped = { ...this.snapped, x2, y2 };
+        this.view.requestLive();
+      }
+      return;
+    }
+    if (this.snapping && Math.hypot(s.x - this.holdX, s.y - this.holdY) > HOLD_MOVE) {
+      this.holdX = s.x;
+      this.holdY = s.y;
+      this.holdSince = performance.now();
+    }
 
     if (this.kind === 'pen') {
       // a pen that already left the glass reports no pressure
