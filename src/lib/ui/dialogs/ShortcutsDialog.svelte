@@ -14,7 +14,11 @@
   const groups: { name: string; items: Shortcut[] }[] = [
     {
       name: 'Tools',
-      items: [...tools.map((tool) => ({ keys: [tool.shortcut], what: tool.label })), { keys: ['Space'], what: 'Hand while held' }]
+      items: [
+        ...tools.map((tool) => ({ keys: [tool.shortcut], what: tool.label })),
+        { keys: ['Space'], what: 'Hand while held' },
+        { keys: ['Shift'], what: 'Straight lines, squares and circles' }
+      ]
     },
     {
       name: 'Pages',
@@ -22,7 +26,7 @@
         { keys: ['Ctrl', 'Enter'], what: 'New page' },
         { keys: ['PageDown'], what: 'Next page' },
         { keys: ['PageUp'], what: 'Previous page' },
-        { keys: ['←/→'], what: 'Previous / next page on the board' }
+        { keys: ['←/→'], what: 'Previous / next page on the board, with nothing selected' }
       ]
     },
     {
@@ -30,9 +34,13 @@
       items: [
         { keys: ['Ctrl', 'Z'], what: 'Undo' },
         { keys: ['Ctrl', 'Shift', 'Z'], what: 'Redo (also Ctrl+Y)' },
-        { keys: ['Ctrl', 'A'], what: 'Select all' },
+        { keys: ['Ctrl', 'A'], what: 'Select all on the page' },
+        { keys: ['Ctrl', 'C'], what: 'Copy the selection' },
+        { keys: ['Ctrl', 'X'], what: 'Cut the selection' },
+        { keys: ['Ctrl', 'V'], what: 'Paste items, a picture or text' },
         { keys: ['Ctrl', 'D'], what: 'Duplicate the selection' },
         { keys: ['Delete'], what: 'Delete the selection (Backspace too)' },
+        { keys: ['←↑→↓'], what: 'Move the selection, Shift for bigger steps' },
         { keys: ['Escape'], what: 'Cancel / close' }
       ]
     },
