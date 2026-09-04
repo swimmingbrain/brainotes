@@ -1,13 +1,22 @@
 import { get } from 'svelte/store';
-import { actions, plugActions } from './actions';
+import { actions, plugActions, type Point } from './actions';
 import type { ToolId } from './tools';
-import { copyPage, Doc, newId, newPageData, newPageMeta, type DocChange, type PageData } from '$lib/engine/doc';
+import { copyItem, copyPage, Doc, newId, newPageData, newPageMeta, type DocChange, type PageData } from '$lib/engine/doc';
 import { History, type Op } from '$lib/engine/history';
+import { itemNear } from '$lib/engine/hit';
+import { clearBitmaps, setImageLoader } from '$lib/engine/images';
 import { Input, penIsDown } from '$lib/engine/input';
+import { fontLoaded, fontOf } from '$lib/engine/text';
+import { moveBy, transformItem } from '$lib/engine/transform';
 import { EraserTool } from '$lib/engine/tools/eraser';
 import { HandTool } from '$lib/engine/tools/hand';
+import { LaserTool } from '$lib/engine/tools/laser';
 import { PenTool } from '$lib/engine/tools/pen';
-import type { PageMeta } from '$lib/engine/types';
+import { SelectTool } from '$lib/engine/tools/select';
+import { ShapeTool } from '$lib/engine/tools/shape';
+import { TextTool } from '$lib/engine/tools/text';
+import type { Sample, Tool } from '$lib/engine/tools/tool';
+import type { PageMeta, ShapeKind, TextItem } from '$lib/engine/types';
 import { CanvasView } from '$lib/engine/view';
 import * as storage from '$lib/storage/db';
 import type { PageLoader } from '$lib/storage/loader';
@@ -24,6 +33,7 @@ import {
   pageIndex,
   pageList,
   paperStyle,
+  selectionCount,
   toolOptions,
   zoomPercent,
   type ToolOptions
@@ -59,7 +69,41 @@ let session: Session | null = null;
 let doc: Doc | null = null;
 let history: History | null = null;
 let view: CanvasView | null = null;
+let select: SelectTool | null = null;
+let text: TextTool | null = null;
 let offDoc: (() => void) | null = null;
+// where the pointer is over the canvas, in window pixels
+let pointer: Point | null = null;
+
+// what the clipboard and the picture import work with
+export interface Editor {
+  view: CanvasView;
+  doc: Doc;
+  select: SelectTool;
+}
+
+export function editor(): Editor | null {
+  return view && doc && select ? { view, doc, select } : null;
+}
+
+// a point of the window as a page and a point on it in page units. no
+// point means the pointer while it is over the canvas, else the middle of
+// the view, which centre asks for always
+export function spotAt(at: Point | null, centre = false): { index: number; x: number; y: number } | null {
+  if (!view || !doc || doc.pageCount === 0) return null;
+  const p = at ?? (centre ? null : pointer);
+  let x = p ? p.x - view.left : view.width / 2;
+  let y = p ? p.y - view.top : view.height / 2;
+  let index = view.pageAtScreen(x, y);
+  if (index < 0) {
+    // between two pages the page in the middle of the view takes it
+    index = current();
+    x = view.width / 2;
+    y = view.height / 2;
+  }
+  const cam = view.cam;
+  return { index, x: cam.x + x / cam.zoom - view.pageX(index), y: cam.y + y / cam.zoom - view.pageY(index) };
+}
 
 let tool: ToolId = get(activeTool);
 let options: ToolOptions = get(toolOptions);
@@ -94,6 +138,7 @@ function syncHistory() {
 }
 
 function onDocChange(change: DocChange) {
+  select?.docChanged(change);
   // while the pen is down the counts wait, the gesture ends with a history
   // change that brings them up to date
   if (change.type === 'items') {
@@ -112,6 +157,9 @@ function onDocChange(change: DocChange) {
 
 // a notebook from the library takes over the canvas, null closes it
 export function showNotebook(next: Session | null) {
+  text?.commit();
+  select?.clear();
+  clearBitmaps();
   offDoc?.();
   offDoc = null;
   session = next;
@@ -163,7 +211,49 @@ function penSettings() {
     color: marker ? options.highlighterColor : options.penColor,
     size: marker ? options.highlighterSize : options.penSize,
     pressure: prefs.pressure,
-    smoothing: prefs.smoothing
+    smoothing: prefs.smoothing,
+    holdToSnap: prefs.holdToSnap
+  };
+}
+
+const SHAPE_KINDS: Record<ToolOptions['shapeKind'], ShapeKind> = {
+  line: 'line',
+  arrow: 'arrow',
+  rectangle: 'rect',
+  ellipse: 'ellipse'
+};
+
+function shapeSettings() {
+  return { kind: SHAPE_KINDS[options.shapeKind], color: options.shapeColor, size: options.shapeSize };
+}
+
+function textSettings() {
+  return { size: options.textSize, color: options.textColor };
+}
+
+// the text under a point of page index, for editing it
+function textAt(index: number, x: number, y: number): TextItem | null {
+  if (!doc || !view) return null;
+  const items = doc.pageAt(index).items;
+  const r = 4 / view.cam.zoom;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    if (item.type === 'text' && itemNear(item, x, y, r)) return item;
+  }
+  return null;
+}
+
+// a click with the image tool picks a picture for that spot
+function imageTool(v: CanvasView): Tool {
+  let at: Point | null = null;
+  return {
+    down: (s: Sample) => (at = { x: s.x + v.left, y: s.y + v.top }),
+    move: () => {},
+    up: () => {
+      if (at) actions.insertImage(at);
+      at = null;
+    },
+    cancel: () => (at = null)
   };
 }
 
@@ -184,22 +274,39 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
       syncPage();
     },
     scroll: onscroll,
-    near: (first, last) => session?.loader.near(first, last)
+    near: (first, last) => session?.loader.near(first, last),
+    camera: () => text?.place()
   });
   view = v;
 
   const pen = new PenTool(v, penSettings);
   const eraser = new EraserTool(v, eraserSettings);
   const hand = new HandTool(v);
+  const shape = new ShapeTool(v, shapeSettings);
+  const laser = new LaserTool(v);
+  const picker = imageTool(v);
+  const words = new TextTool(v, textSettings, textAt);
+  const sel = new SelectTool(v, {
+    changed: (count) => selectionCount.set(count),
+    editText: (index, item) => words.edit(index, item)
+  });
+  select = sel;
+  text = words;
+  const tools: Partial<Record<ToolId, Tool>> = {
+    select: sel,
+    pen,
+    highlighter: pen,
+    eraser,
+    shape,
+    text: words,
+    image: picker,
+    laser,
+    hand
+  };
   const input = new Input(
     v,
     {
-      pick: () => {
-        if (tool === 'pen' || tool === 'highlighter') return pen;
-        if (tool === 'eraser') return eraser;
-        if (tool === 'hand') return hand;
-        return null;
-      },
+      pick: () => tools[tool] ?? null,
       eraser,
       hand
     },
@@ -209,19 +316,39 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
     }
   );
 
+  const track = (e: PointerEvent) => (pointer = { x: e.clientX, y: e.clientY });
+  const lose = () => (pointer = null);
+  v.live.addEventListener('pointermove', track);
+  v.live.addEventListener('pointerdown', track);
+  v.live.addEventListener('pointerleave', lose);
+
   const unsubs = [
     activeTool.subscribe((t) => {
+      const before = tool;
       tool = t;
+      if (t === before) return;
+      // switching tools ends the text being typed and drops the selection
+      words.commit();
+      if (t !== 'select') sel.clear();
+      v.live.style.cursor = '';
       input.toolChanged();
+      if (t === 'image') actions.insertImage();
     }),
     toolOptions.subscribe((o) => (options = o))
   ];
 
   return () => {
     for (const unsub of unsubs) unsub();
+    v.live.removeEventListener('pointermove', track);
+    v.live.removeEventListener('pointerdown', track);
+    v.live.removeEventListener('pointerleave', lose);
+    words.destroy();
+    sel.clear();
     input.destroy();
     v.destroy();
     if (view === v) view = null;
+    if (select === sel) select = null;
+    if (text === words) text = null;
   };
 }
 
@@ -289,6 +416,18 @@ function paperOnAllPages(index: number) {
 
 preferences.subscribe((p) => (prefs = p));
 
+if (typeof window !== 'undefined') {
+  setImageLoader(async (id) => (await storage.getAsset(id))?.blob);
+  // text measured before inter arrived is measured again and drawn anew
+  void document.fonts?.load(fontOf(16)).then(() => {
+    fontLoaded();
+    view?.redrawAll();
+  });
+}
+
+// duplicates sit a little down and to the right of what they copy
+const DUPLICATE_SHIFT = 16;
+
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   window.brainotes = {
     get view() {
@@ -346,5 +485,24 @@ plugActions({
     if (doc && doc.pageCount > 0) setPagePaper(current(), style);
   },
   setPagePaper,
-  paperOnAllPages
+  paperOnAllPages,
+  deleteSelection: () => select?.remove(),
+  duplicateSelection: () => {
+    if (!select || select.items.length === 0) return;
+    const shift = moveBy(DUPLICATE_SHIFT, DUPLICATE_SHIFT);
+    select.insert(
+      select.index,
+      select.items.map((item) => transformItem(copyItem(item), shift))
+    );
+  },
+  recolorSelection: (color) => select?.recolor(color),
+  nudgeSelection: (dx, dy) => select?.nudge(dx, dy),
+  selectAll: () => {
+    if (!doc || !select || doc.pageCount === 0) return;
+    text?.commit();
+    activeTool.set('select');
+    const index = current();
+    select.select(index, doc.pageAt(index).items);
+  },
+  clearSelection: () => select?.clear()
 });
