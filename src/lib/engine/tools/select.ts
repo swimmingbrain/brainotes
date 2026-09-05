@@ -20,6 +20,8 @@ const PICK = 6;
 const DOUBLE = 400;
 // the biggest picture of the selection that is moved around while dragging
 const SPRITE_PIXELS = 16_000_000;
+// ms after a selection is made before its picture is drawn ahead of a drag
+const PREPARE = 80;
 
 type Mode = 'idle' | 'lasso' | 'move' | 'scale';
 
@@ -60,6 +62,9 @@ export class SelectTool implements Tool {
   // the dragged corner of the box (0 top left, then clockwise)
   private corner = 0;
   private sprite: Sprite | null = null;
+  // drawn while nothing happens, a drag that starts later finds it ready
+  private prepared: Sprite | null = null;
+  private prepTimer: ReturnType<typeof setTimeout> | null = null;
   private lastClick = { time: 0, item: null as Item | null };
 
   constructor(
@@ -96,6 +101,9 @@ export class SelectTool implements Tool {
   }
 
   private show() {
+    this.prepared = null;
+    if (this.prepTimer) clearTimeout(this.prepTimer);
+    this.prepTimer = this.items.length > 0 ? setTimeout(this.prepare, PREPARE) : null;
     this.hooks.changed?.(this.items.length);
     // the box is drawn by whatever tool the view shows, so this one takes over
     if (this.items.length > 0) this.view.tool = this;
@@ -198,7 +206,8 @@ export class SelectTool implements Tool {
     } else if (!this.started && Math.hypot(s.x - this.sx, s.y - this.sy) >= CLICK) {
       // the items leave their layers and ride on the live canvas until they land
       this.started = true;
-      this.sprite = this.makeSprite();
+      const ready = this.prepared;
+      this.sprite = ready && ready.scale === this.spriteScale() ? ready : this.makeSprite();
       this.view.hide(this.index, this.items);
     }
     this.view.requestLive();
@@ -378,6 +387,28 @@ export class SelectTool implements Tool {
 
   // drawing
 
+  private prepare = () => {
+    this.prepTimer = null;
+    if (this.busy) return;
+    const sprite = this.makeSprite();
+    if (!sprite) return;
+    // a canvas draws when its picture is first used, this makes it draw now
+    const sink = new OffscreenCanvas(1, 1).getContext('2d');
+    sink?.drawImage(sprite.canvas, 0, 0, 1, 1);
+    this.prepared = sprite;
+  };
+
+  // device pixels per page unit of the sprite, smaller for a big selection
+  private spriteScale(): number {
+    const box = this.box();
+    if (!box) return 1;
+    const w = Math.max(box.maxX - box.minX, 1);
+    const h = Math.max(box.maxY - box.minY, 1);
+    let scale = this.view.cam.zoom * this.view.dpr;
+    if (w * h * scale * scale > SPRITE_PIXELS) scale = Math.sqrt(SPRITE_PIXELS / (w * h));
+    return Math.min(scale, 8192 / Math.max(w, h));
+  }
+
   // the selection drawn once into a picture, so a drag only moves that picture
   private makeSprite(): Sprite | null {
     const box = this.box();
@@ -385,9 +416,7 @@ export class SelectTool implements Tool {
     if (!box || index < 0 || typeof OffscreenCanvas === 'undefined') return null;
     const w = box.maxX - box.minX;
     const h = box.maxY - box.minY;
-    let scale = this.view.cam.zoom * this.view.dpr;
-    if (w * h * scale * scale > SPRITE_PIXELS) scale = Math.sqrt(SPRITE_PIXELS / (w * h));
-    scale = Math.min(scale, 8192 / Math.max(w, h));
+    const scale = this.spriteScale();
     const canvas = new OffscreenCanvas(Math.max(1, Math.ceil(w * scale) + 2), Math.max(1, Math.ceil(h * scale) + 2));
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
