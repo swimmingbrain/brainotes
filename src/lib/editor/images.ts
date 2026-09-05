@@ -143,8 +143,15 @@ export function pickFiles(accept: string, multiple = true): Promise<File[]> {
     input.type = 'file';
     input.accept = accept;
     input.multiple = multiple;
-    input.addEventListener('change', () => resolve(Array.from(input.files ?? [])));
-    input.addEventListener('cancel', () => resolve([]));
+    input.style.display = 'none';
+    // some browsers only open the picker for an input that is in the page
+    document.body.appendChild(input);
+    const done = (files: File[]) => {
+      input.remove();
+      resolve(files);
+    };
+    input.addEventListener('change', () => done(Array.from(input.files ?? [])));
+    input.addEventListener('cancel', () => done([]));
     input.click();
   });
 }
