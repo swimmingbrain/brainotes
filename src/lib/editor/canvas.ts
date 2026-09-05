@@ -272,6 +272,9 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
     state: () => {
       zoomPercent.set(Math.round(v.cam.zoom * 100));
       syncPage();
+      // another board is on show, what was selected or typed on the last one ends
+      if (v.isBoard && select && select.index >= 0 && select.index !== v.board) select.clear();
+      if (v.isBoard) text?.place();
     },
     scroll: onscroll,
     near: (first, last) => session?.loader.near(first, last),
