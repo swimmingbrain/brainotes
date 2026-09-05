@@ -1,6 +1,7 @@
 import { loadPage, openDoc } from './canvas';
 import { emptyBox, growBox, isEmpty, itemBox } from '$lib/engine/bounds';
-import type { Doc, DocChange, PageData } from '$lib/engine/doc';
+import { imagesOf, type Doc, type DocChange, type PageData } from '$lib/engine/doc';
+import { onBitmap } from '$lib/engine/images';
 import { penIsDown } from '$lib/engine/input';
 import { pageJob, type Frame } from '$lib/engine/render';
 
@@ -48,9 +49,11 @@ export class Thumbs {
   private cancelIdle: (() => void) | null = null;
   private sink: OffscreenCanvasRenderingContext2D | null = null;
   private off: () => void;
+  private offBitmap: () => void;
 
   constructor() {
     this.off = this.doc?.on(this.onChange) ?? (() => {});
+    this.offBitmap = onBitmap(this.onBitmap);
   }
 
   // root is the list that scrolls, thumbnails just past its edges are drawn too
@@ -74,6 +77,7 @@ export class Thumbs {
 
   destroy() {
     this.off();
+    this.offBitmap();
     this.observer?.disconnect();
     if (this.timer) clearTimeout(this.timer);
     this.cancelIdle?.();
@@ -97,6 +101,19 @@ export class Thumbs {
     thumb.job = null;
     // ink that just arrived from storage shows at once, an edit waits a moment
     this.schedule(change.type === 'loaded' ? 0 : REFRESH);
+  };
+
+  // a picture finished decoding, the pages that show it are drawn again
+  private onBitmap = (assetId: string) => {
+    let any = false;
+    for (const thumb of this.byId.values()) {
+      const page = this.doc?.page(thumb.id);
+      if (!page || !imagesOf(page).some((image) => image.assetId === assetId)) continue;
+      thumb.stale = true;
+      thumb.job = null;
+      any = true;
+    }
+    if (any) this.schedule(0);
   };
 
   private schedule(delay: number) {
