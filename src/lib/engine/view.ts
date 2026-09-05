@@ -662,7 +662,8 @@ export class CanvasView {
       const box = moveBox(change.box, this.pageX(index), this.pageY(index));
       this.hlLayer.drop(box);
       this.inkLayer.drop(box);
-      this.inkDirty = this.hlDirty = true;
+      // its pictures are on the paper layer
+      this.bgDirty = this.inkDirty = this.hlDirty = true;
       this.requestFrame();
     } else if (change.type === 'pages') {
       this.relayout();
