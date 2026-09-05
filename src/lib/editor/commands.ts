@@ -96,8 +96,13 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
     c('undo', 'Undo', 'Edit', () => actions.undo(), 'Ctrl+Z'),
     c('redo', 'Redo', 'Edit', () => actions.redo(), 'Ctrl+Shift+Z'),
     c('select-all', 'Select all', 'Edit', () => actions.selectAll(), 'Ctrl+A'),
+    c('copy', 'Copy selection', 'Edit', () => actions.copySelection(), 'Ctrl+C'),
+    c('cut', 'Cut selection', 'Edit', () => actions.cutSelection(), 'Ctrl+X'),
+    c('paste', 'Paste', 'Edit', () => actions.paste(), 'Ctrl+V'),
     c('duplicate', 'Duplicate selection', 'Edit', () => actions.duplicateSelection(), 'Ctrl+D'),
     c('delete', 'Delete selection', 'Edit', () => actions.deleteSelection(), 'Delete'),
+    c('deselect', 'Clear the selection', 'Edit', () => actions.clearSelection(), 'Escape'),
+    c('insert-image', 'Insert a picture', 'Edit', () => actions.insertImage()),
 
     // view
     c('zoom-in', 'Zoom in', 'View', () => actions.zoomIn(), 'Ctrl+='),
