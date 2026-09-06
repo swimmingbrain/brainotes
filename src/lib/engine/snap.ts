@@ -51,7 +51,6 @@ function pathLength(pts: Pt[]): number {
   return len;
 }
 
-// n points evenly spread along the path, so slow parts do not weigh more
 function resample(pts: Pt[], n: number): Pt[] {
   const step = pathLength(pts) / (n - 1);
   const out: Pt[] = [pts[0]];
@@ -88,7 +87,6 @@ function bounds(pts: Pt[]) {
   return { minX, minY, maxX, maxY };
 }
 
-// spread across the main direction over spread along it: 0 for a line, 1 for a circle
 function elongation(pts: Pt[]): number {
   let mx = 0;
   let my = 0;
@@ -125,7 +123,6 @@ function cross(o: Pt, a: Pt, b: Pt): number {
   return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
 }
 
-// area of the convex hull, monotone chain
 function hullArea(pts: Pt[]): number {
   const sorted = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const half = (list: Pt[]) => {
@@ -155,7 +152,6 @@ function turn(a: Pt, b: Pt, c: Pt): number {
   return Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y);
 }
 
-// how far the path turns in all, left minus right
 function totalTurn(pts: Pt[]): number {
   let sum = 0;
   for (let i = 1; i < pts.length - 1; i++) sum += turn(pts[i - 1], pts[i], pts[i + 1]);
@@ -179,7 +175,6 @@ function cornerShare(pts: Pt[]): number {
       if (!taken[i] && (peak < 0 || turns[i] > turns[peak])) peak = i;
     }
     if (peak < 0) break;
-    // one corner smears over the window, it counts once
     for (let i = Math.max(0, peak - TURN_WINDOW); i <= Math.min(turns.length - 1, peak + TURN_WINDOW); i++) {
       if (!taken[i]) top += turns[i];
       taken[i] = true;
@@ -267,8 +262,6 @@ function openShape(raw: Pt[], pts: Pt[], length: number): Snapped | null {
   return { kind: 'arrow', x1: first[0], y1: first[1], x2: point[0], y2: point[1] };
 }
 
-// xy is x, y, x, y, ... in page units, minSize the smallest size of the
-// larger side of the box that is worth snapping
 export function recognize(xy: ArrayLike<number>, minSize: number): Snapped | null {
   const raw: Pt[] = [];
   for (let i = 0; i + 1 < xy.length; i += 2) raw.push([xy[i], xy[i + 1]]);
