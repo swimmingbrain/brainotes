@@ -145,6 +145,11 @@ export class TextTool implements Tool {
       this.close();
       return;
     }
+    // another board came up, the text stays on its own
+    if (this.view.isBoard && index !== this.view.board) {
+      this.commit();
+      return;
+    }
     const cam = this.view.cam;
     const z = cam.zoom;
     const measure = measurer(e.size);
