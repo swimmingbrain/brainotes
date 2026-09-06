@@ -1,6 +1,8 @@
 node_modules/
 .svelte-kit/
 build/
+# copied from pdfjs-dist on every dev and build run
+static/pdfjs/
 .env
 .env.*
 .DS_Store
