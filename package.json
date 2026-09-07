@@ -19,6 +19,7 @@
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^24.19.1",
     "@types/rbush": "^4.0.0",
     "fake-indexeddb": "^6.2.5",
     "svelte": "^5.19.0",
