@@ -1,9 +1,11 @@
 import { PAPER_COLORS } from '$lib/editor/paper';
+import { shotsOf } from '$lib/pdf/pdf';
+import { pickShots } from '$lib/pdf/shots';
 import { bitmapFor } from './images';
 import { shapePath } from './shapes';
 import { PENS, strokeLine, strokePath, THIN } from './stroke';
 import { fontOf, LINE_HEIGHT, textLayout } from './text';
-import type { ImageItem, Item, PageMeta, Paper } from './types';
+import type { ImageItem, Item, PageMeta, Paper, PdfBackground } from './types';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -12,6 +14,31 @@ type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 export const HIGHLIGHTER_ALPHA = 0.5;
 
 const PAGE_BORDER = '#2e2e33';
+// a pdf page that is still on its way
+export const PDF_WAITING = '#f1f1f3';
+// the edge of a pdf page that shares its page with room for notes
+export const PDF_EDGE = 'rgba(60, 60, 70, 0.18)';
+
+// a pdf page under the ink, in page units, with the best picture there is
+// of it. false while there is none yet
+export function drawPdfBackground(ctx: Ctx, bg: PdfBackground, scale: number, page: { w: number; h: number }): boolean {
+  const { base } = pickShots(shotsOf(bg.assetId, bg.page), scale);
+  ctx.globalAlpha = 1;
+  if (base) {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(base.picture, bg.x, bg.y, bg.w, bg.h);
+  } else {
+    ctx.fillStyle = PDF_WAITING;
+    ctx.fillRect(bg.x, bg.y, bg.w, bg.h);
+  }
+  if (bg.w < page.w - 1 || bg.h < page.h - 1) {
+    ctx.strokeStyle = PDF_EDGE;
+    ctx.lineWidth = 1 / scale;
+    ctx.strokeRect(bg.x, bg.y, bg.w, bg.h);
+  }
+  return base !== null;
+}
 
 export function isDark(paper: Paper): boolean {
   return paper.color === 'dark';
@@ -262,11 +289,12 @@ export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale
         ctx.fillStyle = PAPER_COLORS[paper.color].paper;
         ctx.fillRect(0, 0, width, height);
         drawPattern(ctx, paper, ox, oy, scale, 0, 0, width, height, frame !== undefined);
-        // pictures lie on the paper, under all the ink
+        // the pdf page and the pictures lie on the paper, under all the ink
         ctx.beginPath();
         ctx.rect(0, 0, width, height);
         ctx.clip();
         ctx.setTransform(scale, 0, 0, scale, ox, oy);
+        if (page.meta.pdf) drawPdfBackground(ctx, page.meta.pdf, scale, page.meta);
         for (const image of images) drawImageItem(ctx, image, dark);
         ctx.restore();
       }
@@ -299,7 +327,8 @@ export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale
   };
 }
 
-// a whole page with its ink in one go, for the png export
+// a whole page with its ink in one go, for the png export. a pdf page is
+// drawn from the pictures there are of it, ensureShot makes a sharp one first
 export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
   pageJob(ctx, page, scale, frame).step(Infinity);
 }

@@ -10,6 +10,8 @@ export interface Paper {
   color: PaperColor;
 }
 
+// a pdf page under the ink: page counts from 1, w and h are the size of
+// the pdf page itself in points and x, y where it sits on the page
 export interface PdfBackground {
   assetId: string;
   page: number;
