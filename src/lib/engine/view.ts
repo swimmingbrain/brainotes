@@ -18,12 +18,24 @@ import { imagesOf, type Doc, type DocChange, type PageData } from './doc';
 import type { History } from './history';
 import { onBitmap } from './images';
 import { penIsDown } from './input';
-import { drawImageItem, drawItem, drawPattern, drawSheet, HIGHLIGHTER_ALPHA, isDark, isMarker } from './render';
+import {
+  drawImageItem,
+  drawItem,
+  drawPattern,
+  drawSheet,
+  HIGHLIGHTER_ALPHA,
+  isDark,
+  isMarker,
+  PDF_EDGE,
+  PDF_WAITING
+} from './render';
 import { hasLine, hasPath, strokeLine, strokePath, THIN } from './stroke';
 import { TileLayer, type TileJob } from './tiles';
 import type { Tool } from './tools/tool';
-import type { Box, Item } from './types';
+import type { Box, Item, PdfBackground } from './types';
 import { PAPER_COLORS } from '$lib/editor/paper';
+import { capScale, MAX_PIXELS, onShot, previewScale, shotsOf, touchShot, want, type Wanted } from '$lib/pdf/pdf';
+import { pickShots, sharp, type Part } from '$lib/pdf/shots';
 
 const BG_DEEP = '#111113';
 // how long the zoom has to rest before the tiles are rendered sharp again
@@ -55,6 +67,9 @@ export interface ViewHooks {
 const NEAR = 2;
 // ms, a wheel step glides most of its way in about three times this
 const GLIDE = 40;
+// device pixels, a sharp part of a pdf page is cut on this grid so a small
+// pan does not ask for a new one
+const PART_GRID = 256;
 // ms, how fast a flung page slows down after the fingers lifted
 const FRICTION = 260;
 // px per ms, slower than this a fling has ended
@@ -136,6 +151,9 @@ export class CanvasView {
   private hiddenPage = -1;
   private offDoc: () => void;
   private offBitmap: () => void;
+  private offShot: () => void;
+  // the zoom changed and the pdf pages wait for it to rest before they are drawn sharp
+  private pdfWait = false;
   private observer: ResizeObserver;
   private dprQuery: MediaQueryList | null = null;
 
@@ -169,6 +187,11 @@ export class CanvasView {
       this.bgDirty = true;
       this.requestFrame();
     });
+    // and a pdf page that was rendered
+    this.offShot = onShot(() => {
+      this.bgDirty = true;
+      this.requestFrame();
+    });
 
     this.observer = new ResizeObserver(() => this.measure());
     this.observer.observe(host);
@@ -185,6 +208,8 @@ export class CanvasView {
     if (this.zoomTimer) clearTimeout(this.zoomTimer);
     this.offDoc();
     this.offBitmap();
+    this.offShot();
+    want('canvas', []);
     this.observer.disconnect();
     window.removeEventListener('resize', this.measure);
     this.dprQuery?.removeEventListener('change', this.onDpr);
@@ -259,6 +284,7 @@ export class CanvasView {
       // more pages may be in sight now
       this.warm = false;
       this.zoomedAt = performance.now();
+      this.pdfWait = true;
       if (this.zoomTimer) clearTimeout(this.zoomTimer);
       this.zoomTimer = setTimeout(() => this.requestFrame(), ZOOM_SETTLE + 20);
     }
@@ -706,6 +732,10 @@ export class CanvasView {
       this.hlLayer.setScale(target, this.hlCtx);
       this.inkDirty = this.hlDirty = true;
     }
+    if (this.pdfWait && start - this.zoomedAt >= ZOOM_SETTLE) {
+      this.pdfWait = false;
+      this.bgDirty = true;
+    }
 
     if (this.bgDirty) {
       this.drawBackground();
@@ -793,7 +823,9 @@ export class CanvasView {
       ctx.fillStyle = PAPER_COLORS[paper.color].paper;
       ctx.fillRect(0, 0, w, h);
       drawPattern(ctx, paper, -this.cam.x * s, -this.cam.y * s, s, 0, 0, w, h, true);
+      this.drawPdf(ctx, this.board);
       this.drawImages(ctx, this.board);
+      this.wantPdf(this.board, this.board + 1);
       return;
     }
     ctx.fillStyle = BG_DEEP;
@@ -803,8 +835,99 @@ export class CanvasView {
       const r = this.rects[i];
       const paper = this.doc.notebook.pages[i].paper;
       drawSheet(ctx, paper, (r.x - this.cam.x) * s, (r.y - this.cam.y) * s, r.w * s, r.h * s, s, w, h);
+      this.drawPdf(ctx, i);
       this.drawImages(ctx, i);
     }
+    this.wantPdf(from, to);
+  }
+
+  // the pdf page under a page, from the best pictures there are of it. a
+  // picture made for this very scale is copied pixel for pixel
+  private drawPdf(ctx: CanvasRenderingContext2D, index: number) {
+    const meta = this.doc.notebook.pages[index];
+    const bg = meta?.pdf;
+    if (!bg) return;
+    const s = this.cam.zoom * this.dpr;
+    const ox = (this.pageX(index) + bg.x - this.cam.x) * s;
+    const oy = (this.pageY(index) + bg.y - this.cam.y) * s;
+    const w = bg.w * s;
+    const h = bg.h * s;
+    if (ox > this.bg.width || oy > this.bg.height || ox + w < 0 || oy + h < 0) return;
+    const { base, parts } = pickShots(shotsOf(bg.assetId, bg.page), s);
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'medium';
+    if (base) {
+      touchShot(base);
+      const p = base.picture;
+      if (Math.abs(base.scale - s) < s * 0.001) ctx.drawImage(p, Math.round(ox), Math.round(oy));
+      else ctx.drawImage(p, ox, oy, w, h);
+    } else {
+      ctx.fillStyle = PDF_WAITING;
+      ctx.fillRect(ox, oy, w, h);
+    }
+    for (const part of parts) {
+      touchShot(part);
+      ctx.drawImage(part.picture, Math.round(ox + part.x * s), Math.round(oy + part.y * s));
+    }
+    if (bg.w < meta.w - 1 || bg.h < meta.h - 1) {
+      const x = Math.round(ox) + 0.5;
+      const y = Math.round(oy) + 0.5;
+      ctx.strokeStyle = PDF_EDGE;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, Math.round(w) - 1, Math.round(h) - 1);
+    }
+    ctx.restore();
+  }
+
+  // the renders the pdf pages on screen and the ones next to them need:
+  // a quick picture first, a sharp one for this zoom once it rests
+  private wantPdf(from: number, to: number) {
+    const pages = this.doc.notebook.pages;
+    const list: Wanted[] = [];
+    const s = this.cam.zoom * this.dpr;
+    const settled = !this.pdfWait;
+    const first = Math.max(0, from - 1);
+    const last = Math.min(pages.length - 1, to);
+    const middle = (from + to - 1) / 2;
+    for (let i = first; i <= last; i++) {
+      const bg = pages[i]?.pdf;
+      if (!bg) continue;
+      const near = i < from || i >= to;
+      const d = Math.abs(i - middle);
+      const file = bg.assetId;
+      list.push({ file, page: bg.page, scale: previewScale(bg.w), priority: (near ? 20 : 0) + d });
+      if (!settled) continue;
+      const full = capScale(bg.w, bg.h, s);
+      const shots = shotsOf(file, bg.page);
+      if (!shots.some((shot) => shot.full && sharp(shot, full))) {
+        list.push({ file, page: bg.page, scale: full, priority: (near ? 30 : 10) + d });
+      }
+      if (full < s * 0.95 && !near) {
+        const part = this.pdfPart(i, bg, s);
+        if (part) list.push({ file, page: bg.page, scale: s, part, priority: 5 + d });
+      }
+    }
+    want('canvas', list);
+  }
+
+  // the part of a pdf page on screen, a little more, on a grid of device
+  // pixels. a very big screen gets no more than what it shows
+  private pdfPart(index: number, bg: PdfBackground, s: number): Part | null {
+    const z = this.cam.zoom;
+    const left = this.cam.x - this.pageX(index) - bg.x;
+    const top = this.cam.y - this.pageY(index) - bg.y;
+    const g = PART_GRID / s;
+    for (const pad of [g, 0]) {
+      const x0 = Math.max(0, Math.floor((left - pad) / g) * g);
+      const y0 = Math.max(0, Math.floor((top - pad) / g) * g);
+      const x1 = Math.min(bg.w, Math.ceil((left + this.width / z + pad) / g) * g);
+      const y1 = Math.min(bg.h, Math.ceil((top + this.height / z + pad) / g) * g);
+      if (x1 <= x0 || y1 <= y0) return null;
+      if ((x1 - x0) * (y1 - y0) * s * s <= MAX_PIXELS) return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    }
+    return null;
   }
 
   // the pictures of a page that are on screen, over its paper
