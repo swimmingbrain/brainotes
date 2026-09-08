@@ -19,6 +19,15 @@ export function addToast(message: string, type: ToastType = 'info', duration = 3
   return id;
 }
 
+// for a toast that tells how far something got
+export function updateToast(id: string, message: string) {
+  toasts.update((t) => t.map((toast) => (toast.id === id ? { ...toast, message } : toast)));
+}
+
+export function dismissToast(id: string) {
+  toasts.update((t) => t.filter((toast) => toast.id !== id));
+}
+
 export const commandPaletteOpen = writable(false);
 
 export type PreferencesCategory = 'general' | 'tools' | 'pens' | 'paper' | 'input';
@@ -28,7 +37,9 @@ export type Dialog =
   | { kind: 'shortcuts' }
   // no id means the notebook that is open right now
   | { kind: 'rename'; target: 'notebook'; id?: string; name: string }
-  | { kind: 'confirm'; title: string; message: string; confirm: string; danger?: boolean; onconfirm: () => void };
+  | { kind: 'confirm'; title: string; message: string; confirm: string; danger?: boolean; onconfirm: () => void }
+  // read the pdfs on the side or write on them
+  | { kind: 'pdf'; files: File[] };
 
 export const dialog = writable<Dialog | null>(null);
 
