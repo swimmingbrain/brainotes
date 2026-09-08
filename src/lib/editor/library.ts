@@ -128,11 +128,13 @@ function hide() {
   remember('');
 }
 
-// items by page id, pages left out start empty
+// items by page id. a page without items is not written at all, it reads
+// as empty, so a pdf of 500 pages goes in as one record and its file
 async function store(notebook: Notebook, items: Record<string, Item[]> = {}, assets: AssetRecord[] = []) {
   const pages = [];
   for (const meta of notebook.pages) {
-    pages.push({ id: meta.id, notebookId: notebook.id, ...(await packItems(items[meta.id] ?? [])) });
+    const list = items[meta.id];
+    if (list && list.length > 0) pages.push({ id: meta.id, notebookId: notebook.id, ...(await packItems(list)) });
   }
   await importNotebook(notebook, pages, assets);
 }
