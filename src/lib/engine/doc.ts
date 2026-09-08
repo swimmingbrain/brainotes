@@ -29,6 +29,8 @@ export type DocChange =
   | { type: 'pages' }
   | { type: 'paper'; pageId: string }
   | { type: 'name' }
+  // the files open in the reference panel
+  | { type: 'refs' }
   // the items of a page came in from storage, nothing was changed
   | { type: 'loaded'; pageId: string; box: Box };
 
@@ -293,5 +295,10 @@ export class Doc {
   rename(name: string) {
     this.notebook.name = name;
     this.emit({ type: 'name' });
+  }
+
+  setRefs(refs: string[]) {
+    this.notebook.refs = refs;
+    this.emit({ type: 'refs' });
   }
 }
