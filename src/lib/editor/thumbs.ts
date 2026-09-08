@@ -4,6 +4,7 @@ import { imagesOf, type Doc, type DocChange, type PageData } from '$lib/engine/d
 import { onBitmap } from '$lib/engine/images';
 import { penIsDown } from '$lib/engine/input';
 import { pageJob, type Frame } from '$lib/engine/render';
+import { onShot, previewScale, shotsOf, want, type Wanted } from '$lib/pdf/pdf';
 
 // css pixels, the panel never shows a thumbnail wider than this
 export const THUMB_WIDTH = 150;
@@ -50,10 +51,12 @@ export class Thumbs {
   private sink: OffscreenCanvasRenderingContext2D | null = null;
   private off: () => void;
   private offBitmap: () => void;
+  private offShot: () => void;
 
   constructor() {
     this.off = this.doc?.on(this.onChange) ?? (() => {});
     this.offBitmap = onBitmap(this.onBitmap);
+    this.offShot = onShot(this.onShot);
   }
 
   // root is the list that scrolls, thumbnails just past its edges are drawn too
@@ -78,6 +81,8 @@ export class Thumbs {
   destroy() {
     this.off();
     this.offBitmap();
+    this.offShot();
+    want('thumbs', []);
     this.observer?.disconnect();
     if (this.timer) clearTimeout(this.timer);
     this.cancelIdle?.();
@@ -90,7 +95,32 @@ export class Thumbs {
       const thumb = this.byCanvas.get(entry.target);
       if (thumb) thumb.visible = entry.isIntersecting;
     }
+    this.wantPdf();
     this.schedule(0);
+  };
+
+  // the pdf pages of the thumbnails in sight, after what the canvas needs
+  private wantPdf() {
+    const list: Wanted[] = [];
+    for (const thumb of this.byId.values()) {
+      const bg = thumb.visible ? this.doc?.page(thumb.id)?.meta.pdf : undefined;
+      if (!bg || shotsOf(bg.assetId, bg.page).length > 0) continue;
+      list.push({ file: bg.assetId, page: bg.page, scale: previewScale(bg.w), priority: 100 + list.length });
+    }
+    want('thumbs', list);
+  }
+
+  // a pdf page was rendered, the thumbnails that show it are drawn again
+  private onShot = (file: string, page: number) => {
+    let any = false;
+    for (const thumb of this.byId.values()) {
+      const bg = this.doc?.page(thumb.id)?.meta.pdf;
+      if (!bg || bg.assetId !== file || bg.page !== page) continue;
+      thumb.stale = true;
+      thumb.job = null;
+      any = true;
+    }
+    if (any) this.schedule(0);
   };
 
   private onChange = (change: DocChange) => {
