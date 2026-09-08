@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { plugActions, type Point } from './actions';
 import { editor, spotAt } from './canvas';
+import { choosePdf, isPdf } from './pdfs';
 import { newId } from '$lib/engine/doc';
 import { rememberBitmap } from '$lib/engine/images';
 import type { ImageItem, ImageSource } from '$lib/engine/types';
@@ -156,11 +157,13 @@ export function pickFiles(accept: string, multiple = true): Promise<File[]> {
   });
 }
 
-// the next phase reads pdfs and .brainotes files, until then only pictures come in
+// pictures land at the point, pdfs ask what to do with them
 function importAll(files: File[], at: Point | null) {
   const images = files.filter(isImage);
+  const pdfs = files.filter(isPdf);
   if (images.length > 0) void insertImages(images, at);
-  if (images.length < files.length) addToast('Only pictures can be imported for now', 'info');
+  if (pdfs.length > 0) choosePdf(pdfs);
+  if (images.length + pdfs.length < files.length) addToast('Only pdfs and pictures can be imported for now', 'info');
 }
 
 plugActions({
