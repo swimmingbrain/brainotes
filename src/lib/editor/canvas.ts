@@ -16,8 +16,9 @@ import { SelectTool } from '$lib/engine/tools/select';
 import { ShapeTool } from '$lib/engine/tools/shape';
 import { TextTool } from '$lib/engine/tools/text';
 import type { Sample, Tool } from '$lib/engine/tools/tool';
-import type { PageMeta, ShapeKind, TextItem } from '$lib/engine/types';
+import type { Notebook, PageMeta, ShapeKind, TextItem } from '$lib/engine/types';
 import { CanvasView } from '$lib/engine/view';
+import { keepPdfs, setPdfLoader } from '$lib/pdf/pdf';
 import * as storage from '$lib/storage/db';
 import type { PageLoader } from '$lib/storage/loader';
 import type { Saver } from '$lib/storage/saver';
@@ -155,11 +156,19 @@ function onDocChange(change: DocChange) {
   }
 }
 
+// the pdfs a notebook shows: its page backgrounds and its reference files
+function pdfsOf(notebook: Notebook | undefined): Set<string> {
+  const ids = new Set<string>(notebook?.refs ?? []);
+  for (const meta of notebook?.pages ?? []) if (meta.pdf) ids.add(meta.pdf.assetId);
+  return ids;
+}
+
 // a notebook from the library takes over the canvas, null closes it
 export function showNotebook(next: Session | null) {
   text?.commit();
   select?.clear();
   clearBitmaps();
+  keepPdfs(pdfsOf(next?.doc.notebook));
   offDoc?.();
   offDoc = null;
   session = next;
@@ -421,6 +430,7 @@ preferences.subscribe((p) => (prefs = p));
 
 if (typeof window !== 'undefined') {
   setImageLoader(async (id) => (await storage.getAsset(id))?.blob);
+  setPdfLoader(async (id) => (await storage.getAsset(id))?.blob);
   // text measured before inter arrived is measured again and drawn anew
   void document.fonts?.load(fontOf(16)).then(() => {
     fontLoaded();
