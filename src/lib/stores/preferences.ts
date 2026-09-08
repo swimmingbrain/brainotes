@@ -6,6 +6,7 @@ export type PenType = 'ballpoint' | 'fountain' | 'marker' | 'pencil' | 'highligh
 export type PaperStyle = 'blank' | 'lines' | 'grid' | 'dots';
 export type PaperColor = 'white' | 'cream' | 'dark';
 export type PageSize = 'a4' | 'letter' | 'wide';
+export type PdfLayout = 'full' | 'below' | 'beside';
 
 export interface PenPreset {
   id: string;
@@ -17,6 +18,8 @@ export interface PenPreset {
 export interface Preferences {
   workspace: 'notes' | 'study' | 'board';
   pdfDrop: 'ask' | 'reference' | 'notebook';
+  // how write on it lays out a pdf page: alone, or with room below or beside it
+  pdfLayout: PdfLayout;
   tools: Record<ToolId, boolean>;
   pens: PenPreset[];
   defaultPen: string;
@@ -35,6 +38,7 @@ export function defaultPreferences(): Preferences {
   return {
     workspace: 'notes',
     pdfDrop: 'ask',
+    pdfLayout: 'full',
     tools: {
       select: true,
       pen: true,
@@ -110,6 +114,7 @@ export function mergePreferences(stored: unknown): Preferences {
 
   merged.workspace = oneOf(merged.workspace, ['notes', 'study', 'board'], defaults.workspace);
   merged.pdfDrop = oneOf(merged.pdfDrop, ['ask', 'reference', 'notebook'], defaults.pdfDrop);
+  merged.pdfLayout = oneOf(merged.pdfLayout, ['full', 'below', 'beside'], defaults.pdfLayout);
   merged.paper.style = oneOf(merged.paper.style, ['blank', 'lines', 'grid', 'dots'], defaults.paper.style);
   merged.paper.color = oneOf(merged.paper.color, ['white', 'cream', 'dark'], defaults.paper.color);
   merged.paper.size = oneOf(merged.paper.size, ['a4', 'letter', 'wide'], defaults.paper.size);

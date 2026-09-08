@@ -28,6 +28,8 @@ describe('mergePreferences', () => {
     expect(merged.workspace).toBe('notes');
     expect(merged.pressure).toBe(0.5);
     expect(merged.smoothing).toBe(1);
+    expect(mergePreferences({ pdfLayout: 'sideways' }).pdfLayout).toBe('full');
+    expect(mergePreferences({ pdfLayout: 'below' }).pdfLayout).toBe('below');
     expect(merged.paper.color).toBe('white');
   });
 

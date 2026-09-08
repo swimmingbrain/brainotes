@@ -1,6 +1,7 @@
 <script lang="ts">
   import Field from '../../Field.svelte';
   import SelectField from '../../SelectField.svelte';
+  import { PDF_LAYOUTS } from '$lib/pdf/layout';
   import { preferences, setPreference, type Preferences } from '$lib/stores/preferences';
 
   const workspaces = [
@@ -38,6 +39,14 @@
   Read it on the side opens the pdf in the reference panel, next to your notes. Write on it turns it into a notebook with the pdf pages
   as paper.
 </p>
+<Field label="Layout">
+  <SelectField
+    value={$preferences.pdfLayout}
+    options={PDF_LAYOUTS.map((l) => ({ value: l.id, label: l.label }))}
+    label="How a pdf page is laid out to write on it"
+    onchange={(v) => setPreference('pdfLayout', v as Preferences['pdfLayout'])} />
+</Field>
+<p class="help">A full page, or the pdf page with lined room for notes below or beside it.</p>
 
 <style>
   .section {

@@ -1,4 +1,6 @@
-export type PdfLayout = 'full' | 'below' | 'beside';
+import type { PdfLayout } from '$lib/stores/preferences';
+
+export type { PdfLayout };
 
 export const PDF_LAYOUTS: { id: PdfLayout; label: string }[] = [
   { id: 'full', label: 'Full page' },
