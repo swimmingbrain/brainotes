@@ -18,6 +18,7 @@ import { TextTool } from '$lib/engine/tools/text';
 import type { Sample, Tool } from '$lib/engine/tools/tool';
 import type { Notebook, PageMeta, ShapeKind, TextItem } from '$lib/engine/types';
 import { CanvasView } from '$lib/engine/view';
+import * as pdf from '$lib/pdf/pdf';
 import { keepPdfs, setPdfLoader } from '$lib/pdf/pdf';
 import * as storage from '$lib/storage/db';
 import type { PageLoader } from '$lib/storage/loader';
@@ -58,6 +59,7 @@ declare global {
       readonly loader: PageLoader | null;
       readonly saver: Saver | null;
       storage: typeof storage;
+      pdf: typeof pdf;
       newId: () => string;
       actions: typeof actions;
     };
@@ -191,6 +193,21 @@ export function showNotebook(next: Session | null) {
 
 export function openDoc(): Doc | null {
   return doc;
+}
+
+// the page in the middle of the view, or the board on show
+export function currentPage(): number {
+  return current();
+}
+
+// pages with these metas from index on, one undo step, and the view goes
+// to the first of them
+export function addPages(index: number, metas: PageMeta[]) {
+  if (!doc || !history || metas.length === 0) return;
+  const at = Math.max(0, Math.min(index, doc.pageCount));
+  const ops: Op[] = metas.map((meta, k) => ({ type: 'page-add', index: at + k, page: newPageData(meta) }));
+  history.run(ops.length === 1 ? ops[0] : { type: 'batch', ops });
+  view?.goToPage(at);
 }
 
 // a page with all its items, read from storage when it is not in memory yet
@@ -459,6 +476,7 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
       return session?.saver ?? null;
     },
     storage,
+    pdf,
     newId,
     actions
   };
