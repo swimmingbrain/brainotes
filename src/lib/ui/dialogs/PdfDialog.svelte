@@ -15,16 +15,19 @@
 
   const title = $derived(files.length === 1 ? files[0].name : `${files.length} pdfs`);
 
+  // the files are taken first, closing takes the props away with the dialog
   function read() {
+    const list = files;
     if (remember) setPreference('pdfDrop', 'reference');
     onclose();
-    actions.openReference(files);
+    actions.openReference(list);
   }
 
   function write() {
+    const list = files;
     if (remember) setPreference('pdfDrop', 'notebook');
     onclose();
-    void writeOn(files, layout, $notebookOpen ? target : 'new');
+    void writeOn(list, layout, $notebookOpen ? target : 'new');
   }
 </script>
 
