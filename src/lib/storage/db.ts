@@ -125,6 +125,10 @@ export async function getPages(ids: string[]): Promise<(PageRecord | undefined)[
   return records;
 }
 
+export async function listPages(notebookId: string): Promise<PageRecord[]> {
+  return (await database()).getAllFromIndex('pages', 'notebookId', notebookId);
+}
+
 // assets
 
 export async function getAsset(id: string): Promise<AssetRecord | undefined> {
