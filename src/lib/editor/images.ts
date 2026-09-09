@@ -64,7 +64,7 @@ export async function storeImage(blob: Blob, name = 'image'): Promise<ImageAsset
 
 // an image item for the asset, centred on (cx, cy) of page index, about 60
 // percent of the page wide and never bigger than the page. a small picture
-// keeps its own size
+// keeps its own size, a clip of a pdf the size it has in the pdf
 export function imageItemFor(asset: ImageAsset, index: number, cx: number, cy: number, source?: ImageSource): ImageItem | null {
   const ed = editor();
   if (!ed) return null;
@@ -73,7 +73,8 @@ export function imageItemFor(asset: ImageAsset, index: number, cx: number, cy: n
   // a board has no edges, the part of it on screen counts as the page
   const pageW = view.isBoard ? view.width / view.cam.zoom : meta.w;
   const pageH = view.isBoard ? view.height / view.cam.zoom : meta.h;
-  let w = Math.min(asset.w, pageW * SHARE);
+  const natural = source ?? asset;
+  let w = Math.min(natural.w, pageW * SHARE);
   let h = (w * asset.h) / asset.w;
   if (h > pageH * 0.9) {
     h = pageH * 0.9;
