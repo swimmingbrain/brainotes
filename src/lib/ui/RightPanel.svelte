@@ -1,13 +1,26 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import PanelTabs from './PanelTabs.svelte';
+  import PdfReader from './reference/PdfReader.svelte';
+  import ImageReader from './reference/ImageReader.svelte';
   import { actions } from '$lib/editor/actions';
+  import { closeReference, showReference } from '$lib/editor/references';
+  import { activeReference, references } from '$lib/stores/reference';
 
-  const tabs = [{ id: 'reference', label: 'Reference' }];
+  const tabs = $derived(
+    $references.length > 0
+      ? $references.map((r) => ({ id: r.id, label: r.name.replace(/\.pdf$/i, ''), title: r.name }))
+      : [{ id: 'reference', label: 'Reference' }]
+  );
+  const shown = $derived($references.find((r) => r.id === $activeReference) ?? null);
 </script>
 
 <section class="panel" aria-label="Reference">
-  <PanelTabs {tabs} active="reference" onchange={() => {}}>
+  <PanelTabs
+    {tabs}
+    active={shown?.id ?? 'reference'}
+    onchange={(id) => id !== 'reference' && showReference(id)}
+    onclose={$references.length > 0 ? closeReference : undefined}>
     {#snippet right()}
       <button
         class="head-btn"
@@ -20,15 +33,25 @@
   </PanelTabs>
   <!-- the drop overlay sends files dropped in here to the reference panel -->
   <div class="body" data-drop="reference">
-    <div class="empty">
-      <Icon name="pdf" size={26} />
-      <p class="empty-title">Nothing open on the side</p>
-      <p class="empty-text">drop a pdf here to read it next to your notes</p>
-      <button class="empty-btn" onclick={() => actions.openReference()}>
-        <Icon name="import" size={13} />
-        Open a PDF
-      </button>
-    </div>
+    {#if shown}
+      {#key shown.id}
+        {#if shown.kind === 'pdf'}
+          <PdfReader file={shown.id} />
+        {:else}
+          <ImageReader file={shown.id} name={shown.name} />
+        {/if}
+      {/key}
+    {:else}
+      <div class="empty">
+        <Icon name="pdf" size={26} />
+        <p class="empty-title">Nothing open on the side</p>
+        <p class="empty-text">drop a pdf here to read it next to your notes</p>
+        <button class="empty-btn" onclick={() => actions.openReference()}>
+          <Icon name="import" size={13} />
+          Open a PDF
+        </button>
+      </div>
+    {/if}
   </div>
 </section>
 
