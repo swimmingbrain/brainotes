@@ -1,39 +1,61 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Icon from './Icon.svelte';
 
   export interface PanelTab {
     id: string;
     label: string;
     badge?: number | string;
+    // the whole name when the label is cut short
+    title?: string;
   }
 
   let {
     tabs,
     active,
     onchange,
+    onclose,
     right
   }: {
     tabs: PanelTab[];
     active: string;
     onchange: (id: string) => void;
+    // tabs get a close button when this is given
+    onclose?: (id: string) => void;
     right?: Snippet;
   } = $props();
+
+  // a middle click closes a tab, like in a browser
+  function onauxclick(e: MouseEvent, id: string) {
+    if (e.button !== 1 || !onclose) return;
+    e.preventDefault();
+    onclose(id);
+  }
 </script>
 
 <div class="panel-header">
   <div class="tabs" role="tablist">
     {#each tabs as tab (tab.id)}
-      <button
-        class="panel-tab"
-        class:active={tab.id === active}
-        role="tab"
-        aria-selected={tab.id === active}
-        onclick={() => onchange(tab.id)}>
-        {tab.label}
-        {#if tab.badge !== undefined && tab.badge !== 0}
-          <span class="badge">{tab.badge}</span>
+      <div class="tab" class:active={tab.id === active} class:closable={onclose !== undefined}>
+        <button
+          class="panel-tab"
+          class:active={tab.id === active}
+          role="tab"
+          aria-selected={tab.id === active}
+          title={tab.title}
+          onclick={() => onchange(tab.id)}
+          onauxclick={(e) => onauxclick(e, tab.id)}>
+          <span class="label">{tab.label}</span>
+          {#if tab.badge !== undefined && tab.badge !== 0}
+            <span class="badge">{tab.badge}</span>
+          {/if}
+        </button>
+        {#if onclose}
+          <button class="tab-close" onclick={() => onclose(tab.id)} title="Close" aria-label="Close {tab.label}">
+            <Icon name="close" size={10} />
+          </button>
         {/if}
-      </button>
+      </div>
     {/each}
   </div>
   {#if right}
@@ -65,6 +87,16 @@
     height: 0;
   }
 
+  .tab {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .tab.active {
+    background: var(--bg-hover);
+  }
+
   .panel-tab {
     display: flex;
     align-items: center;
@@ -76,13 +108,43 @@
     white-space: nowrap;
   }
 
+  .tab.closable .panel-tab {
+    padding-right: 4px;
+  }
+
+  .label {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .panel-tab:hover {
     color: var(--text-secondary);
   }
 
   .panel-tab.active {
     color: var(--text-primary);
-    background: var(--bg-hover);
+  }
+
+  .tab-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+    color: var(--text-muted);
+    opacity: 0;
+  }
+
+  .tab:hover .tab-close,
+  .tab.active .tab-close {
+    opacity: 1;
+  }
+
+  .tab-close:hover {
+    color: var(--text-primary);
+    background: var(--border);
   }
 
   .badge {
