@@ -5,7 +5,7 @@ import type { Op } from '../history';
 import { itemAt, lassoHits } from '../hit';
 import { drawImageItem, drawItem, HIGHLIGHTER_ALPHA, isDark, isMarker } from '../render';
 import { moveBy, recolorItem, transformItem, type Change } from '../transform';
-import type { Box, Item, TextItem } from '../types';
+import type { Box, ImageItem, ImageSource, Item, TextItem } from '../types';
 import type { CanvasView } from '../view';
 import type { Sample, Tool } from './tool';
 
@@ -22,6 +22,10 @@ const DOUBLE = 400;
 const SPRITE_PIXELS = 16_000_000;
 // ms after a selection is made before its picture is drawn ahead of a drag
 const PREPARE = 80;
+// css pixels of the badge that leads a clip back to its pdf page
+const BADGE_H = 20;
+const BADGE_GAP = 12;
+const BADGE_FONT = '600 11px Inter, system-ui, sans-serif';
 
 type Mode = 'idle' | 'lasso' | 'move' | 'scale';
 
@@ -29,6 +33,8 @@ export interface SelectHooks {
   changed?: (count: number) => void;
   // a text was double clicked
   editText?: (index: number, item: TextItem) => void;
+  // the badge of a clip was clicked
+  source?: (source: ImageSource) => void;
 }
 
 interface Sprite {
@@ -47,6 +53,15 @@ function placesOf(page: PageData, items: Item[]): Placed[] {
     if (wanted.has(item)) out.push({ item, index });
   });
   return out;
+}
+
+let measure: OffscreenCanvasRenderingContext2D | null = null;
+
+function textWidth(text: string): number {
+  measure ??= new OffscreenCanvas(1, 1).getContext('2d');
+  if (!measure) return text.length * 6;
+  measure.font = BADGE_FONT;
+  return measure.measureText(text).width;
 }
 
 export class SelectTool implements Tool {
@@ -168,9 +183,36 @@ export class SelectTool implements Tool {
     return x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;
   }
 
+  // a single clip of a pdf shows where it came from in a badge over its box
+  private clip(): ImageItem | null {
+    if (this.items.length !== 1 || !this.hooks.source) return null;
+    const item = this.items[0];
+    return item.type === 'image' && item.source ? item : null;
+  }
+
+  // the badge in css pixels, over the top right corner of the box or under
+  // it when the box reaches the top of the view
+  private badge(): (Box & { label: string }) | null {
+    const item = this.clip();
+    const box = this.box();
+    if (!item?.source || !box || !this.shown() || (this.started && this.mode !== 'idle')) return null;
+    const label = `p. ${item.source.page}`;
+    const b = this.screenBox(box);
+    const w = Math.ceil(textWidth(label)) + 30;
+    let top = b.minY - BADGE_GAP - BADGE_H;
+    if (top < 4) top = b.maxY + BADGE_GAP;
+    return { minX: b.maxX - w, minY: top, maxX: b.maxX, maxY: top + BADGE_H, label };
+  }
+
+  private onBadge(x: number, y: number): boolean {
+    const b = this.badge();
+    return b !== null && x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;
+  }
+
   hover(s: Sample | null) {
     let cursor = '';
-    if (s) {
+    if (s && this.onBadge(s.x, s.y)) cursor = 'pointer';
+    else if (s) {
       const corner = this.handleAt(s.x, s.y);
       if (corner >= 0) cursor = corner % 2 === 0 ? 'nwse-resize' : 'nesw-resize';
       else if (this.insideBox(s.x, s.y)) cursor = 'move';
@@ -182,6 +224,12 @@ export class SelectTool implements Tool {
     this.sx = this.cx = s.x;
     this.sy = this.cy = s.y;
     this.started = false;
+    const clip = this.clip();
+    if (clip?.source && this.onBadge(s.x, s.y)) {
+      this.mode = 'idle';
+      this.hooks.source?.(clip.source);
+      return;
+    }
     const corner = this.handleAt(s.x, s.y);
     if (corner >= 0) {
       this.mode = 'scale';
@@ -492,7 +540,41 @@ export class SelectTool implements Tool {
     }
     const pad = r + dpr * 2;
     growBox(covered, { minX: x0 - pad, minY: y0 - pad, maxX: x1 + pad, maxY: y1 + pad });
+    const badge = this.badge();
+    if (badge) growBox(covered, this.drawBadge(ctx, badge, dpr));
     return covered;
+  }
+
+  // an accent tag with the page number and a small arrow
+  private drawBadge(ctx: CanvasRenderingContext2D, b: Box & { label: string }, dpr: number): Box {
+    const x = Math.round(b.minX * dpr);
+    const y = Math.round(b.minY * dpr);
+    const w = Math.round((b.maxX - b.minX) * dpr);
+    const h = Math.round((b.maxY - b.minY) * dpr);
+    ctx.fillStyle = ACCENT;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#111111';
+    ctx.font = BADGE_FONT;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dpr, dpr);
+    ctx.fillText(b.label, 8, BADGE_H / 2 + 0.5);
+    // an arrow out of the box, like a link that opens somewhere else
+    const ax = w / dpr - 15;
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = 1.3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(ax, 14);
+    ctx.lineTo(ax + 7, 7);
+    ctx.moveTo(ax + 2.5, 7);
+    ctx.lineTo(ax + 7, 7);
+    ctx.lineTo(ax + 7, 11.5);
+    ctx.stroke();
+    ctx.restore();
+    return { minX: x - 2, minY: y - 2, maxX: x + w + 2, maxY: y + h + 2 };
   }
 
   private drawLasso(ctx: CanvasRenderingContext2D): Box | null {
