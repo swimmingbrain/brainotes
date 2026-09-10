@@ -317,7 +317,8 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
   const words = new TextTool(v, textSettings, textAt);
   const sel = new SelectTool(v, {
     changed: (count) => selectionCount.set(count),
-    editText: (index, item) => words.edit(index, item)
+    editText: (index, item) => words.edit(index, item),
+    source: (source) => actions.showSource(source)
   });
   select = sel;
   text = words;

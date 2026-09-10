@@ -225,6 +225,7 @@ activeTool.subscribe((tool) => {
 });
 
 plugActions({
+  showSource: (source) => void showSource(source),
   openReference: (files) => {
     if (files) void openFiles(files);
     else void pickFiles('application/pdf,.pdf,image/*').then((picked) => openFiles(picked));

@@ -1,5 +1,6 @@
 import { notebookName, notebookOpen, notebookKind, paperStyle, type NotebookKind } from '$lib/stores/app';
 import type { PaperStyle } from '$lib/stores/preferences';
+import type { ImageSource } from '$lib/engine/types';
 
 export type ExportFormat = 'pdf' | 'png' | 'brainotes';
 
@@ -48,6 +49,8 @@ export interface Actions {
   // no files means ask for them with a file picker. pictures land at the point
   importFiles: (files?: File[], at?: Point) => void;
   openReference: (files?: File[]) => void;
+  // a clip of a pdf goes back to its page on the side
+  showSource: (source: ImageSource) => void;
   // picks pictures and puts them at the point or the middle of the view
   insertImage: (at?: Point) => void;
   exportNotebook: (format: ExportFormat) => void;
@@ -97,6 +100,7 @@ export const actions: Actions = {
   deleteNotebook: nothing,
   importFiles: nothing,
   openReference: nothing,
+  showSource: nothing,
   insertImage: nothing,
   exportNotebook: nothing
 };
