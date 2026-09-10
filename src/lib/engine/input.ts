@@ -116,6 +116,8 @@ export class Input {
     this.view.settle();
     const focused = document.activeElement;
     if (focused instanceof HTMLElement) focused.blur();
+    // text selected on the side lets go, a copy now takes the selected ink
+    document.getSelection()?.removeAllRanges();
 
     if (kind === 'touch') {
       this.touches.set(e.pointerId, { x: e.clientX - this.view.left, y: e.clientY - this.view.top });

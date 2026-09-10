@@ -99,8 +99,14 @@ function pasteText(text: string, at: { x: number; y: number } | null) {
   ]);
 }
 
+// text selected in the reference panel is copied by the browser itself
+function textSelected(): boolean {
+  const selection = document.getSelection();
+  return selection !== null && !selection.isCollapsed && selection.toString().trim() !== '';
+}
+
 function onCopy(e: ClipboardEvent) {
-  if (editable(e.target) || !copySelection()) return;
+  if (editable(e.target) || textSelected() || !copySelection()) return;
   e.preventDefault();
   e.clipboardData?.setData('text/plain', MARK);
 }
