@@ -1,4 +1,4 @@
-import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
+import type { PDFDocumentProxy, PDFPageProxy, RenderTask, TextLayer } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { penIsDown } from '$lib/engine/input';
 import { RenderQueue } from './queue';
@@ -185,6 +185,28 @@ export function pdfFailed(id: string): boolean {
 
 export async function pdfPage(id: string, page: number): Promise<PDFPageProxy> {
   return (await docOf(id)).getPage(page);
+}
+
+// the text of a page laid over it as invisible spans, so it can be
+// selected and copied. scale is css pixels per point. what it returns stops
+// it and takes the text away again
+export function pdfText(id: string, page: number, container: HTMLElement, scale: number): () => void {
+  let layer: TextLayer | null = null;
+  let stopped = false;
+  void (async () => {
+    const [mod, proxy] = await Promise.all([pdfjs(), pdfPage(id, page)]);
+    // laying out the text is real work, it waits for the pen
+    while (penIsDown() && !stopped) await new Promise((r) => setTimeout(r, 100));
+    if (stopped) return;
+    container.style.setProperty('--total-scale-factor', String(scale));
+    layer = new mod.TextLayer({ textContentSource: proxy.streamTextContent(), container, viewport: proxy.getViewport({ scale }) });
+    await layer.render();
+  })().catch(() => {});
+  return () => {
+    stopped = true;
+    layer?.cancel();
+    container.replaceChildren();
+  };
 }
 
 // the files another notebook does not use are closed with their pictures
