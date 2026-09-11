@@ -96,8 +96,9 @@
               class:active={target === 'append'}
               role="radio"
               aria-checked={target === 'append'}
+              title="After the last page of the notebook that is open"
               onclick={() => (target = 'append')}>
-              Add to this notebook
+              This notebook
             </button>
           </div>
         {/if}
@@ -125,6 +126,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     padding: 18px 14px 16px;
     text-align: center;
@@ -145,6 +147,7 @@
   }
 
   .write {
+    justify-content: flex-start;
     padding: 0;
     gap: 0;
   }
@@ -214,6 +217,7 @@
   .seg-btn.wide {
     padding: 6px 4px;
     font-size: 11px;
+    white-space: nowrap;
   }
 
   .seg-btn:hover {
