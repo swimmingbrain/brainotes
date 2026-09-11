@@ -105,7 +105,10 @@ async function parse(data: Blob): Promise<PDFDocumentProxy> {
     cMapPacked: true,
     standardFontDataUrl: dataUrl('standard_fonts'),
     wasmUrl: dataUrl('wasm'),
-    iccUrl: dataUrl('iccs')
+    iccUrl: dataUrl('iccs'),
+    // pages drawn on the gpu: a big page took 20 ms of the main thread just
+    // to get its pixels out of a software canvas
+    enableHWA: true
   }).promise;
 }
 
@@ -349,14 +352,16 @@ async function draw(page: PDFPageProxy, job: Wanted & { id: string; key: string 
   if (width * height > MAX_PIXELS * 1.05) throw new Error('a pdf render that big is not allowed');
   const viewport = page.getViewport({ scale, offsetX: -x0, offsetY: -y0 });
   const canvas = new OffscreenCanvas(width, height);
-  // pdf.js only touches the 2d context of the canvas, an offscreen one does
-  // the same work and its picture moves out without a copy
+  // pdf.js only touches the 2d context of the canvas, an offscreen one
+  // does the same work without being in the page
   const task = page.render({ canvas: canvas as unknown as HTMLCanvasElement, viewport, background: '#ffffff' });
   task.onContinue = whenPenUp;
   if (slot) slot.task = task;
   await task.promise;
   if (slot?.cancelled) return null;
-  const picture = canvas.transferToImageBitmap();
+  // a copy made on the gpu, the main thread does not wait for the pixels
+  const picture = await createImageBitmap(canvas);
+  canvas.width = canvas.height = 0;
   return {
     id: job.id,
     key: job.key,
