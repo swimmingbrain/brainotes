@@ -1,4 +1,4 @@
-import type { PDFDocumentProxy, PDFPageProxy, RenderTask, TextLayer } from 'pdfjs-dist';
+import type { PDFDocumentProxy, PDFPageProxy, PDFWorker, RenderTask, TextLayer } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { penBusy } from '$lib/engine/input';
 import { RenderQueue } from './queue';
@@ -57,7 +57,7 @@ interface Slot {
 
 type Loader = (id: string) => Promise<Blob | undefined>;
 
-let lib: Promise<PdfLib> | null = null;
+let lib: Promise<{ pdf: PdfLib; worker: PDFWorker }> | null = null;
 let loader: Loader | null = null;
 const docs = new Map<string, Promise<PDFDocumentProxy>>();
 const sizes = new Map<string, Promise<PageSize[]>>();
@@ -70,13 +70,19 @@ const running = new Map<string, Slot>();
 const listeners = new Set<(file: string, page: number) => void>();
 let penTimer: ReturnType<typeof setTimeout> | null = null;
 
-// pdf.js is big, it only comes in once the first pdf is opened
-function pdfjs(): Promise<PdfLib> {
-  lib ??= import('pdfjs-dist').then((mod) => {
-    mod.GlobalWorkerOptions.workerSrc = workerUrl;
-    return mod;
+// pdf.js is big, it only comes in once the first pdf is opened. all files
+// share one worker, starting a worker for each took half a second
+function pdfjs(): Promise<{ pdf: PdfLib; worker: PDFWorker }> {
+  lib ??= import('pdfjs-dist').then((pdf) => {
+    pdf.GlobalWorkerOptions.workerSrc = workerUrl;
+    return { pdf, worker: new pdf.PDFWorker() };
   });
   return lib;
+}
+
+// loads pdf.js and starts its worker ahead, while someone picks what to do
+export function warmPdf() {
+  void pdfjs().catch(() => {});
 }
 
 function dataUrl(dir: string): string {
@@ -99,10 +105,11 @@ function notify(file: string, page: number) {
 }
 
 async function parse(data: Blob): Promise<PDFDocumentProxy> {
-  const pdf = await pdfjs();
+  const { pdf, worker } = await pdfjs();
   const bytes = new Uint8Array(await data.arrayBuffer());
   return pdf.getDocument({
     data: bytes,
+    worker,
     cMapUrl: dataUrl('cmaps'),
     cMapPacked: true,
     standardFontDataUrl: dataUrl('standard_fonts'),
@@ -199,12 +206,12 @@ export function pdfText(id: string, page: number, container: HTMLElement, scale:
   let layer: TextLayer | null = null;
   let stopped = false;
   void (async () => {
-    const [mod, proxy] = await Promise.all([pdfjs(), pdfPage(id, page)]);
+    const [{ pdf }, proxy] = await Promise.all([pdfjs(), pdfPage(id, page)]);
     // laying out the text is real work, it waits for the pen
     while (penBusy(PEN_PAUSE) && !stopped) await new Promise((r) => setTimeout(r, 100));
     if (stopped) return;
     container.style.setProperty('--total-scale-factor', String(scale));
-    layer = new mod.TextLayer({ textContentSource: proxy.streamTextContent(), container, viewport: proxy.getViewport({ scale }) });
+    layer = new pdf.TextLayer({ textContentSource: proxy.streamTextContent(), container, viewport: proxy.getViewport({ scale }) });
     await layer.render();
   })().catch(() => {});
   return () => {
