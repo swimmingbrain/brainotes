@@ -1,6 +1,6 @@
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask, TextLayer } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { penIsDown } from '$lib/engine/input';
+import { penBusy } from '$lib/engine/input';
 import { RenderQueue } from './queue';
 import { pageKey, shotId, ShotCache, type Part, type Shot } from './shots';
 
@@ -19,6 +19,8 @@ const RUNNING = 2;
 // pages whose parsed drawing commands pdf.js may keep
 const PARSED = 12;
 const PEN_WAIT = 50;
+// ms after the pen lifts before rendering goes on, the next word comes soon
+const PEN_PAUSE = 300;
 
 export interface PageSize {
   w: number;
@@ -199,7 +201,7 @@ export function pdfText(id: string, page: number, container: HTMLElement, scale:
   void (async () => {
     const [mod, proxy] = await Promise.all([pdfjs(), pdfPage(id, page)]);
     // laying out the text is real work, it waits for the pen
-    while (penIsDown() && !stopped) await new Promise((r) => setTimeout(r, 100));
+    while (penBusy(PEN_PAUSE) && !stopped) await new Promise((r) => setTimeout(r, 100));
     if (stopped) return;
     container.style.setProperty('--total-scale-factor', String(scale));
     layer = new mod.TextLayer({ textContentSource: proxy.streamTextContent(), container, viewport: proxy.getViewport({ scale }) });
@@ -273,8 +275,8 @@ function stop(id: string, slot: Slot) {
 
 function pump() {
   while (running.size < RUNNING) {
-    // a pen on the page goes first, nothing new starts until it lifts
-    if (penIsDown()) {
+    // a pen on the page goes first, nothing new starts until it rests
+    if (penBusy(PEN_PAUSE)) {
       penTimer ??= setTimeout(() => {
         penTimer = null;
         pump();
@@ -293,9 +295,9 @@ function pump() {
   }
 }
 
-// waits for the pen to lift before pdf.js draws its next slice
+// waits for the pen to rest before pdf.js draws its next slice
 function whenPenUp(go: () => void) {
-  if (!penIsDown()) {
+  if (!penBusy(PEN_PAUSE)) {
     go();
     return;
   }

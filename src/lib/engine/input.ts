@@ -3,6 +3,7 @@ import type { PointerKind, Sample, Tool } from './tools/tool';
 import type { CanvasView } from './view';
 
 let drawing = false;
+let liftedAt = 0;
 
 // ms of finger movement that count for the speed of a fling
 const TRACK = 100;
@@ -13,6 +14,11 @@ const MIN_FLING = 0.3;
 // heavy work (pdf pages, far tiles, thumbnails, saving) waits for it
 export function penIsDown(): boolean {
   return drawing;
+}
+
+// down, or lifted only a moment ago, like between two words
+export function penBusy(pause: number): boolean {
+  return drawing || performance.now() - liftedAt < pause;
 }
 
 export interface InputTools {
@@ -210,6 +216,7 @@ export class Input {
     const active = this.active;
     if (!active || e.pointerId !== active.id) return;
     this.active = null;
+    if (drawing) liftedAt = performance.now();
     drawing = false;
     // a cancelled pen stroke still keeps its ink, only gestures are dropped
     if (cancel && active.tool === this.tools.hand) active.tool.cancel();
