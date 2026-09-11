@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import { actions } from '$lib/editor/actions';
+  import { warmPdf } from '$lib/pdf/pdf';
 
   // enter/leave fire for every child the pointer crosses, a counter is the
   // only reliable way to know when the drag has actually left the window
@@ -19,6 +20,8 @@
 
   function ondragenter(e: DragEvent) {
     if (!hasFiles(e)) return;
+    // it may be a pdf, pdf.js gets ready while the file is on its way
+    if (!visible) warmPdf();
     depth++;
     visible = true;
   }

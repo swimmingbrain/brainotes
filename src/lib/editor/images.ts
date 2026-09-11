@@ -5,6 +5,7 @@ import { choosePdf, isPdf } from './pdfs';
 import { newId } from '$lib/engine/doc';
 import { rememberBitmap } from '$lib/engine/images';
 import type { ImageItem, ImageSource } from '$lib/engine/types';
+import { warmPdf } from '$lib/pdf/pdf';
 import { putAsset } from '$lib/storage/db';
 import { activeTool, addToast, notebookId } from '$lib/stores/app';
 
@@ -175,7 +176,12 @@ plugActions({
     });
   },
   importFiles: (files, at) => {
-    if (files) importAll(files, at ?? null);
-    else void pickFiles('image/*,application/pdf,.brainotes').then((picked) => importAll(picked, at ?? null));
+    if (files) {
+      importAll(files, at ?? null);
+      return;
+    }
+    // a pdf may come, pdf.js gets ready while the file is picked
+    warmPdf();
+    void pickFiles('image/*,application/pdf,.brainotes').then((picked) => importAll(picked, at ?? null));
   }
 });

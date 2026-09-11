@@ -7,7 +7,7 @@ import { baseName, isPdf, pdfAsset, readFile, writeOnPage } from './pdfs';
 import { newId, newNotebook } from '$lib/engine/doc';
 import type { ImageSource } from '$lib/engine/types';
 import { layoutOf } from '$lib/pdf/layout';
-import { openPdf, renderPart, type Part } from '$lib/pdf/pdf';
+import { openPdf, renderPart, warmPdf, type Part } from '$lib/pdf/pdf';
 import { deleteAsset, getAsset, listAssets, listPages, putAsset } from '$lib/storage/db';
 import { activeTool, addToast, notebookId, panels, updatePanels, workspace } from '$lib/stores/app';
 import { preferences } from '$lib/stores/preferences';
@@ -227,6 +227,7 @@ activeTool.subscribe((tool) => {
 plugActions({
   showSource: (source) => void showSource(source),
   openReference: (files) => {
+    warmPdf();
     if (files) void openFiles(files);
     else void pickFiles('application/pdf,.pdf,image/*').then((picked) => openFiles(picked));
   }

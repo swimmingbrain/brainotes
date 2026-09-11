@@ -4,10 +4,14 @@
   import { actions } from '$lib/editor/actions';
   import { writeOn, type PdfTarget } from '$lib/editor/pdfs';
   import { PDF_LAYOUTS, type PdfLayout } from '$lib/pdf/layout';
+  import { warmPdf } from '$lib/pdf/pdf';
   import { notebookOpen } from '$lib/stores/app';
   import { preferences, setPreference } from '$lib/stores/preferences';
 
   let { files, onclose }: { files: File[]; onclose: () => void } = $props();
+
+  // pdf.js gets ready while the choice is made
+  warmPdf();
 
   let layout = $state<PdfLayout>(get(preferences).pdfLayout);
   let target = $state<PdfTarget>('new');
