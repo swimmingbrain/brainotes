@@ -167,6 +167,23 @@ export async function snip(file: string, page: number, part?: Part) {
   }
 }
 
+// a part of a picture on the side, in pixels of the picture, lands in the notes
+export async function snipImage(file: string, part: Part) {
+  const spot = spotAt(null, true);
+  if (!spot || !editor()) return;
+  try {
+    const asset = await getAsset(file);
+    if (!asset) throw new Error('the picture is not stored');
+    const w = Math.max(1, Math.round(part.w));
+    const h = Math.max(1, Math.round(part.h));
+    const cut = await createImageBitmap(asset.blob, Math.round(part.x), Math.round(part.y), w, h);
+    await insertImageBlob(await toPng(cut), spot.index, spot.x, spot.y);
+  } catch (err) {
+    console.warn(err);
+    addToast('That part of the picture could not be cut out', 'warning');
+  }
+}
+
 async function pageSize(file: string, page: number): Promise<{ w: number; h: number }> {
   const pdf = await openPdf(file);
   return pdf.pages[page - 1];

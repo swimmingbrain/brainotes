@@ -1,12 +1,15 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import Icon from '../Icon.svelte';
+  import { snipImage } from '$lib/editor/references';
   import { clampReaderZoom, READER_PAD } from '$lib/pdf/reader';
   import { getAsset } from '$lib/storage/db';
+  import { activeTool } from '$lib/stores/app';
 
   let { file, name }: { file: string; name: string } = $props();
 
   const ZOOM_STEP = 1.25;
+  const MIN_SNIP = 6;
 
   let url = $state('');
   let failed = $state(false);
@@ -14,6 +17,10 @@
   let viewW = $state(0);
   let zoom = $state(1);
 
+  let image = $state<HTMLImageElement | null>(null);
+  let drag = $state<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+
+  const snipping = $derived($activeTool === 'snip');
   // the picture fits the width at zoom 1
   const width = $derived(Math.max(40, Math.round((viewW - READER_PAD * 2) * zoom)));
 
@@ -56,6 +63,39 @@
     void zoomTo(zoom * Math.exp(-dy * (Math.abs(dy) < 50 ? 0.01 : 0.002)), e.clientX - r.left, e.clientY - r.top);
   }
 
+  function local(e: PointerEvent): { x: number; y: number } {
+    const r = image!.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(r.width, e.clientX - r.left)), y: Math.max(0, Math.min(r.height, e.clientY - r.top)) };
+  }
+
+  function onpointerdown(e: PointerEvent) {
+    if (!snipping || e.button !== 0 || !image) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const p = local(e);
+    drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+  }
+
+  function onpointermove(e: PointerEvent) {
+    if (!drag) return;
+    const p = local(e);
+    drag = { ...drag, x1: p.x, y1: p.y };
+  }
+
+  function onpointerup() {
+    const d = drag;
+    drag = null;
+    if (!d || !image) return;
+    const box = boxOf(d);
+    if (box.w < MIN_SNIP || box.h < MIN_SNIP) return;
+    const k = image.naturalWidth / image.getBoundingClientRect().width;
+    void snipImage(file, { x: box.x * k, y: box.y * k, w: box.w * k, h: box.h * k });
+  }
+
+  function boxOf(d: { x0: number; y0: number; x1: number; y1: number }) {
+    return { x: Math.min(d.x0, d.x1), y: Math.min(d.y0, d.y1), w: Math.abs(d.x1 - d.x0), h: Math.abs(d.y1 - d.y0) };
+  }
+
   function wheel(node: HTMLElement) {
     node.addEventListener('wheel', onwheel, { passive: false });
     return { destroy: () => node.removeEventListener('wheel', onwheel) };
@@ -77,7 +117,21 @@
     {#if failed}
       <p class="note">This picture is not stored any more.</p>
     {:else if url}
-      <img src={url} alt={name} style="width: {width}px" draggable="false" />
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="picture"
+        class:snipping
+        style="width: {width}px"
+        {onpointerdown}
+        {onpointermove}
+        {onpointerup}
+        onpointercancel={() => (drag = null)}>
+        <img bind:this={image} src={url} alt={name} draggable="false" />
+        {#if drag}
+          {@const b = boxOf(drag)}
+          <div class="snip-box" style="left: {b.x}px; top: {b.y}px; width: {b.w}px; height: {b.h}px"></div>
+        {/if}
+      </div>
     {/if}
   </div>
 </div>
@@ -140,12 +194,28 @@
     background: var(--bg-deep);
   }
 
-  img {
-    display: block;
-    max-width: none;
+  .picture {
+    position: relative;
     margin: 0 auto;
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  }
+
+  .picture.snipping {
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  img {
+    display: block;
+    width: 100%;
     user-select: none;
+  }
+
+  .snip-box {
+    position: absolute;
+    border: 1px solid var(--accent);
+    background: rgba(209, 154, 102, 0.15);
+    pointer-events: none;
   }
 
   .note {
