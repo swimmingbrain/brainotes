@@ -302,13 +302,39 @@ function pump() {
   }
 }
 
-// waits for the pen to rest before pdf.js draws its next slice
-function whenPenUp(go: () => void) {
-  if (!penBusy(PEN_PAUSE)) {
-    go();
+// pdf.js draws a page in slices of up to 15 ms, each in a frame of its
+// own. two renders at once put two slices in one frame, so the slices wait
+// in line here and only one goes on per frame. none while the pen writes
+const slices: (() => void)[] = [];
+let releasing = false;
+
+function nextSlice(go: () => void) {
+  slices.push(go);
+  scheduleSlice();
+}
+
+function scheduleSlice() {
+  if (releasing) return;
+  releasing = true;
+  if (penBusy(PEN_PAUSE)) {
+    setTimeout(() => {
+      releasing = false;
+      scheduleSlice();
+    }, PEN_WAIT);
+  } else {
+    requestAnimationFrame(releaseSlice);
+  }
+}
+
+// go asks pdf.js for the slice in the next frame, the next one waits a frame more
+function releaseSlice() {
+  releasing = false;
+  if (penBusy(PEN_PAUSE)) {
+    scheduleSlice();
     return;
   }
-  setTimeout(() => whenPenUp(go), PEN_WAIT);
+  slices.shift()?.();
+  if (slices.length > 0) scheduleSlice();
 }
 
 async function run(job: Job, slot: Slot) {
@@ -364,7 +390,7 @@ async function draw(page: PDFPageProxy, job: Wanted & { id: string; key: string 
   // pdf.js only touches the 2d context of the canvas, an offscreen one
   // does the same work without being in the page
   const task = page.render({ canvas: canvas as unknown as HTMLCanvasElement, viewport, background: '#ffffff' });
-  task.onContinue = whenPenUp;
+  task.onContinue = nextSlice;
   if (slot) slot.task = task;
   await task.promise;
   if (slot?.cancelled) return null;
