@@ -27,6 +27,8 @@
   const AHEAD = 120;
   // css pixels, a smaller drag is a click and snips nothing
   const MIN_SNIP = 6;
+  // ms the scrolling rests before the pages in sight get their text
+  const TEXT_WAIT = 200;
   const ZOOM_STEP = 1.25;
 
   let pdf = $state.raw<PdfFile | null>(null);
@@ -43,6 +45,10 @@
   let restored = false;
   let lastWidth = 0;
   let handledFocus = 0;
+  let textTimer: ReturnType<typeof setTimeout> | null = null;
+  // pages whose text can be selected. laying it out is real work, pages
+  // flying past while scrolling never get it
+  let textPages = $state.raw(new Set<number>());
   const canvases = new Map<number, HTMLCanvasElement>();
 
   interface Drag {
@@ -84,6 +90,7 @@
       off();
       want('reference', []);
       if (settleTimer) clearTimeout(settleTimer);
+      if (textTimer) clearTimeout(textTimer);
     };
   });
 
@@ -221,7 +228,18 @@
     scrollTop = scroller.scrollTop;
     spot = spotOf(layout.tops, scrollTop);
     keepReadingSpot(file, { at: spot, zoom });
+    textLater();
   }
+
+  function textLater() {
+    if (textTimer) clearTimeout(textTimer);
+    textTimer = setTimeout(() => (textPages = new Set(shown)), TEXT_WAIT);
+  }
+
+  // the first pages and the ones after a zoom get their text once things rest
+  $effect(() => {
+    if (settled && shown.length > 0) untrack(textLater);
+  });
 
   // zooms with the point at cx, cy of the view staying where it is
   async function zoomTo(next: number, cx = viewW / 2, cy = viewH / 2) {
@@ -397,7 +415,7 @@
             onpointerup={(e) => onpointerup(e, n)}
             onpointercancel={() => (drag = null)}>
             <canvas use:paint={n}></canvas>
-            {#if settled && !snipping}
+            {#if settled && !snipping && textPages.has(n)}
               {#key layout.scale}
                 <div class="text-layer" use:text={{ n, scale: layout.scale }}></div>
               {/key}
