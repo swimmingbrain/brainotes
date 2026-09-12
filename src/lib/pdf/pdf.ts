@@ -191,10 +191,6 @@ export function pdfFile(id: string): PdfFile | null {
   return files.get(id) ?? null;
 }
 
-export function pdfFailed(id: string): boolean {
-  return failed.has(id);
-}
-
 export async function pdfPage(id: string, page: number): Promise<PDFPageProxy> {
   return (await docOf(id)).getPage(page);
 }
