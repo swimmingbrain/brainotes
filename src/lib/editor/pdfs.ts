@@ -64,14 +64,16 @@ export function pdfAsset(file: File, pdf: PdfFile, notebookId: string): AssetRec
 // that is all pdf is blank. a board gets the pdf page in its middle
 export function pdfPageMeta(file: string, page: number, size: PageSize, layout: PdfLayout, kind: NotebookKind): PageMeta {
   const p = placePdfPage(size.w, size.h, layout);
-  const spacing = get(preferences).paper.spacing;
+  const paper = get(preferences).paper;
   const board = kind === 'board';
+  // a board keeps its pattern around the pdf page
+  const style = board ? paper.style : layout === 'full' ? 'blank' : 'lines';
   return {
     id: newId(),
     w: p.w,
     h: p.h,
     // white under a pdf page, so the default black ink stays black on it
-    paper: { style: layout === 'full' ? 'blank' : 'lines', spacing, color: 'white' },
+    paper: { style, spacing: paper.spacing, color: 'white' },
     pdf: {
       assetId: file,
       page,
