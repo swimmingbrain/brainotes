@@ -386,7 +386,7 @@ export class CanvasView {
   // where a notebook starts: the top of the first page, or the middle of the board
   private home() {
     if (this.isBoard) {
-      this.setCamera({ x: -this.width / 2, y: -this.height / 2, zoom: 1 });
+      this.setCamera(this.boardHome());
       return;
     }
     const zoom = fitWidthZoom(this.content.w, this.width);
@@ -395,6 +395,19 @@ export class CanvasView {
     // a notebook that just opened has no old pictures to stretch, its pdf
     // pages are drawn sharp right away
     this.pdfWait = false;
+  }
+
+  // a board starts at its middle at 100 percent, one with a pdf page on it
+  // shows the whole pdf page
+  private boardHome(): Camera {
+    const bg = this.doc.notebook.pages[this.board]?.pdf;
+    if (!bg) return { x: -this.width / 2, y: -this.height / 2, zoom: 1 };
+    const zoom = Math.min(1, (this.width - MARGIN * 2) / bg.w, (this.height - MARGIN * 2) / bg.h);
+    return {
+      x: bg.x + bg.w / 2 - this.width / 2 / zoom,
+      y: bg.y + bg.h / 2 - this.height / 2 / zoom,
+      zoom: Math.max(0.1, zoom)
+    };
   }
 
   goToPage(index: number) {
@@ -408,7 +421,7 @@ export class CanvasView {
       this.boardId = this.doc.notebook.pages[index].id;
       this.redrawAll();
       const saved = this.cameras.get(this.boardId);
-      this.setCamera(saved ?? { x: -this.width / 2, y: -this.height / 2, zoom: 1 });
+      this.setCamera(saved ?? this.boardHome());
       this.hooks.state?.();
       return;
     }
