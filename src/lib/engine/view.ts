@@ -392,6 +392,9 @@ export class CanvasView {
     const zoom = fitWidthZoom(this.content.w, this.width);
     this.fitted = true;
     this.setCamera({ x: 0, y: this.content.y - MARGIN / zoom, zoom });
+    // a notebook that just opened has no old pictures to stretch, its pdf
+    // pages are drawn sharp right away
+    this.pdfWait = false;
   }
 
   goToPage(index: number) {
