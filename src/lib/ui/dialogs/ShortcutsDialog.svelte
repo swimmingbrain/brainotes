@@ -50,6 +50,7 @@
         { keys: ['Ctrl', '='], what: 'Zoom in' },
         { keys: ['Ctrl', '-'], what: 'Zoom out' },
         { keys: ['Ctrl', '0'], what: 'Fit the page width' },
+        { keys: ['Ctrl', 'Wheel'], what: 'Zoom the notes or the pdf on the side' },
         { keys: ['Ctrl', 'B'], what: 'Pages panel' },
         { keys: ['Ctrl', 'Alt', 'B'], what: 'Reference panel' },
         { keys: ['Ctrl', '1/2/3'], what: 'Notes, Study, Board' },
