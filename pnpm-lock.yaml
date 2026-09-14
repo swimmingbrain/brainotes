@@ -14,6 +14,9 @@ importers:
       '@pdfme/pdf-lib':
         specifier: ^6.2.2
         version: 6.2.2
+      browser-fs-access:
+        specifier: ^0.38.0
+        version: 0.38.0
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -688,6 +691,9 @@ packages:
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
     engines: {node: '>= 0.4'}
+
+  browser-fs-access@0.38.0:
+    resolution: {integrity: sha512-JveqW2w6pEZqFEEfMgCszXzYpE89dG+nPsmOdcs741mFFAROeL+iqjGEpR07RI+s0YY0EFr+4KnOoACprJTpOw==}
 
   chai@6.3.0:
     resolution: {integrity: sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg==}
@@ -1563,6 +1569,8 @@ snapshots:
   assertion-error@2.0.1: {}
 
   axobject-query@4.1.0: {}
+
+  browser-fs-access@0.38.0: {}
 
   chai@6.3.0: {}
 
