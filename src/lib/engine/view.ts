@@ -19,6 +19,7 @@ import type { History } from './history';
 import { onBitmap } from './images';
 import { penIsDown } from './input';
 import {
+  darkUnder,
   drawImageItem,
   drawItem,
   drawPattern,
@@ -187,9 +188,10 @@ export class CanvasView {
       this.bgDirty = true;
       this.requestFrame();
     });
-    // and a pdf page that was rendered
+    // and a pdf page that was rendered, it may turn out to be a dark one
     this.offShot = onShot(() => {
       this.bgDirty = true;
+      this.updateBlend();
       this.requestFrame();
     });
 
@@ -592,11 +594,12 @@ export class CanvasView {
     this.boardId = this.doc.notebook.pages[this.board]?.id ?? '';
   }
 
-  // on dark paper the highlighter is laid on normally, multiply would hide it
+  // on a dark page the highlighter is laid on normally, multiply would hide it
   private updateBlend() {
     const index = this.currentPage;
     const page = index >= 0 && index < this.doc.pageCount ? this.doc.notebook.pages[index] : null;
-    this.hl.style.mixBlendMode = page && isDark(page.paper) ? 'normal' : 'multiply';
+    const blend = page && darkUnder(page) ? 'normal' : 'multiply';
+    if (this.hl.style.mixBlendMode !== blend) this.hl.style.mixBlendMode = blend;
   }
 
   // what a tile of one layer has to draw, page by page, in a job the tile

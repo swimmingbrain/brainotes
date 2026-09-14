@@ -1,5 +1,5 @@
 import { PAPER_COLORS } from '$lib/editor/paper';
-import { shotsOf } from '$lib/pdf/pdf';
+import { pdfIsDark, shotsOf } from '$lib/pdf/pdf';
 import { pickShots } from '$lib/pdf/shots';
 import { bitmapFor } from './images';
 import { shapePath } from './shapes';
@@ -42,6 +42,12 @@ export function drawPdfBackground(ctx: Ctx, bg: PdfBackground, scale: number, pa
 
 export function isDark(paper: Paper): boolean {
   return paper.color === 'dark';
+}
+
+// the highlighter is laid on normally where the page is dark, on dark
+// paper or a dark pdf page. multiply would hide it there
+export function darkUnder(meta: PageMeta): boolean {
+  return isDark(meta.paper) || (meta.pdf !== undefined && pdfIsDark(meta.pdf.assetId, meta.pdf.page));
 }
 
 export function isMarker(item: Item): boolean {
@@ -308,7 +314,7 @@ export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.globalAlpha = HIGHLIGHTER_ALPHA;
-        ctx.globalCompositeOperation = dark ? 'source-over' : 'multiply';
+        ctx.globalCompositeOperation = darkUnder(page.meta) ? 'source-over' : 'multiply';
         ctx.drawImage(layer.canvas, 0, 0);
         ctx.restore();
       }

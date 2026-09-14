@@ -1,6 +1,7 @@
 import type { PDFDocumentProxy, PDFPageProxy, PDFWorker, RenderTask, TextLayer } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { penBusy } from '$lib/engine/input';
+import { knownDark, measureDark } from './dark';
 import { RenderQueue } from './queue';
 import { pageKey, shotId, ShotCache, type Part, type Shot } from './shots';
 
@@ -336,7 +337,7 @@ async function run(job: Job, slot: Slot) {
       shot.picture.close();
       return;
     }
-    cache.add(shot);
+    keep(shot);
     remember(doc, job.file, job.page);
     notify(job.file, job.page);
   } catch (err) {
@@ -420,7 +421,32 @@ export async function ensureShot(file: string, page: number, scale: number): Pro
   if (found) return found;
   const shot = await draw(proxy, { file, page, scale: s, priority: 0, id, key });
   if (!shot) return null;
-  cache.add(shot);
+  keep(shot);
   notify(file, page);
   return shot;
+}
+
+function keep(shot: Shot) {
+  cache.add(shot);
+  if (shot.full) measureDark(shot.key, shot.picture);
+}
+
+// a dark pdf page gets the highlighter laid on normally. false while there
+// is no picture of it yet
+export function pdfIsDark(file: string, page: number): boolean {
+  return knownDark(pageKey(file, page)) ?? false;
+}
+
+// the same for an export, a tiny picture is made when there is none. w is
+// the width of the page in points
+export async function pdfDark(file: string, page: number, w: number): Promise<boolean> {
+  const key = pageKey(file, page);
+  if (knownDark(key) === undefined) {
+    try {
+      const picture = await renderPart(file, page, 48 / Math.max(1, w));
+      measureDark(key, picture);
+      picture.close();
+    } catch {}
+  }
+  return knownDark(key) ?? false;
 }
