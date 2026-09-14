@@ -19,7 +19,6 @@ export interface PdfPlacement {
   ph: number;
 }
 
-// the share of the slide the space beside it gets
 const BESIDE = 0.6;
 
 export function placePdfPage(pw: number, ph: number, layout: PdfLayout): PdfPlacement {

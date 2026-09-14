@@ -1,6 +1,5 @@
 export interface Job {
   id: string;
-  // lower goes first
   priority: number;
 }
 
@@ -32,7 +31,6 @@ export class RenderQueue<T extends Job> {
     return false;
   }
 
-  // the most urgent job that is not running yet, the first asked for wins a tie
   next(skip: (id: string) => boolean): T | null {
     let best: T | null = null;
     for (const jobs of this.owners.values()) {
@@ -44,7 +42,6 @@ export class RenderQueue<T extends Job> {
     return best;
   }
 
-  // finished or failed, no one has to wait for it any more
   done(id: string) {
     for (const [owner, jobs] of this.owners) {
       jobs.delete(id);

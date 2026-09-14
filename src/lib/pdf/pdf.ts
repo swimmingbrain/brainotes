@@ -11,7 +11,6 @@ type PdfLib = typeof import('pdfjs-dist');
 // the biggest picture one render makes. a page that would be bigger is
 // drawn whole at a lower scale and the part on screen sharp on top
 export const MAX_PIXELS = 16_000_000;
-// device pixels across the quick picture a page gets first
 export const PREVIEW_WIDTH = 480;
 const CACHE_PIXELS = 64_000_000;
 // renders at once: one draws while pdf.js reads the next in its worker
@@ -29,7 +28,6 @@ export interface PageSize {
 
 export interface PdfFile {
   id: string;
-  // in points, as the pages are shown
   pages: PageSize[];
 }
 
@@ -37,11 +35,8 @@ export interface Wanted {
   file: string;
   // counts from 1 like the pages of the pdf
   page: number;
-  // device pixels per point
   scale: number;
-  // only this part of the page, in points
   part?: Part;
-  // lower goes first
   priority: number;
 }
 
@@ -89,12 +84,10 @@ function dataUrl(dir: string): string {
   return new URL(`pdfjs/${dir}/`, document.baseURI).href;
 }
 
-// where stored pdfs come from, the storage hands its reader in
 export function setPdfLoader(fn: Loader) {
   loader = fn;
 }
 
-// called with the file and the page once a new picture of it is ready
 export function onShot(fn: (file: string, page: number) => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -164,8 +157,8 @@ function sizesOf(id: string, progress?: (done: number, total: number) => void): 
   return list;
 }
 
-// a pdf that is not stored yet, read under the id it is going to get.
-// throws when pdf.js can not read it, a password is one reason
+// a pdf that is not stored yet, under the id it is going to get. throws
+// when pdf.js can not read it, a password is one reason
 export async function readPdf(blob: Blob, id: string, progress?: (done: number, total: number) => void): Promise<PdfFile> {
   const doc = parse(blob);
   docs.set(id, doc);
@@ -180,13 +173,11 @@ export async function readPdf(blob: Blob, id: string, progress?: (done: number, 
   return { id, pages };
 }
 
-// a stored pdf with the size of every page
 export async function openPdf(id: string): Promise<PdfFile> {
   const pages = await sizesOf(id);
   return { id, pages };
 }
 
-// the pdf when it is open already
 export function pdfFile(id: string): PdfFile | null {
   return files.get(id) ?? null;
 }
@@ -195,9 +186,8 @@ export async function pdfPage(id: string, page: number): Promise<PDFPageProxy> {
   return (await docOf(id)).getPage(page);
 }
 
-// the text of a page laid over it as invisible spans, so it can be
-// selected and copied. scale is css pixels per point. what it returns stops
-// it and takes the text away again
+// invisible text over a page so it can be selected and copied, scale is
+// css pixels per point. what it returns takes the text away again
 export function pdfText(id: string, page: number, container: HTMLElement, scale: number): () => void {
   let layer: TextLayer | null = null;
   let stopped = false;
@@ -234,7 +224,6 @@ export function keepPdfs(keep: Set<string>) {
   failed.clear();
 }
 
-// the scale a whole page can have without passing the pixel limit
 export function capScale(w: number, h: number, scale: number): number {
   const most = Math.sqrt(MAX_PIXELS / Math.max(1, w * h));
   return Math.min(scale, most);
@@ -244,7 +233,6 @@ export function previewScale(w: number): number {
   return PREVIEW_WIDTH / Math.max(1, w);
 }
 
-// the pictures there are of a page, for drawing it right now
 export function shotsOf(file: string, page: number): Shot[] {
   return cache.of(pageKey(file, page));
 }
@@ -278,7 +266,6 @@ function stop(id: string, slot: Slot) {
 
 function pump() {
   while (running.size < RUNNING) {
-    // a pen on the page goes first, nothing new starts until it rests
     if (penBusy(PEN_PAUSE)) {
       penTimer ??= setTimeout(() => {
         penTimer = null;
@@ -374,7 +361,6 @@ function remember(doc: PDFDocumentProxy, file: string, page: number) {
   parsed.set(file, list);
 }
 
-// the page, or a part of it, drawn into a picture of its own
 async function draw(page: PDFPageProxy, job: Wanted & { id: string; key: string }, slot?: Slot): Promise<Shot | null> {
   const { scale, part } = job;
   const whole = page.getViewport({ scale });

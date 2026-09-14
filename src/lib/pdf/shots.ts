@@ -15,9 +15,7 @@ export interface Part {
 
 export interface Shot<P extends Picture = ImageBitmap> extends Part {
   id: string;
-  // the file and the page
   key: string;
-  // device pixels per point
   scale: number;
   // the whole page, else only the part x, y, w, h (in points)
   full: boolean;
@@ -39,8 +37,7 @@ export function sharp(shot: { scale: number }, scale: number): boolean {
   return shot.scale >= scale * 0.95 && shot.scale <= scale * 2;
 }
 
-// what to draw for a page at a scale: the best whole page, and the sharp
-// parts made for this very scale on top of it
+// the best whole page for a scale, and the sharp parts made for it on top
 export function pickShots<P extends Picture>(shots: Shot<P>[], scale: number): { base: Shot<P> | null; parts: Shot<P>[] } {
   let base: Shot<P> | null = null;
   let above: Shot<P> | null = null;
@@ -50,7 +47,6 @@ export function pickShots<P extends Picture>(shots: Shot<P>[], scale: number): {
       if (Math.abs(shot.scale - scale) <= scale * 0.01) parts.push(shot);
       continue;
     }
-    // the smallest one that is sharp enough, else the biggest there is
     if (shot.scale >= scale * 0.95 && (!above || shot.scale < above.scale)) above = shot;
     if (!base || shot.scale > base.scale) base = shot;
   }
@@ -61,7 +57,6 @@ export function pickShots<P extends Picture>(shots: Shot<P>[], scale: number): {
 // once they hold too many pixels
 export class ShotCache<P extends Picture = ImageBitmap> {
   pixels = 0;
-  // a map keeps its order, a shot that is used moves to the end
   private lru = new Map<string, Shot<P>>();
   private pages = new Map<string, Shot<P>[]>();
 
@@ -69,7 +64,6 @@ export class ShotCache<P extends Picture = ImageBitmap> {
     private maxPixels: number,
     // this many stay whatever their size, the ones on screen never thrash
     private keep: number,
-    // shots one page may hold
     private perPage: number
   ) {}
 
@@ -128,7 +122,6 @@ export class ShotCache<P extends Picture = ImageBitmap> {
     shot.picture.close();
   }
 
-  // every shot of a file, or all of them
   clear(file?: string) {
     for (const shot of [...this.lru.values()]) {
       if (file === undefined || shot.key.startsWith(file + ':')) this.remove(shot);

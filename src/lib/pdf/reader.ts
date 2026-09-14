@@ -7,9 +7,7 @@ export const MIN_READER_ZOOM = 0.25;
 export const MAX_READER_ZOOM = 5;
 
 export interface ReaderLayout {
-  // css pixels per point
   scale: number;
-  // where each page starts, and one more for the end of the last
   tops: number[];
   width: number;
   height: number;
@@ -33,7 +31,6 @@ export function readerLayout(pages: PageSize[], viewW: number, zoom: number): Re
   return { scale, tops, width, height };
 }
 
-// the page whose bottom is below y, counting from 0
 export function pageAtY(tops: number[], y: number): number {
   let lo = 0;
   let hi = tops.length - 2;
@@ -45,7 +42,6 @@ export function pageAtY(tops: number[], y: number): number {
   return Math.max(0, lo);
 }
 
-// index range [from, to) of the pages that reach into y0..y1
 export function pagesIn(tops: number[], y0: number, y1: number): [number, number] {
   const count = tops.length - 1;
   if (count <= 0) return [0, 0];
