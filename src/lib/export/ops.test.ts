@@ -4,6 +4,7 @@ import {
   blendOver,
   BOARD_MARGIN,
   boardFrame,
+  dotsOf,
   MAX_SIDE,
   outlinePath,
   pageSetup,
@@ -67,8 +68,22 @@ describe('export ops', () => {
     // rows at -100, 0, 100 and columns at -200 ... 200
     expect(grid.split('\n').filter((p) => p.endsWith(' l'))).toHaveLength(3 + 5);
     expect(patternOps({ style: 'blank', spacing: 24, color: 'white' }, { x: 0, y: 0, w: 100, h: 100 }, false)).toBe('');
-    const dots = patternOps({ style: 'dots', spacing: 24, color: 'dark' }, { x: 0, y: 0, w: 100, h: 50 }, false);
-    expect(dots.split('\n').filter((p) => p.endsWith(' l'))).toHaveLength(4 * 2);
+    expect(patternOps({ style: 'dots', spacing: 24, color: 'white' }, { x: 0, y: 0, w: 100, h: 100 }, false)).toBe('');
+  });
+
+  it('puts the dots of a tile where the canvas has them', () => {
+    const frame = { x: 0, y: 0, w: 595, h: 842 };
+    const setup = pageSetup(frame);
+    const dots = dotsOf({ style: 'dots', spacing: 24, color: 'white' }, frame, false, setup.m)!;
+    expect(dots.step).toBe(24);
+    // the middle of the first tile lands on the page point (0, 0), of the
+    // next one on (24, 24), both in the default space of the pdf page
+    expect(apply(dots.matrix, 12, 12)).toEqual(apply(setup.m, 0, 0));
+    expect(apply(dots.matrix, 36, 36)).toEqual(apply(setup.m, 24, 24));
+    expect(dots.area).toBe('12 12 583 830 re');
+    const board = dotsOf({ style: 'dots', spacing: 24, color: 'dark' }, { x: -100, y: -50, w: 200, h: 100 }, true, setup.m)!;
+    expect(board.area).toBe('-100 -50 200 100 re');
+    expect(dotsOf({ style: 'lines', spacing: 24, color: 'white' }, frame, false, setup.m)).toBeNull();
   });
 
   it('lays a pdf page onto its place for every turn', () => {

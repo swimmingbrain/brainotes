@@ -138,38 +138,47 @@ export function shapeOps(shape: Shape, color: string): string {
   return `${strokeColor(color)} ${num(shape.size)} w 1 J 1 j\n${shapePathOps(shape)}\nS`;
 }
 
-// the lines or dots of the paper over a frame of the page. a page starts its
+// the lines of the paper over a frame of the page. a page starts its
 // pattern one step in from its edges, a board has it everywhere
 export function patternOps(paper: Paper, frame: Frame, everywhere: boolean): string {
   const step = paper.spacing;
-  if (paper.style === 'blank' || !(step > 0)) return '';
+  if ((paper.style !== 'lines' && paper.style !== 'grid') || !(step > 0)) return '';
   const colors = PAPER_COLORS[paper.color];
-  const color = rgb(blendOver(colors.rule, colors.paper));
   const x0 = frame.x;
   const y0 = frame.y;
   const x1 = frame.x + frame.w;
   const y1 = frame.y + frame.h;
   const first = (v: number) => Math.max(everywhere ? -Infinity : 1, Math.ceil(v / step));
-  const parts: string[] = [];
-  if (paper.style === 'dots') {
-    parts.push(`${color} RG ${num(DOT)} w 1 J`);
-    for (let j = first(y0); j * step < y1; j++) {
-      const y = num(j * step);
-      for (let i = first(x0); i * step < x1; i++) {
-        const x = i * step;
-        parts.push(`${num(x)} ${y} m ${num(x + 0.01)} ${y} l`);
-      }
-    }
-  } else {
-    parts.push(`${color} RG ${num(RULE)} w 0 J`);
-    for (let j = first(y0); j * step < y1; j++) parts.push(`${num(x0)} ${num(j * step)} m ${num(x1)} ${num(j * step)} l`);
-    if (paper.style === 'grid') {
-      for (let i = first(x0); i * step < x1; i++) parts.push(`${num(i * step)} ${num(y0)} m ${num(i * step)} ${num(y1)} l`);
-    }
+  const parts: string[] = [`${rgb(blendOver(colors.rule, colors.paper))} RG ${num(RULE)} w 0 J`];
+  for (let j = first(y0); j * step < y1; j++) parts.push(`${num(x0)} ${num(j * step)} m ${num(x1)} ${num(j * step)} l`);
+  if (paper.style === 'grid') {
+    for (let i = first(x0); i * step < x1; i++) parts.push(`${num(i * step)} ${num(y0)} m ${num(i * step)} ${num(y1)} l`);
   }
   if (parts.length === 1) return '';
   parts.push('S');
-  return parts.join('\n') + '\n';
+  return parts.join('\n');
+}
+
+// dots are one tile with a dot in its middle, repeated over the page like
+// on the canvas. a pattern lives in the space of the page itself, so the
+// tile gets the matrix of the page. area is the part of the frame to fill
+export function dotsOf(
+  paper: Paper,
+  frame: Frame,
+  everywhere: boolean,
+  page: number[]
+): { tile: string; step: number; matrix: number[]; area: string } | null {
+  const step = paper.spacing;
+  if (paper.style !== 'dots' || !(step > 0)) return null;
+  const colors = PAPER_COLORS[paper.color];
+  const half = step / 2;
+  const tile = `${rgb(blendOver(colors.rule, colors.paper))} rg\n${ellipsePath(half, half, DOT / 2, DOT / 2)}\nf`;
+  const [a, b, c, d, e, f] = page;
+  const matrix = [a, b, c, d, e - a * half - c * half, f - b * half - d * half];
+  const x0 = everywhere ? frame.x : frame.x + half;
+  const y0 = everywhere ? frame.y : frame.y + half;
+  const area = `${num(x0)} ${num(y0)} ${num(frame.x + frame.w - x0)} ${num(frame.y + frame.h - y0)} re`;
+  return { tile, step, matrix, area };
 }
 
 // the matrix that lays a pdf page onto rect of the page. crop is the part
