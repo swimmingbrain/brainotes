@@ -12,7 +12,6 @@ import { preferences } from '$lib/stores/preferences';
 
 export type PdfTarget = 'new' | 'append';
 
-// ms before reading a pdf says how far it got
 const SLOW = 600;
 
 export function isPdf(file: File): boolean {
@@ -117,7 +116,6 @@ export async function writeOn(files: File[], layout: PdfLayout, target: PdfTarge
   }
 }
 
-// one pdf page after the page on screen, laid out like the page it follows
 export function writeOnPage(file: string, page: number, size: PageSize, layout: PdfLayout) {
   const doc = openDoc();
   if (!doc) return;

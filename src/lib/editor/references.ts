@@ -39,7 +39,6 @@ function setActive(id: string) {
   if (doc) saveActive(doc.notebook.id, id);
 }
 
-// the list follows the open notebook
 async function loadRefs(id: string) {
   const doc = openDoc();
   if (!id || !doc || doc.notebook.id !== id) {
@@ -167,7 +166,6 @@ export async function snip(file: string, page: number, part?: Part) {
   }
 }
 
-// a part of a picture on the side, in pixels of the picture, lands in the notes
 export async function snipImage(file: string, part: Part) {
   const spot = spotAt(null, true);
   if (!spot || !editor()) return;
@@ -189,7 +187,6 @@ async function pageSize(file: string, page: number): Promise<{ w: number; h: num
   return pdf.pages[page - 1];
 }
 
-// a reference page becomes the paper of a new page after the one on screen
 export async function writeOnReferencePage(file: string, page: number) {
   const doc = openDoc();
   if (!doc) return;

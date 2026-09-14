@@ -29,7 +29,6 @@ export interface ReadingSpot {
 }
 
 const KEY = 'brainotes-reading';
-// files remembered, the oldest are forgotten
 const KEEP = 100;
 
 let spots: Record<string, ReadingSpot & { t: number }> = {};
@@ -48,7 +47,6 @@ export function readingSpot(id: string): ReadingSpot | null {
   return { at: spot.at, zoom: spot.zoom };
 }
 
-// written a moment after the scrolling stops
 export function keepReadingSpot(id: string, spot: ReadingSpot) {
   spots[id] = { ...spot, t: Date.now() };
   if (!browser || timer) return;

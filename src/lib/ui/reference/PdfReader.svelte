@@ -23,7 +23,6 @@
 
   // ms the zoom rests before the pages are drawn sharp again
   const SETTLE = 150;
-  // css pixels of pages kept around what is in sight
   const AHEAD = 120;
   // css pixels, a smaller drag is a click and snips nothing
   const MIN_SNIP = 6;
@@ -107,7 +106,6 @@
     settleTimer = setTimeout(() => (paintScale = target), SETTLE);
   });
 
-  // the canvases get their new size once the zoom rests
   $effect(() => {
     if (paintScale === 0) return;
     for (const n of canvases.keys()) draw(n);
@@ -183,7 +181,6 @@
     want('reference', list);
   });
 
-  // the best picture there is of page n on its canvas
   function draw(n: number) {
     const canvas = canvases.get(n);
     const size = pdf?.pages[n - 1];
@@ -241,7 +238,6 @@
     if (settled && shown.length > 0) untrack(textLater);
   });
 
-  // zooms with the point at cx, cy of the view staying where it is
   async function zoomTo(next: number, cx = viewW / 2, cy = viewH / 2) {
     next = clampReaderZoom(next);
     const before = layout;
@@ -295,7 +291,6 @@
     }
   }
 
-  // snip: a box dragged over a page
 
   function local(e: PointerEvent, el: HTMLElement): { x: number; y: number } {
     const r = el.getBoundingClientRect();
