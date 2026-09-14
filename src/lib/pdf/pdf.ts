@@ -300,12 +300,13 @@ function pump() {
 
 // pdf.js draws a page in slices of up to 15 ms, each in a frame of its
 // own. two renders at once put two slices in one frame, so the slices wait
-// in line here and only one goes on per frame. none while the pen writes
-const slices: (() => void)[] = [];
+// here and only one goes on per frame, the most urgent render first. none
+// while the pen writes
+const slices: { go: () => void; priority: number }[] = [];
 let releasing = false;
 
-function nextSlice(go: () => void) {
-  slices.push(go);
+function nextSlice(go: () => void, priority: number) {
+  slices.push({ go, priority });
   scheduleSlice();
 }
 
@@ -329,7 +330,10 @@ function releaseSlice() {
     scheduleSlice();
     return;
   }
-  slices.shift()?.();
+  let best = 0;
+  for (let i = 1; i < slices.length; i++) if (slices[i].priority < slices[best].priority) best = i;
+  const [slice] = slices.splice(best, 1);
+  slice?.go();
   if (slices.length > 0) scheduleSlice();
 }
 
@@ -386,7 +390,7 @@ async function draw(page: PDFPageProxy, job: Wanted & { id: string; key: string 
   // pdf.js only touches the 2d context of the canvas, an offscreen one
   // does the same work without being in the page
   const task = page.render({ canvas: canvas as unknown as HTMLCanvasElement, viewport, background: '#ffffff' });
-  task.onContinue = nextSlice;
+  task.onContinue = (go: () => void) => nextSlice(go, job.priority);
   if (slot) slot.task = task;
   await task.promise;
   if (slot?.cancelled) return null;
