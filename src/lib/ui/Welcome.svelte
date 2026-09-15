@@ -3,6 +3,7 @@
   import Icon from './Icon.svelte';
   import { actions } from '$lib/editor/actions';
   import { notebookMenu } from '$lib/editor/commands';
+  import { openNotebookFile } from '$lib/editor/notebook-file';
   import { countPages, timeAgo } from '$lib/format';
   import { contextMenu, library, type NotebookSummary } from '$lib/stores/app';
 
@@ -34,6 +35,10 @@
         <Icon name="pdf" size={14} />
         Open PDF
       </button>
+      <button class="welcome-btn secondary" onclick={openNotebookFile} title="Open a notebook saved as a .brainotes file">
+        <Icon name="import" size={14} />
+        Open .brainotes
+      </button>
     </div>
 
     {#if recents.length > 0}
@@ -54,7 +59,7 @@
       </div>
     {/if}
 
-    <p class="welcome-hint">or drop a pdf or an image anywhere</p>
+    <p class="welcome-hint">or drop a pdf, an image or a .brainotes file anywhere</p>
   </div>
 </div>
 
