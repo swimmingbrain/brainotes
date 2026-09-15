@@ -89,6 +89,28 @@ export function bitmapFor(assetId: string): ImageBitmap | null {
   return null;
 }
 
+// for an export: waits until the picture is decoded, null when it can not be
+export function bitmapReady(assetId: string): Promise<ImageBitmap | null> {
+  const now = bitmapFor(assetId);
+  if (now || cache.get(assetId)?.failed) return Promise.resolve(now);
+  return new Promise((resolve) => {
+    const check = () => {
+      const entry = cache.get(assetId);
+      if (entry?.bitmap || entry?.failed || !entry) {
+        listeners.delete(onDone);
+        clearInterval(timer);
+        resolve(entry?.bitmap ?? null);
+      }
+    };
+    const onDone = (id: string) => {
+      if (id === assetId) check();
+    };
+    listeners.add(onDone);
+    // a failed decode tells nobody, it is looked for now and then
+    const timer = setInterval(check, 100);
+  });
+}
+
 // another notebook opens, its pictures are others
 export function clearBitmaps() {
   for (const entry of cache.values()) entry.bitmap?.close();
