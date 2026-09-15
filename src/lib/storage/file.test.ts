@@ -7,7 +7,7 @@ import { FileFormatError, readNotebookFile, withFreshIds, writeNotebookFile, typ
 
 const SETUP: PaperSetup = { style: 'grid', spacing: 20, color: 'cream', size: 'a4' };
 
-function bytes(n: number, seed: number): Uint8Array {
+function bytes(n: number, seed: number): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(n);
   for (let i = 0; i < n; i++) out[i] = (i * 31 + seed) & 255;
   return out;
