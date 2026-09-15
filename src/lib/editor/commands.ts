@@ -81,8 +81,9 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
     c('close-notebook', 'Close notebook', 'Notebook', () => actions.closeNotebook()),
     c('import', 'Import a PDF or images', 'Notebook', () => actions.importFiles(), 'Ctrl+O'),
     c('open-reference', 'Open a PDF on the side', 'Notebook', () => actions.openReference()),
-    c('export-pdf', 'Export as PDF', 'Notebook', () => actions.exportNotebook('pdf')),
-    c('export-png', 'Export this page as PNG', 'Notebook', () => actions.exportNotebook('png')),
+    c('export-pdf', 'Export as PDF', 'Notebook', () => actions.exportNotebook('pdf', 'all')),
+    c('export-pdf-page', 'Export this page as PDF', 'Notebook', () => actions.exportNotebook('pdf', 'page')),
+    c('export-png', 'Export this page as PNG', 'Notebook', () => actions.exportNotebook('png', 'page')),
     c('export-file', 'Export a .brainotes file', 'Notebook', () => actions.exportNotebook('brainotes')),
 
     // pages

@@ -9,6 +9,7 @@
     commandPaletteOpen,
     dialog,
     history,
+    notebookKind,
     notebookName,
     notebookOpen,
     saveState,
@@ -25,11 +26,17 @@
     failed: 'Could not save, the browser storage may be full'
   };
 
-  const exportItems: MenuItem[] = [
-    { label: 'PDF', action: () => actions.exportNotebook('pdf') },
-    { label: 'This page as PNG', action: () => actions.exportNotebook('png') },
-    { label: '.brainotes file', action: () => actions.exportNotebook('brainotes') }
-  ];
+  // a whiteboard calls its pages boards
+  const exportItems: MenuItem[] = $derived.by(() => {
+    const page = $notebookKind === 'board' ? 'board' : 'page';
+    return [
+      { label: `PDF, all ${page}s`, action: () => actions.exportNotebook('pdf', 'all') },
+      { label: `PDF, this ${page}`, action: () => actions.exportNotebook('pdf', 'page') },
+      { label: `PNG, this ${page}`, action: () => actions.exportNotebook('png', 'page') },
+      { separator: true, label: '' },
+      { label: '.brainotes file', action: () => actions.exportNotebook('brainotes') }
+    ];
+  });
 </script>
 
 <div class="topbar">
