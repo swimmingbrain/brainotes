@@ -1,9 +1,9 @@
 import { plugActions, type ExportPages } from './actions';
 import { currentPage, loadPage, openDoc } from './canvas';
 import type { Doc } from '$lib/engine/doc';
-import type { Item, PageMeta } from '$lib/engine/types';
+import type { Item, Notebook, PageMeta } from '$lib/engine/types';
 import { fileName, saveFile, type FileKind } from '$lib/export/save';
-import { getAsset } from '$lib/storage/db';
+import { getAsset, listAssets } from '$lib/storage/db';
 import { addToast, dismissToast, updateToast } from '$lib/stores/app';
 
 // one export at a time, a second click would only fight the first for the dialog
@@ -87,9 +87,50 @@ function exportPng() {
   });
 }
 
+function pause(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+// the stored files a notebook still uses: its pdf pages, the files on the
+// side, its pictures and the pdfs its clips came from
+function usedAssets(notebook: Notebook, pages: Record<string, Item[]>): Set<string> {
+  const used = new Set(notebook.refs);
+  for (const meta of notebook.pages) if (meta.pdf) used.add(meta.pdf.assetId);
+  for (const items of Object.values(pages)) {
+    for (const item of items) {
+      if (item.type !== 'image') continue;
+      used.add(item.assetId);
+      if (item.source) used.add(item.source.assetId);
+    }
+  }
+  return used;
+}
+
+function exportFile() {
+  const doc = openDoc();
+  if (!doc) return;
+  const notebook = JSON.parse(JSON.stringify(doc.notebook)) as Notebook;
+  const total = notebook.pages.length;
+  run('brainotes', notebook.name, '.brainotes file', async (stopped, toast) => {
+    const { writeNotebookFile } = await import('$lib/storage/file');
+    const pages: Record<string, Item[]> = {};
+    for (let i = 0; i < total; i++) {
+      if (stopped()) throw stoppedError();
+      const id = notebook.pages[i].id;
+      const { items } = await pageOf(doc, id);
+      if (items.length > 0) pages[id] = items;
+      if (total > 20 && (i + 1) % 10 === 0) updateToast(toast, `Packing the notebook: ${i + 1} of ${total} pages`);
+    }
+    const used = usedAssets(notebook, pages);
+    const assets = (await listAssets(notebook.id)).filter((asset) => used.has(asset.id));
+    return writeNotebookFile({ notebook, pages, assets }, pause);
+  });
+}
+
 plugActions({
   exportNotebook: (format, pages = 'all') => {
     if (format === 'pdf') exportPdf(pages);
     else if (format === 'png') exportPng();
+    else exportFile();
   }
 });
