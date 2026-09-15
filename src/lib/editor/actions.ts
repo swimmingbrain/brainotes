@@ -3,6 +3,8 @@ import type { PaperStyle } from '$lib/stores/preferences';
 import type { ImageSource } from '$lib/engine/types';
 
 export type ExportFormat = 'pdf' | 'png' | 'brainotes';
+// the whole notebook or the page on screen
+export type ExportPages = 'all' | 'page';
 
 // a point of the window in css pixels, like clientX and clientY
 export interface Point {
@@ -53,7 +55,7 @@ export interface Actions {
   showSource: (source: ImageSource) => void;
   // picks pictures and puts them at the point or the middle of the view
   insertImage: (at?: Point) => void;
-  exportNotebook: (format: ExportFormat) => void;
+  exportNotebook: (format: ExportFormat, pages?: ExportPages) => void;
 }
 
 function nothing() {}

@@ -17,6 +17,7 @@
   // these plug their actions in, the start screen needs them before any canvas
   import '$lib/editor/images';
   import '$lib/editor/references';
+  import '$lib/editor/exports';
   import { installShortcuts } from '$lib/editor/shortcuts';
   import { startLibrary } from '$lib/editor/library';
   import { watchFullscreen } from '$lib/editor/present';
