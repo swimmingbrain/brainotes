@@ -87,7 +87,7 @@ function updateRow() {
   library.update((list) => newestFirst([row, ...list.filter((n) => n.id !== row.id)]));
 }
 
-function uniqueName(base: string): string {
+export function uniqueName(base: string): string {
   const names = new Set(get(library).map((n) => n.name));
   if (!names.has(base)) return base;
   let i = 2;
