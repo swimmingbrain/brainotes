@@ -195,6 +195,25 @@ describe('saver', () => {
     saver.close();
   });
 
+  it('tells what is not stored yet, also while it is being written', async () => {
+    const { doc, ids } = await storedDoc(2);
+    const saver = new Saver(doc);
+    expect(saver.unsaved()).toBeNull();
+    doc.addItems(ids[1], [stroke(1, 1)]);
+    const before = saver.unsaved()!;
+    expect(Object.keys(before.pages)).toEqual([ids[1]]);
+    expect(before.notebook.id).toBe(doc.notebook.id);
+    const flushing = saver.flush();
+    await Promise.resolve();
+    await Promise.resolve();
+    // the write is on its way, a tab closing now must still keep the page
+    expect(saver.pending).toBe(false);
+    expect(Object.keys(saver.unsaved()!.pages)).toEqual([ids[1]]);
+    await flushing;
+    expect(saver.unsaved()).toBeNull();
+    saver.close();
+  });
+
   it('a flush writes at once and refreshes the date of the notebook', async () => {
     const { doc, ids } = await storedDoc(1);
     const saver = new Saver(doc);
