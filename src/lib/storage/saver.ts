@@ -1,6 +1,6 @@
 import type { Doc, DocChange } from '$lib/engine/doc';
 import { penIsDown } from '$lib/engine/input';
-import type { Item } from '$lib/engine/types';
+import type { Item, Notebook } from '$lib/engine/types';
 import { writeChanges, type PageRecord } from './db';
 import { packItems } from './pack';
 
@@ -10,6 +10,13 @@ export interface SaveReport {
   pages: string[];
   deleted: string[];
   notebook: boolean;
+}
+
+// what is not safely in storage yet
+export interface Unsaved {
+  notebook: Notebook;
+  pages: Record<string, Item[]>;
+  deleted: string[];
 }
 
 export interface SaverHooks {
@@ -44,6 +51,9 @@ export class Saver {
   // the page ids that are in storage right now
   private stored: Set<string>;
   private notebookDirty = false;
+  // a write on its way and its pages, a write that is cut off loses them
+  private inFlight = false;
+  private writing = new Set<string>();
   private touched = false;
   private touchedAt = Date.now();
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -73,6 +83,21 @@ export class Saver {
 
   settled(): Promise<void> {
     return this.queue;
+  }
+
+  // the pages a write would take along right now and the ones still being
+  // written, for the copy a closing tab keeps. null when all is stored
+  unsaved(): Unsaved | null {
+    if (!this.pending && !this.inFlight) return null;
+    const notebook = this.doc.notebook;
+    const current = new Set(notebook.pages.map((p) => p.id));
+    const pages: Record<string, Item[]> = {};
+    for (const id of current) {
+      if (this.stored.has(id) && !this.dirty.has(id) && !this.writing.has(id)) continue;
+      const page = this.doc.page(id);
+      if (page?.ready) pages[id] = page.items;
+    }
+    return { notebook, pages, deleted: [...this.stored].filter((id) => !current.has(id)) };
   }
 
   close() {
@@ -154,6 +179,8 @@ export class Saver {
       this.touched = false;
       this.touchedAt = now;
     }
+    this.inFlight = true;
+    for (const page of pages) this.writing.add(page.id);
     try {
       const records: PageRecord[] = [];
       for (const page of pages) {
@@ -165,12 +192,16 @@ export class Saver {
       if (this.closed) return;
       await writeChanges({ notebook: withNotebook ? notebook : undefined, pages: records, deleted });
     } catch {
+      this.inFlight = false;
+      this.writing.clear();
       for (const page of pages) this.dirty.add(page.id);
       if (withNotebook) this.notebookDirty = true;
       this.setState('failed');
       this.schedule(RETRY);
       return;
     }
+    this.inFlight = false;
+    this.writing.clear();
     for (const id of deleted) this.stored.delete(id);
     for (const page of pages) this.stored.add(page.id);
     this.last = { pages: pages.map((p) => p.id), deleted, notebook: withNotebook };
