@@ -1,0 +1,17 @@
+{
+  "name": "braiNOTES",
+  "short_name": "braiNOTES",
+  "author": "Braian Plaku",
+  "description": "Handwritten notes and a whiteboard in your browser. Write with a pen, keep the pdf next to your notes.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111113",
+  "theme_color": "#111113",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
