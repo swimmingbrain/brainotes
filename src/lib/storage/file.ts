@@ -2,6 +2,7 @@ import { strFromU8, strToU8, unzipSync, Zip, ZipDeflate, ZipPassThrough } from '
 import { newId } from '$lib/engine/doc';
 import type { Item, Notebook, PageMeta } from '$lib/engine/types';
 import type { AssetKind, AssetRecord } from './db';
+import { itemsFromJson, itemsToJson } from './pack';
 
 // a notebook as a .brainotes file: a zip with manifest.json, notebook.json,
 // one json file per page with ink, and the pdfs and pictures as they are
@@ -58,33 +59,6 @@ const GROUP = 25;
 type Pause = () => Promise<void>;
 
 const noPause: Pause = () => Promise.resolve();
-
-function round(v: number): number {
-  return Math.round(v * 100) / 100;
-}
-
-// strokes keep their points as a plain list, rounded to 2 decimals
-export function itemsToJson(items: Item[]): unknown[] {
-  return items.map((item) => (item.type === 'stroke' ? { ...item, pts: Array.from(item.pts, round) } : item));
-}
-
-const TYPES = new Set(['stroke', 'shape', 'text', 'image']);
-
-// what a file says a page holds, anything that is not an item is left out
-export function itemsFromJson(list: unknown): Item[] {
-  if (!Array.isArray(list)) return [];
-  const items: Item[] = [];
-  for (const raw of list) {
-    if (!raw || typeof raw !== 'object' || !TYPES.has(raw.type) || typeof raw.id !== 'string') continue;
-    if (raw.type === 'stroke') {
-      if (!Array.isArray(raw.pts) || raw.pts.length < 3) continue;
-      items.push({ ...raw, pts: Float32Array.from(raw.pts.slice(0, raw.pts.length - (raw.pts.length % 3)), Number) });
-    } else {
-      items.push(raw as Item);
-    }
-  }
-  return items;
-}
 
 function pagePath(id: string): string {
   return `pages/${id}.json`;
