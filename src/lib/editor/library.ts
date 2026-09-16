@@ -13,6 +13,7 @@ import {
 } from '$lib/storage/db';
 import { PageLoader } from '$lib/storage/loader';
 import { packItems } from '$lib/storage/pack';
+import { dropRescue, keepRescue, recover } from '$lib/storage/rescue';
 import { Saver } from '$lib/storage/saver';
 import {
   activeTool,
@@ -101,7 +102,10 @@ function start(notebook: Notebook, ready: boolean) {
   const doc = new Doc(notebook, ready ? {} : null);
   const loader = new PageLoader(doc);
   const saver = new Saver(doc, {
-    state: (state) => saveState.set(state),
+    state: (state) => {
+      saveState.set(state);
+      if (state === 'saved') dropRescue(notebook.id);
+    },
     saved: updateRow
   });
   session = { doc, loader, saver };
@@ -163,7 +167,10 @@ export function addNotebook(notebook: Notebook, items: Record<string, Item[]> = 
 export function startLibrary(): () => void {
   void navigator.storage?.persist?.().catch(() => {});
 
+  // a tab on its way out may not finish the write, what it holds goes into
+  // local storage as well
   const flush = () => {
+    keepRescue(session?.saver.unsaved() ?? null);
     void session?.saver.flush();
   };
   const onvisibility = () => {
@@ -183,6 +190,7 @@ export function startLibrary(): () => void {
       } else {
         // no note of the last one means its record got lost, the newest will do
         const id = last ?? all[0]?.id;
+        if (id) await recover(id);
         const notebook = id ? await getNotebook(id) : undefined;
         if (notebook) start(notebook, false);
       }
@@ -214,6 +222,7 @@ plugActions({
   openNotebook: (id) => {
     void run(async () => {
       if (session?.doc.notebook.id === id) return;
+      await recover(id);
       const notebook = await getNotebook(id);
       if (!notebook) {
         addToast('That notebook is not there any more', 'warning');
@@ -257,6 +266,7 @@ plugActions({
         hide();
       }
       await deleteNotebook(id);
+      dropRescue(id);
       await refresh();
     });
   }
