@@ -265,6 +265,20 @@ export class Doc {
     this.unordered.delete(page);
   }
 
+  // the font of the texts changed (inter came in after they were measured),
+  // their boxes are worked out again
+  remeasureText() {
+    for (const page of this.pages.values()) {
+      for (const item of page.items) {
+        if (item.type !== 'text') continue;
+        const entry = entryOf(item);
+        if (entry) page.tree.remove(entry);
+        derived(item).box = undefined;
+        page.tree.insert(makeEntry(item, entry?.z ?? 0));
+      }
+    }
+  }
+
   insertPage(index: number, page: PageData) {
     this.pages.set(page.meta.id, page);
     this.notebook.pages.splice(index, 0, page.meta);
