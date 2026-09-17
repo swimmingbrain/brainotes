@@ -76,7 +76,7 @@
 
   .welcome-content {
     text-align: center;
-    max-width: 560px;
+    max-width: 620px;
     width: 100%;
   }
 
