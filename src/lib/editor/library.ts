@@ -15,6 +15,7 @@ import { PageLoader } from '$lib/storage/loader';
 import { packItems } from '$lib/storage/pack';
 import { dropRescue, keepRescue, recover } from '$lib/storage/rescue';
 import { Saver } from '$lib/storage/saver';
+import { lockNotebook, openElsewhere, unlockNotebook } from './locks';
 import {
   activeTool,
   addToast,
@@ -97,7 +98,7 @@ export function uniqueName(base: string): string {
 }
 
 // ready means the pages are all in memory already, a new notebook has
-// nothing to read
+// nothing to read. the caller holds the lock of the notebook
 function start(notebook: Notebook, ready: boolean) {
   const doc = new Doc(notebook, ready ? {} : null);
   const loader = new PageLoader(doc);
@@ -123,6 +124,7 @@ async function stop() {
   current.loader.close();
   await current.saver.flush();
   current.saver.close();
+  unlockNotebook(current.doc.notebook.id);
 }
 
 function hide() {
@@ -130,6 +132,30 @@ function hide() {
   notebookOpen.set(false);
   saveState.set('saved');
   remember('');
+}
+
+function nameOf(id: string): string {
+  return get(library).find((n) => n.id === id)?.name ?? 'That notebook';
+}
+
+// a stored notebook opens unless another tab has it, then this tab stays
+// where it is. quiet leaves out the toast for a notebook that is gone
+async function openStored(id: string, quiet = false) {
+  if (session?.doc.notebook.id === id) return;
+  if (!(await lockNotebook(id))) {
+    addToast(`"${nameOf(id)}" is open in another tab`, 'warning', 5000);
+    return;
+  }
+  await recover(id);
+  const notebook = await getNotebook(id);
+  if (!notebook) {
+    unlockNotebook(id);
+    if (!quiet) addToast('That notebook is not there any more', 'warning');
+    await refresh();
+    return;
+  }
+  await stop();
+  start(notebook, false);
 }
 
 // items by page id. a page without items is not written at all, it reads
@@ -157,6 +183,7 @@ async function create(kind: NotebookKind, name: string): Promise<Notebook> {
 export function addNotebook(notebook: Notebook, items: Record<string, Item[]> = {}, assets: AssetRecord[] = []) {
   return run(async () => {
     await store(notebook, items, assets);
+    await lockNotebook(notebook.id);
     await stop();
     start(notebook, false);
   });
@@ -185,14 +212,14 @@ export function startLibrary(): () => void {
       library.set(all);
       const last = lastOpened();
       if (all.length === 0 && last === null) {
-        start(await create('paper', 'My notes'), true);
+        const notebook = await create('paper', 'My notes');
+        await lockNotebook(notebook.id);
+        start(notebook, true);
         activeTool.set('pen');
       } else {
         // no note of the last one means its record got lost, the newest will do
         const id = last ?? all[0]?.id;
-        if (id) await recover(id);
-        const notebook = id ? await getNotebook(id) : undefined;
-        if (notebook) start(notebook, false);
+        if (id) await openStored(id, true);
       }
     } catch (err) {
       // no storage at all (a locked down browser): notes still work, they
@@ -215,23 +242,13 @@ plugActions({
   newNotebook: (kind) => {
     void run(async () => {
       const notebook = await create(kind, uniqueName(kind === 'board' ? 'Whiteboard' : 'Notebook'));
+      await lockNotebook(notebook.id);
       await stop();
       start(notebook, true);
     });
   },
   openNotebook: (id) => {
-    void run(async () => {
-      if (session?.doc.notebook.id === id) return;
-      await recover(id);
-      const notebook = await getNotebook(id);
-      if (!notebook) {
-        addToast('That notebook is not there any more', 'warning');
-        await refresh();
-        return;
-      }
-      await stop();
-      start(notebook, false);
-    });
+    void run(() => openStored(id));
   },
   closeNotebook: () => {
     void run(async () => {
@@ -247,6 +264,11 @@ plugActions({
       return;
     }
     void run(async () => {
+      // the tab that has it open would write its old name back
+      if (await openElsewhere(id)) {
+        addToast(`"${nameOf(id)}" is open in another tab, rename it there`, 'warning', 5000);
+        return;
+      }
       const notebook = await getNotebook(id);
       if (!notebook) return;
       notebook.name = name;
@@ -263,7 +285,11 @@ plugActions({
         current.saver.close();
         // a write that was already on its way finishes before the delete
         await current.saver.settled();
+        unlockNotebook(id);
         hide();
+      } else if (await openElsewhere(id)) {
+        addToast(`"${nameOf(id)}" is open in another tab, close it there first`, 'warning', 5000);
+        return;
       }
       await deleteNotebook(id);
       dropRescue(id);
