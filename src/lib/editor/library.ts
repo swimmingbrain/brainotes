@@ -134,8 +134,10 @@ function hide() {
   remember('');
 }
 
-function nameOf(id: string): string {
-  return get(library).find((n) => n.id === id)?.name ?? 'That notebook';
+// the name in quotes for a toast, another tab may have made the notebook
+async function nameOf(id: string): Promise<string> {
+  const name = get(library).find((n) => n.id === id)?.name ?? (await getNotebook(id).catch(() => undefined))?.name;
+  return name ? `"${name}"` : 'That notebook';
 }
 
 // a stored notebook opens unless another tab has it, then this tab stays
@@ -143,7 +145,7 @@ function nameOf(id: string): string {
 async function openStored(id: string, quiet = false) {
   if (session?.doc.notebook.id === id) return;
   if (!(await lockNotebook(id))) {
-    addToast(`"${nameOf(id)}" is open in another tab`, 'warning', 5000);
+    addToast(`${await nameOf(id)} is open in another tab`, 'warning', 5000);
     return;
   }
   await recover(id);
@@ -200,8 +202,10 @@ export function startLibrary(): () => void {
     keepRescue(session?.saver.unsaved() ?? null);
     void session?.saver.flush();
   };
+  // coming back to the tab shows what other tabs made in the meantime
   const onvisibility = () => {
     if (document.visibilityState === 'hidden') flush();
+    else void run(refresh);
   };
   document.addEventListener('visibilitychange', onvisibility);
   window.addEventListener('pagehide', flush);
@@ -266,7 +270,7 @@ plugActions({
     void run(async () => {
       // the tab that has it open would write its old name back
       if (await openElsewhere(id)) {
-        addToast(`"${nameOf(id)}" is open in another tab, rename it there`, 'warning', 5000);
+        addToast(`${await nameOf(id)} is open in another tab, rename it there`, 'warning', 5000);
         return;
       }
       const notebook = await getNotebook(id);
@@ -288,7 +292,7 @@ plugActions({
         unlockNotebook(id);
         hide();
       } else if (await openElsewhere(id)) {
-        addToast(`"${nameOf(id)}" is open in another tab, close it there first`, 'warning', 5000);
+        addToast(`${await nameOf(id)} is open in another tab, close it there first`, 'warning', 5000);
         return;
       }
       await deleteNotebook(id);
