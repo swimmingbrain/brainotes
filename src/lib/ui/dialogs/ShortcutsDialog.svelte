@@ -35,6 +35,7 @@
         { keys: ['Ctrl', 'Z'], what: 'Undo' },
         { keys: ['Ctrl', 'Shift', 'Z'], what: 'Redo (also Ctrl+Y)' },
         { keys: ['Ctrl', 'A'], what: 'Select all on the page' },
+        { keys: ['Shift', 'Click'], what: 'Add to the selection or take out of it' },
         { keys: ['Ctrl', 'C'], what: 'Copy the selection' },
         { keys: ['Ctrl', 'X'], what: 'Cut the selection' },
         { keys: ['Ctrl', 'V'], what: 'Paste items, a picture or text' },
