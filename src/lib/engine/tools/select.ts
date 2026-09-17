@@ -81,6 +81,8 @@ export class SelectTool implements Tool {
   private prepared: Sprite | null = null;
   private prepTimer: ReturnType<typeof setTimeout> | null = null;
   private lastClick = { time: 0, item: null as Item | null };
+  // shift adds to the selection or takes out of it
+  private adding = false;
 
   constructor(
     private view: CanvasView,
@@ -224,13 +226,14 @@ export class SelectTool implements Tool {
     this.sx = this.cx = s.x;
     this.sy = this.cy = s.y;
     this.started = false;
+    this.adding = s.shift === true;
     const clip = this.clip();
     if (clip?.source && this.onBadge(s.x, s.y)) {
       this.mode = 'idle';
       this.hooks.source?.(clip.source);
       return;
     }
-    const corner = this.handleAt(s.x, s.y);
+    const corner = this.adding ? -1 : this.handleAt(s.x, s.y);
     if (corner >= 0) {
       this.mode = 'scale';
       this.corner = corner;
@@ -239,7 +242,7 @@ export class SelectTool implements Tool {
     } else {
       this.mode = 'lasso';
       this.lasso = [s.x, s.y];
-      this.clear();
+      if (!this.adding) this.clear();
     }
     this.view.requestLive();
   }
@@ -303,6 +306,10 @@ export class SelectTool implements Tool {
     const page = this.view.doc.pageAt(index);
     const [px, py] = this.toPage(index, x, y);
     const hit = itemAt(page.items, px, py, PICK / this.view.cam.zoom);
+    if (this.adding) {
+      this.toggle(index, hit);
+      return;
+    }
     const now = performance.now();
     const again = hit !== null && hit === this.lastClick.item && now - this.lastClick.time < DOUBLE;
     this.lastClick = { time: now, item: hit };
@@ -313,6 +320,18 @@ export class SelectTool implements Tool {
     }
     if (hit) this.select(index, [hit]);
     else this.clear();
+  }
+
+  // a shift click puts an item into the selection or takes it out. on
+  // another page it starts a new selection there
+  private toggle(index: number, hit: Item | null) {
+    if (!hit) return;
+    if (this.items.length === 0 || this.index !== index) {
+      this.select(index, [hit]);
+      return;
+    }
+    const has = this.items.includes(hit);
+    this.select(index, has ? this.items.filter((item) => item !== hit) : [...this.items, hit]);
   }
 
   private finishLasso() {
@@ -330,7 +349,14 @@ export class SelectTool implements Tool {
     if (index < 0) return;
     const poly: number[] = [];
     for (let i = 0; i < pts.length; i += 2) poly.push(...this.toPage(index, pts[i], pts[i + 1]));
-    this.select(index, lassoHits(this.view.doc.pageAt(index).items, poly));
+    const hits = lassoHits(this.view.doc.pageAt(index).items, poly);
+    // with shift the loop adds to what is selected on the same page
+    if (this.adding && this.items.length > 0 && this.index === index) {
+      const more = hits.filter((item) => !this.items.includes(item));
+      this.select(index, [...this.items, ...more]);
+      return;
+    }
+    this.select(index, hits);
   }
 
   // what the drag does to the items so far, in page units
