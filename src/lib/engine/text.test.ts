@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { itemBox } from './bounds';
-import { layoutText, LINE_HEIGHT, textLayout, textWidth } from './text';
+import { derived } from './cache';
+import { Doc, newNotebook } from './doc';
+import { fontLoaded, layoutText, LINE_HEIGHT, textLayout, textWidth } from './text';
 import type { TextItem } from './types';
 
 // every letter and space is 10 units wide
@@ -49,5 +51,23 @@ describe('text layout', () => {
   it('wraps a stored text at its width', () => {
     const item: TextItem = { id: 't', type: 'text', x: 0, y: 0, w: 80, text: 'aaa bbb ccc', size: 20, color: '#000' };
     expect(textLayout(item).lines).toEqual(['aaa bbb ', 'ccc']);
+  });
+});
+
+describe('a font that comes in late', () => {
+  it('measures the texts of the open pages again', () => {
+    const notebook = newNotebook('paper', 'Fonts', { style: 'blank', spacing: 24, color: 'white', size: 'a4' });
+    const pageId = notebook.pages[0].id;
+    const item: TextItem = { id: 't', type: 'text', x: 0, y: 0, w: 80, text: 'aaa bbb ccc', size: 20, color: '#000' };
+    // the box from a fallback font that was much too tall
+    derived(item).box = { minX: 0, minY: 0, maxX: 80, maxY: 900 };
+    const doc = new Doc(notebook, { [pageId]: [item] });
+    const tree = doc.page(pageId)!.tree;
+    expect(tree.search({ minX: 0, minY: 500, maxX: 10, maxY: 600 })).toHaveLength(1);
+    fontLoaded();
+    doc.remeasureText();
+    expect(itemBox(item).maxY).toBeLessThan(100);
+    expect(tree.search({ minX: 0, minY: 500, maxX: 10, maxY: 600 })).toHaveLength(0);
+    expect(tree.search({ minX: 0, minY: 0, maxX: 10, maxY: 10 })).toHaveLength(1);
   });
 });
