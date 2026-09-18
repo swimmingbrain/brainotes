@@ -8,13 +8,15 @@ import { rememberBitmap } from '$lib/engine/images';
 import type { ImageItem, ImageSource } from '$lib/engine/types';
 import { warmPdf } from '$lib/pdf/pdf';
 import { putAsset } from '$lib/storage/db';
-import { activeTool, addToast, notebookId } from '$lib/stores/app';
+import { activeTool, addToast, dismissToast, notebookId, updateToast } from '$lib/stores/app';
 
 // a photo is made smaller once when it comes in, longer sides than this
 // only cost memory
 export const MAX_SIDE = 2400;
 // share of the page width a new picture takes
 const SHARE = 0.6;
+// ms before a toast says pictures are on their way, a big photo takes a while
+const SLOW = 400;
 
 export interface ImageAsset {
   assetId: string;
@@ -100,16 +102,30 @@ export async function insertImages(blobs: Blob[], at: Point | null, centre = fal
   const spot = spotAt(at, centre);
   if (!spot) return;
   const placed: ImageItem[] = [];
-  for (const blob of blobs) {
-    const asset = await storeImage(blob, blob instanceof File ? blob.name : 'image');
-    if (!asset) {
-      addToast('That picture could not be read', 'warning');
-      continue;
+  let done = 0;
+  let toast = '';
+  const label = () =>
+    blobs.length > 1
+      ? `Importing pictures: ${done + 1} of ${blobs.length}`
+      : `Importing ${blobs[0] instanceof File ? blobs[0].name : 'the picture'}...`;
+  const timer = setTimeout(() => (toast = addToast(label(), 'info', 0)), SLOW);
+  try {
+    for (const blob of blobs) {
+      if (toast) updateToast(toast, label());
+      const asset = await storeImage(blob, blob instanceof File ? blob.name : 'image');
+      done++;
+      if (!asset) {
+        addToast('That picture could not be read', 'warning');
+        continue;
+      }
+      // more than one picture fan out a little
+      const step = placed.length * 24;
+      const item = imageItemFor(asset, spot.index, spot.x + step, spot.y + step);
+      if (item) placed.push(item);
     }
-    // more than one picture fan out a little
-    const step = placed.length * 24;
-    const item = imageItemFor(asset, spot.index, spot.x + step, spot.y + step);
-    if (item) placed.push(item);
+  } finally {
+    clearTimeout(timer);
+    if (toast) dismissToast(toast);
   }
   const ed = editor();
   if (!ed || placed.length === 0 || spot.index >= ed.doc.pageCount) return;
