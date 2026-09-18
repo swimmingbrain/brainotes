@@ -43,7 +43,13 @@ function escape(): void {
     dialog.set(null);
     return;
   }
-  actions.clearSelection();
+  if (get(selectionCount) > 0) {
+    actions.clearSelection();
+    return;
+  }
+  // most browsers leave fullscreen on escape by themselves, the ones that
+  // hand the key on leave present here
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
 }
 
 function bind(fn: () => unknown): KeybindingHandler {
