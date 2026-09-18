@@ -449,11 +449,21 @@ preferences.subscribe((p) => (prefs = p));
 if (typeof window !== 'undefined') {
   setImageLoader(async (id) => (await storage.getAsset(id))?.blob);
   setPdfLoader(async (id) => (await storage.getAsset(id))?.blob);
-  // text measured before inter arrived is measured again and drawn anew
-  void document.fonts?.load(fontOf(16)).then(() => {
+  // text measured before inter arrived is measured again and drawn anew.
+  // the stylesheet with the font can come in after the first look, so every
+  // finished font load is checked until inter is there
+  let interIn = false;
+  const remeasure = () => {
+    if (interIn || !document.fonts) return;
+    interIn = [...document.fonts].some((face) => face.family.replace(/["']/g, '') === 'Inter' && face.status === 'loaded');
+    if (!interIn) return;
     fontLoaded();
+    doc?.remeasureText();
     view?.redrawAll();
-  });
+  };
+  void document.fonts?.load(fontOf(16)).then(remeasure);
+  void document.fonts?.ready.then(remeasure);
+  document.fonts?.addEventListener('loadingdone', remeasure);
 }
 
 // duplicates sit a little down and to the right of what they copy
