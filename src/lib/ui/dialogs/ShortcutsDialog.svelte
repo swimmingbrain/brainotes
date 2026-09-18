@@ -42,7 +42,7 @@
         { keys: ['Ctrl', 'D'], what: 'Duplicate the selection' },
         { keys: ['Delete'], what: 'Delete the selection (Backspace too)' },
         { keys: ['←↑→↓'], what: 'Move the selection, Shift for bigger steps' },
-        { keys: ['Escape'], what: 'Cancel / close' }
+        { keys: ['Escape'], what: 'Cancel, close, leave present' }
       ]
     },
     {
