@@ -27,6 +27,10 @@ export default defineConfig({
   worker: {
     format: 'es'
   },
+  build: {
+    // pdf-lib alone is about 540 kB, it only loads for a pdf export
+    chunkSizeWarningLimit: 600
+  },
   server: {
     watch: {
       // pdfs and notebooks people keep next to the checkout must not trigger reloads
