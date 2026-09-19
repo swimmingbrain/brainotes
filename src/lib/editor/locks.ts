@@ -7,8 +7,6 @@ function lockName(id: string): string {
   return `brainotes-notebook-${id}`;
 }
 
-// true when this tab has the notebook now. browsers without web locks
-// always get it
 export function lockNotebook(id: string): Promise<boolean> {
   if (held.has(id) || typeof navigator === 'undefined' || !navigator.locks) return Promise.resolve(true);
   return new Promise((resolve) => {
@@ -31,7 +29,6 @@ export function unlockNotebook(id: string) {
   held.delete(id);
 }
 
-// for a change to a notebook this tab does not have open, like a delete
 export async function openElsewhere(id: string): Promise<boolean> {
   if (held.has(id)) return false;
   if (!(await lockNotebook(id))) return true;

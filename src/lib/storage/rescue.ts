@@ -3,10 +3,9 @@ import { writeChanges } from './db';
 import { itemsFromJson, itemsToJson, packItems } from './pack';
 import type { Unsaved } from './saver';
 
-// a tab that closes or reloads gets no time to finish writing to indexeddb,
-// the ink of the last second was lost. what is not stored yet goes into
-// local storage at once, which is written right away, and the next time
-// the notebook opens it is put into the database first
+// a closing tab gets no time to finish writing to indexeddb. what is not
+// stored yet goes into local storage, which writes at once, and into the
+// database the next time the notebook opens
 const PREFIX = 'brainotes-rescue-';
 
 interface Rescue {
@@ -23,7 +22,7 @@ export function keepRescue(unsaved: Unsaved | null) {
   try {
     localStorage.setItem(PREFIX + unsaved.notebook.id, JSON.stringify(rescue));
   } catch {
-    // too big for local storage or no storage at all, the normal save is all there is
+    // too big or no local storage, the normal save is all there is
   }
 }
 
@@ -33,7 +32,6 @@ export function dropRescue(notebookId: string) {
   } catch {}
 }
 
-// writes what a closed tab kept of this notebook, before the notebook is read
 export async function recover(notebookId: string) {
   let raw: string | null = null;
   try {

@@ -2,12 +2,10 @@
 // dark background. the highlighter is laid on them normally, multiply
 // would make it almost invisible there
 const DARK = 0.4;
-// the picture is shrunk to this many pixels a side before it is averaged
 const SAMPLE = 24;
 
 const known = new Map<string, boolean>();
 
-// the average brightness of rgba pixels, 0 is black and 1 is white
 export function lightness(data: ArrayLike<number>): number {
   const n = Math.floor(data.length / 4);
   if (n === 0) return 1;
@@ -20,7 +18,6 @@ export function isDarkLightness(value: number): boolean {
   return value < DARK;
 }
 
-// a page is looked at once, its first picture says enough
 export function measureDark(key: string, picture: CanvasImageSource) {
   if (known.has(key) || typeof OffscreenCanvas === 'undefined') return;
   const canvas = new OffscreenCanvas(SAMPLE, SAMPLE);
