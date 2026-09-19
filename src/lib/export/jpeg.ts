@@ -5,14 +5,12 @@ export function isJpeg(bytes: Uint8Array): boolean {
   return bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
 }
 
-// the exif orientation, 1 means upright or none given
 export function jpegOrientation(bytes: Uint8Array): number {
   if (!isJpeg(bytes)) return 1;
   let at = 2;
   while (at + 4 <= bytes.length && bytes[at] === 0xff) {
     const marker = bytes[at + 1];
     const size = (bytes[at + 2] << 8) | bytes[at + 3];
-    // the picture data starts, there is no exif before it
     if (marker === 0xda || size < 2) break;
     const exif = bytes[at + 4] === 0x45 && bytes[at + 5] === 0x78 && bytes[at + 6] === 0x69 && bytes[at + 7] === 0x66;
     if (marker === 0xe1 && exif) return exifOrientation(bytes, at + 10, Math.min(bytes.length, at + 2 + size));

@@ -8,8 +8,6 @@ const SCALE = 2;
 const MAX_PIXELS = 40_000_000;
 const MAX_SIDE = 16384;
 
-// one page as a png at twice its size, with its pdf page under the ink. a
-// board is cut to its ink like in the pdf
 export async function exportPng(page: { meta: PageMeta; items: Item[] }, board: boolean): Promise<Blob> {
   const { meta, items } = page;
   const frame = board ? boardFrame(meta, items) : { x: 0, y: 0, w: meta.w, h: meta.h };
@@ -18,7 +16,6 @@ export async function exportPng(page: { meta: PageMeta; items: Item[] }, board: 
   scale = Math.min(scale, MAX_SIDE / frame.w, MAX_SIDE / frame.h);
   for (const item of items) if (item.type === 'image') await bitmapReady(item.assetId);
   if (meta.pdf) {
-    // the blend of the highlighter and a sharp picture of the pdf page
     await pdfDark(meta.pdf.assetId, meta.pdf.page, meta.pdf.w);
     await ensureShot(meta.pdf.assetId, meta.pdf.page, scale);
   }

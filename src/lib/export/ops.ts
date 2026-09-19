@@ -5,10 +5,8 @@ import { outlineOf, PF_SCALE, scaledPoints } from '$lib/engine/stroke';
 import type { Item, PageMeta, Paper, Shape, Stroke } from '$lib/engine/types';
 import { PAPER_COLORS } from '$lib/editor/paper';
 
-// pdf content stream text for the parts of a page. everything is written in
-// page units with y going down, the page sets that up once at its start
+// pdf drawing commands in page units, the page sets up y going down once
 
-// room around the ink of a board that becomes a pdf page
 export const BOARD_MARGIN = 32;
 // pdf viewers do not take pages longer than this many points
 export const MAX_SIDE = 14400;
@@ -25,7 +23,6 @@ function channel(v: number): string {
   return String(Math.round(v * 1000) / 1000);
 }
 
-// #rgb, #rrggbb and rgb() or rgba() as 0..255 channels and an alpha
 export function parseColor(color: string): [number, number, number, number] {
   const c = color.trim();
   const fn = c.match(/^rgba?\(([^)]*)\)$/);
@@ -40,7 +37,6 @@ export function parseColor(color: string): [number, number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1];
 }
 
-// a see through color laid over an opaque one, as one opaque color
 export function blendOver(top: string, under: string): [number, number, number] {
   const [r, g, b, a] = parseColor(top);
   const [ur, ug, ub] = parseColor(under);
@@ -63,9 +59,7 @@ export function matrix(m: number[]): string {
   return m.map((v) => (Math.abs(v) < 1e-9 ? '0' : String(Math.round(v * 10000) / 10000))).join(' ') + ' cm';
 }
 
-// the closed curve the canvas draws for a stroke (see traceOutline): through
-// the middles of the outline edges with the corners as control points. a
-// quadratic curve is written as the cubic one that is the same curve
+// the same curve traceOutline gives the canvas, a pdf only has cubic curves
 export function outlinePath(outline: number[][]): string {
   const n = outline.length;
   if (n < 3) return '';
@@ -116,7 +110,6 @@ export function ellipsePath(cx: number, cy: number, rx: number, ry: number): str
   ].join('\n');
 }
 
-// the outline of a shape, the same path shapePath gives the canvas
 export function shapePathOps(shape: Shape): string {
   const { x1, y1, x2, y2 } = shape;
   if (shape.kind === 'rect') {
@@ -138,8 +131,7 @@ export function shapeOps(shape: Shape, color: string): string {
   return `${strokeColor(color)} ${num(shape.size)} w 1 J 1 j\n${shapePathOps(shape)}\nS`;
 }
 
-// the lines of the paper over a frame of the page. a page starts its
-// pattern one step in from its edges, a board has it everywhere
+// a page starts its pattern one step in, a board has it everywhere
 export function patternOps(paper: Paper, frame: Frame, everywhere: boolean): string {
   const step = paper.spacing;
   if ((paper.style !== 'lines' && paper.style !== 'grid') || !(step > 0)) return '';
@@ -159,9 +151,8 @@ export function patternOps(paper: Paper, frame: Frame, everywhere: boolean): str
   return parts.join('\n');
 }
 
-// dots are one tile with a dot in its middle, repeated over the page like
-// on the canvas. a pattern lives in the space of the page itself, so the
-// tile gets the matrix of the page. area is the part of the frame to fill
+// dots are one repeated tile like on the canvas. a pattern lives in the
+// space of the page itself, so the tile gets the matrix of the page
 export function dotsOf(
   paper: Paper,
   frame: Frame,
@@ -181,9 +172,7 @@ export function dotsOf(
   return { tile, step, matrix, area };
 }
 
-// the matrix that lays a pdf page onto rect of the page. crop is the part
-// of the pdf page a viewer shows, in its own units, and rotate the turn a
-// viewer gives it. the page we draw on has y going down
+// lays the part of a pdf page a viewer shows (crop, turned by rotate) onto rect
 export function pdfMatrix(
   crop: { x: number; y: number; w: number; h: number },
   rotate: number,
@@ -193,7 +182,6 @@ export function pdfMatrix(
   const turned = r === 90 || r === 270;
   const shownW = turned ? crop.h : crop.w;
   const shownH = turned ? crop.w : crop.h;
-  // from the corner of the crop box to what a viewer shows, y going down
   let m = [1, 0, 0, -1, 0, crop.h];
   if (r === 90) m = [0, 1, 1, 0, 0, 0];
   else if (r === 180) m = [-1, 0, 0, 1, crop.w, 0];
@@ -212,8 +200,7 @@ export function imageMatrix(x: number, y: number, w: number, h: number): number[
   return [w, 0, 0, -h, x, y + h];
 }
 
-// the part of a board that becomes its page: all of its ink and its pdf
-// page with a margin. an empty board keeps its frame
+// a board page is cut to its ink and its pdf page, an empty one keeps its frame
 export function boardFrame(meta: PageMeta, items: Item[]): Frame {
   const box = emptyBox();
   for (const item of items) growBox(box, itemBox(item));
@@ -228,8 +215,6 @@ export function boardFrame(meta: PageMeta, items: Item[]): Frame {
   };
 }
 
-// a frame of the world as a pdf page: its size and the matrix that puts
-// the frame on it with y going down. a frame that is too big is scaled down
 export function pageSetup(frame: Frame): { w: number; h: number; m: number[] } {
   const k = Math.min(1, MAX_SIDE / Math.max(frame.w, frame.h));
   const w = frame.w * k;
