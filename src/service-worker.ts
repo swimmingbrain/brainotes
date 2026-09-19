@@ -3,20 +3,16 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
-// keeps every file of the app around, so it opens and works without a
-// network and a page and its chunks always come from the same build. the
-// pdf.js worker is one of the build files, the maps, fonts and decoders it
-// fetches while it reads a pdf are kept with them
+// keeps every file of the app, the pdf.js worker and its data around, so it
+// works without a network and a page always gets chunks of its own build
 
 import { build, files, prerendered, version } from '$service-worker';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
-// one cache per build for the app itself
 const APP_PREFIX = 'brainotes-app-';
 const APP_CACHE = `${APP_PREFIX}${version}`;
-// these outlive builds: the last good copies of everything else, and the
-// fonts from google fonts once they were loaded
+// these outlive builds: last good copies of everything else, and the fonts
 const CACHE_NAME = 'brainotes-v1';
 const FONT_CACHE = 'brainotes-fonts-v1';
 
@@ -91,8 +87,7 @@ async function handleImmutable(request: Request): Promise<Response> {
   return response;
 }
 
-// a font file never changes under its address, the stylesheet that lists
-// them is asked for first and kept for when there is no network
+// a font file never changes under its address, the stylesheet may
 async function handleFont(request: Request, url: URL): Promise<Response> {
   if (url.hostname === 'fonts.gstatic.com') {
     const hit = await caches.match(request).catch(() => undefined);
