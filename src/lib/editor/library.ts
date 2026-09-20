@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { plugActions } from './actions';
-import { showNotebook, type Session } from './canvas';
+import { commitText, showNotebook, type Session } from './canvas';
 import { Doc, newNotebook } from '$lib/engine/doc';
 import type { Item, Notebook, NotebookKind } from '$lib/engine/types';
 import {
@@ -120,6 +120,7 @@ function start(notebook: Notebook, ready: boolean) {
 async function stop() {
   const current = session;
   if (!current) return;
+  commitText();
   session = null;
   current.loader.close();
   await current.saver.flush();
@@ -207,8 +208,13 @@ export function startLibrary(): () => void {
     if (document.visibilityState === 'hidden') flush();
     else void run(refresh);
   };
+  // a closing tab also keeps the text that was still being typed
+  const onpagehide = () => {
+    if (session) commitText();
+    flush();
+  };
   document.addEventListener('visibilitychange', onvisibility);
-  window.addEventListener('pagehide', flush);
+  window.addEventListener('pagehide', onpagehide);
 
   void run(async () => {
     try {
@@ -238,7 +244,7 @@ export function startLibrary(): () => void {
 
   return () => {
     document.removeEventListener('visibilitychange', onvisibility);
-    window.removeEventListener('pagehide', flush);
+    window.removeEventListener('pagehide', onpagehide);
   };
 }
 

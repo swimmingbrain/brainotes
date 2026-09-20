@@ -195,6 +195,11 @@ export function openDoc(): Doc | null {
   return doc;
 }
 
+// the text being typed goes into the notebook before it is written away
+export function commitText() {
+  text?.commit();
+}
+
 // the page in the middle of the view, or the board on show
 export function currentPage(): number {
   return current();
