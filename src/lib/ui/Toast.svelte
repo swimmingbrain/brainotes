@@ -29,7 +29,7 @@
     position: fixed;
     top: 86px;
     right: 12px;
-    z-index: 9999;
+    z-index: 1100;
     display: flex;
     flex-direction: column;
     gap: 4px;
