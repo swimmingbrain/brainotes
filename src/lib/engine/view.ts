@@ -373,8 +373,9 @@ export class CanvasView {
     this.zoomAt(this.width / 2, this.height / 2, stepZoom(this.cam.zoom, dir));
   }
 
-  // paper fits the page width, a board goes back to 100 percent
-  zoomReset() {
+  // paper fits the page width, a board goes back to 100 percent. a resize
+  // keeps the top of the view, the panels coming and going would push it down
+  zoomReset(keepTop = false) {
     if (this.isBoard) {
       this.zoomAt(this.width / 2, this.height / 2, 1);
       return;
@@ -382,7 +383,7 @@ export class CanvasView {
     const zoom = fitWidthZoom(this.content.w, this.width);
     const mid = this.cam.y + this.height / 2 / this.cam.zoom;
     this.fitted = true;
-    this.setCamera({ x: this.cam.x, y: mid - this.height / 2 / zoom, zoom });
+    this.setCamera({ x: this.cam.x, y: keepTop ? this.cam.y : mid - this.height / 2 / zoom, zoom });
   }
 
   // where a notebook starts: the top of the first page, or the middle of the board
@@ -581,7 +582,7 @@ export class CanvasView {
     this.liveBox = null;
     this.liveClean = true;
     this.bgDirty = this.inkDirty = this.hlDirty = this.liveDirty = true;
-    if (this.fitted && !this.isBoard) this.zoomReset();
+    if (this.fitted && !this.isBoard) this.zoomReset(true);
     else this.setCamera(this.cam);
   }
 
