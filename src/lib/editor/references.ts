@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { plugActions } from './actions';
+import { plugActions, type Point } from './actions';
 import { currentPage, editor, openDoc, spotAt } from './canvas';
 import { insertImageBlob, isImage, pickFiles } from './images';
 import { addNotebook } from './library';
@@ -22,6 +22,7 @@ import {
 
 // device pixels per point of a snip, about 200 dpi
 export const SNIP_SCALE = 200 / 72;
+const SNIP_GAP = 12;
 // ms after a notebook opens before its unused pdfs are looked for
 const SWEEP_DELAY = 4000;
 
@@ -151,6 +152,20 @@ async function toPng(picture: ImageBitmap): Promise<Blob> {
   return canvas.convertToBlob({ type: 'image/png' });
 }
 
+// the id of the clip the last snip made
+let lastClip = '';
+
+// the next snip goes under the last clip while that one is in sight, so a
+// few snips in a row do not cover each other
+function underLast(spot: { index: number; x: number; y: number }): Point | undefined {
+  const ed = editor();
+  const last = ed?.doc.pageAt(spot.index).items.find((item) => item.id === lastClip);
+  if (!ed || last?.type !== 'image') return undefined;
+  const corner = { x: last.x, y: last.y + last.h + SNIP_GAP };
+  const half = ed.view.height / 2 / ed.view.cam.zoom;
+  return Math.abs(corner.y - spot.y) < half ? corner : undefined;
+}
+
 // a part of a reference page lands in the notes in the middle of the view,
 // selected, remembering where it came from. no part means the whole page
 export async function snip(file: string, page: number, part?: Part) {
@@ -159,7 +174,8 @@ export async function snip(file: string, page: number, part?: Part) {
   try {
     const whole = part ?? { x: 0, y: 0, ...(await pageSize(file, page)) };
     const blob = await toPng(await renderPart(file, page, SNIP_SCALE, part));
-    await insertImageBlob(blob, spot.index, spot.x, spot.y, { assetId: file, page, ...whole });
+    const item = await insertImageBlob(blob, spot.index, spot.x, spot.y, { assetId: file, page, ...whole }, underLast(spot));
+    lastClip = item?.id ?? '';
   } catch (err) {
     console.warn(err);
     addToast('That part of the pdf could not be cut out', 'warning');
@@ -175,7 +191,8 @@ export async function snipImage(file: string, part: Part) {
     const w = Math.max(1, Math.round(part.w));
     const h = Math.max(1, Math.round(part.h));
     const cut = await createImageBitmap(asset.blob, Math.round(part.x), Math.round(part.y), w, h);
-    await insertImageBlob(await toPng(cut), spot.index, spot.x, spot.y);
+    const item = await insertImageBlob(await toPng(cut), spot.index, spot.x, spot.y, undefined, underLast(spot));
+    lastClip = item?.id ?? '';
   } catch (err) {
     console.warn(err);
     addToast('That part of the picture could not be cut out', 'warning');

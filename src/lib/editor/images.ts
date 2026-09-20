@@ -66,10 +66,18 @@ export async function storeImage(blob: Blob, name = 'image'): Promise<ImageAsset
   return { assetId, w: bitmap.width, h: bitmap.height };
 }
 
-// an image item for the asset, centred on (cx, cy) of page index, about 60
-// percent of the page wide and never bigger than the page. a small picture
-// keeps its own size, a clip of a pdf the size it has in the pdf
-export function imageItemFor(asset: ImageAsset, index: number, cx: number, cy: number, source?: ImageSource): ImageItem | null {
+// an image item for the asset, centred on (cx, cy) of page index or with its
+// top left at a corner, about 60 percent of the page wide and never bigger
+// than the page. a small picture keeps its own size, a clip of a pdf the
+// size it has in the pdf
+export function imageItemFor(
+  asset: ImageAsset,
+  index: number,
+  cx: number,
+  cy: number,
+  source?: ImageSource,
+  corner?: Point
+): ImageItem | null {
   const ed = editor();
   if (!ed) return null;
   const { view, doc } = ed;
@@ -84,8 +92,8 @@ export function imageItemFor(asset: ImageAsset, index: number, cx: number, cy: n
     h = pageH * 0.9;
     w = (h * asset.w) / asset.h;
   }
-  let x = cx - w / 2;
-  let y = cy - h / 2;
+  let x = corner ? corner.x : cx - w / 2;
+  let y = corner ? corner.y : cy - h / 2;
   if (!view.isBoard) {
     x = Math.max(0, Math.min(x, meta.w - w));
     y = Math.max(0, Math.min(y, meta.h - h));
@@ -140,12 +148,13 @@ export async function insertImageBlob(
   index: number,
   cx: number,
   cy: number,
-  source?: ImageSource
+  source?: ImageSource,
+  corner?: Point
 ): Promise<ImageItem | null> {
   const asset = await storeImage(blob);
   const ed = editor();
   if (!asset || !ed) return null;
-  const item = imageItemFor(asset, index, cx, cy, source);
+  const item = imageItemFor(asset, index, cx, cy, source, corner);
   if (!item) return null;
   activeTool.set('select');
   ed.select.insert(index, [item]);
