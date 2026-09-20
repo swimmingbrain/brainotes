@@ -25,12 +25,12 @@ export const SNIP_SCALE = 200 / 72;
 // ms after a notebook opens before its unused pdfs are looked for
 const SWEEP_DELAY = 4000;
 
-// the panel comes up. with both panels closed that is the study workspace
-export function showReferencePanel() {
+// the panel comes up. with both panels closed that is the study workspace,
+// and a file opened to read on the side always goes there
+export function showReferencePanel(study = false) {
   const p = get(panels);
-  if (p.rightOpen) return;
-  if (!p.leftOpen && get(workspace) !== 'study') workspace.set('study');
-  updatePanels((q) => ({ ...q, rightOpen: true }));
+  if (get(workspace) !== 'study' && (study || (!p.leftOpen && !p.rightOpen))) workspace.set('study');
+  if (!get(panels).rightOpen) updatePanels((q) => ({ ...q, rightOpen: true }));
 }
 
 function setActive(id: string) {
@@ -104,7 +104,7 @@ async function openFiles(files: File[]) {
   doc.setRefs(refs);
   references.set(infos);
   setActive(last);
-  showReferencePanel();
+  showReferencePanel(true);
 }
 
 // the tab goes, the file stays stored for the clips and pages that use it
