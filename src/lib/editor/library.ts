@@ -101,7 +101,7 @@ export function uniqueName(base: string): string {
 // nothing to read. the caller holds the lock of the notebook
 function start(notebook: Notebook, ready: boolean) {
   const doc = new Doc(notebook, ready ? {} : null);
-  const loader = new PageLoader(doc);
+  const loader = new PageLoader(doc, (index) => addToast(`Page ${index + 1} could not be read from the browser storage`, 'error', 8000));
   const saver = new Saver(doc, {
     state: (state) => {
       saveState.set(state);
