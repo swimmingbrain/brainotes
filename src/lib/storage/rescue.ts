@@ -34,22 +34,32 @@ export function dropRescue(notebookId: string) {
   } catch {}
 }
 
-export async function recover(notebookId: string) {
+// false when the kept ink could not be written, it then stays for the next try
+export async function recover(notebookId: string): Promise<boolean> {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(PREFIX + notebookId);
   } catch {}
-  if (!raw) return;
+  if (!raw) return true;
+  let rescue: Rescue;
+  const pages = [];
   try {
-    const rescue = JSON.parse(raw) as Rescue;
+    rescue = JSON.parse(raw) as Rescue;
     if (rescue.notebook?.id !== notebookId || !Array.isArray(rescue.notebook.pages)) throw new Error('a broken rescue');
-    const pages = [];
     for (const [id, list] of Object.entries(rescue.pages ?? {})) {
       pages.push({ id, notebookId, ...(await packItems(itemsFromJson(list))) });
     }
+  } catch (err) {
+    console.warn('the ink a closed tab kept could not be read', err);
+    dropRescue(notebookId);
+    return true;
+  }
+  try {
     await writeChanges({ notebook: rescue.notebook, pages, deleted: Array.isArray(rescue.deleted) ? rescue.deleted : [] });
   } catch (err) {
     console.warn('the ink a closed tab kept could not be put back', err);
+    return false;
   }
   dropRescue(notebookId);
+  return true;
 }

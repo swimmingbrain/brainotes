@@ -160,7 +160,12 @@ async function openStored(id: string, quiet = false) {
     addToast(`${await nameOf(id)} is open in another tab`, 'warning', 5000);
     return;
   }
-  await recover(id);
+  // the stored copy is older than what the last tab kept, it waits for that
+  if (!(await recover(id))) {
+    unlockNotebook(id);
+    addToast(`${await nameOf(id)} has changes the browser storage did not take yet, try again in a moment`, 'error', 8000);
+    return;
+  }
   const notebook = await getNotebook(id);
   if (!notebook) {
     unlockNotebook(id);
