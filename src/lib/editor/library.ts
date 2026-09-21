@@ -124,7 +124,18 @@ async function stop() {
   session = null;
   current.loader.close();
   await current.saver.flush();
+  // ink drawn while that write ran goes as well
+  if (current.saver.pending) await current.saver.flush();
   current.saver.close();
+  // a write that failed leaves its pages in local storage for the next open
+  if (current.saver.pending) {
+    const name = current.doc.notebook.name;
+    if (keepRescue(current.saver.unsaved())) {
+      addToast(`The last changes to "${name}" are kept until the browser storage works again`, 'warning', 8000);
+    } else {
+      addToast(`The last changes to "${name}" could not be stored`, 'error', 8000);
+    }
+  }
   unlockNotebook(current.doc.notebook.id);
 }
 

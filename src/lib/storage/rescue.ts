@@ -14,15 +14,17 @@ interface Rescue {
   deleted: string[];
 }
 
-export function keepRescue(unsaved: Unsaved | null) {
-  if (!unsaved) return;
+export function keepRescue(unsaved: Unsaved | null): boolean {
+  if (!unsaved) return false;
   const pages: Record<string, unknown[]> = {};
   for (const [id, items] of Object.entries(unsaved.pages)) pages[id] = itemsToJson(items);
   const rescue: Rescue = { notebook: unsaved.notebook, pages, deleted: unsaved.deleted };
   try {
     localStorage.setItem(PREFIX + unsaved.notebook.id, JSON.stringify(rescue));
+    return true;
   } catch {
     // too big or no local storage, the normal save is all there is
+    return false;
   }
 }
 
