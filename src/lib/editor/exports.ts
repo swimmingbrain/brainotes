@@ -18,6 +18,8 @@ async function pageOf(doc: Doc, id: string): Promise<{ meta: PageMeta; items: It
   if (openDoc() !== doc) throw stoppedError();
   const page = await loadPage(id);
   if (!page || openDoc() !== doc) throw stoppedError();
+  // a page that could not be read would go into the file empty
+  if (!page.ready) throw new Error('a page could not be read');
   return { meta: page.meta, items: page.items.slice() };
 }
 
