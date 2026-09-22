@@ -47,7 +47,7 @@ export async function storeImage(blob: Blob, name = 'image'): Promise<ImageAsset
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bitmap, 0, 0, w, h);
     bitmap.close();
-    const type = blob.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    const type = blob.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
     out = await canvas.convertToBlob({ type, quality: 0.9 });
     bitmap = canvas.transferToImageBitmap();
   }
