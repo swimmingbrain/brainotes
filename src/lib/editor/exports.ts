@@ -38,10 +38,14 @@ function run(kind: FileKind, name: string, label: string, work: (stopped: () => 
   let stopped = false;
   const toast = addToast(`Exporting ${label}...`, 'info', 0);
   const blob = work(() => stopped, toast);
-  blob.catch(() => {});
+  // the work can stop on its own (the notebook was closed), the file the
+  // dialog made is then left empty
+  let broke = false;
+  blob.catch(() => (broke = true));
   void saveFile(blob, fileName(name, kind), kind)
     .then((saved) => {
-      if (!saved) stopped = true;
+      if (broke) addToast(`The ${label} export stopped before it was done`, 'warning', 5000);
+      else if (!saved) stopped = true;
       else addToast(`Exported ${label}`, 'success');
     })
     .catch((err) => {
