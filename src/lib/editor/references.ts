@@ -86,23 +86,31 @@ async function openFiles(files: File[]) {
     const kind = isPdf(file) ? 'pdf' : 'image';
     const same = assets.find((a) => a.kind === kind && a.name === file.name && a.blob.size === file.size);
     let id = same?.id ?? '';
-    if (!id && kind === 'pdf') {
-      const pdf = await readFile(file);
-      if (!pdf) continue;
-      id = pdf.id;
-      await putAsset(pdfAsset(file, pdf, owner));
-    } else if (!id) {
-      id = newId();
-      await putAsset({ id, notebookId: owner, kind: 'image', name: file.name, type: file.type, blob: file });
+    try {
+      if (!id && kind === 'pdf') {
+        const pdf = await readFile(file);
+        if (!pdf) continue;
+        id = pdf.id;
+        await putAsset(pdfAsset(file, pdf, owner));
+      } else if (!id) {
+        id = newId();
+        await putAsset({ id, notebookId: owner, kind: 'image', name: file.name, type: file.type, blob: file });
+      }
+    } catch (err) {
+      console.error(err);
+      addToast(`${file.name} could not be stored in the browser`, 'error', 5000);
+      continue;
     }
+    if (openDoc() !== doc) return;
     if (!refs.includes(id)) {
       refs.push(id);
       infos.push({ id, name: file.name, kind });
+      // at once, the sweep of unused files must not find it stored but unused
+      doc.setRefs([...refs]);
     }
     last = id;
   }
   if (openDoc() !== doc || !last) return;
-  doc.setRefs(refs);
   references.set(infos);
   setActive(last);
   showReferencePanel(true);
