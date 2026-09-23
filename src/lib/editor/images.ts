@@ -25,10 +25,10 @@ export interface ImageAsset {
   h: number;
 }
 
-// the picture goes into storage for the open notebook, made smaller first
-// when it is big. png stays png, the rest becomes jpeg. null when the
-// browser can not read it
-export async function storeImage(blob: Blob, name = 'image'): Promise<ImageAsset | null> {
+// the picture goes into storage for the notebook, made smaller first when
+// it is big. a jpeg stays a jpeg, the rest becomes a png so see through
+// parts stay see through. null when the browser can not read it
+export async function storeImage(blob: Blob, name = 'image', owner = get(notebookId)): Promise<ImageAsset | null> {
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(blob);
@@ -54,7 +54,7 @@ export async function storeImage(blob: Blob, name = 'image'): Promise<ImageAsset
   const assetId = newId();
   await putAsset({
     id: assetId,
-    notebookId: get(notebookId),
+    notebookId: owner,
     kind: 'image',
     name,
     type: out.type,
@@ -108,7 +108,9 @@ export function imageItemFor(
 export async function insertImages(blobs: Blob[], at: Point | null, centre = false) {
   // the spot is taken now, the pointer may move on while the files are read
   const spot = spotAt(at, centre);
-  if (!spot) return;
+  const doc = editor()?.doc;
+  const owner = get(notebookId);
+  if (!spot || !doc) return;
   const placed: ImageItem[] = [];
   let done = 0;
   let toast = '';
@@ -120,8 +122,17 @@ export async function insertImages(blobs: Blob[], at: Point | null, centre = fal
   try {
     for (const blob of blobs) {
       if (toast) updateToast(toast, label());
-      const asset = await storeImage(blob, blob instanceof File ? blob.name : 'image');
+      let asset: ImageAsset | null;
+      try {
+        asset = await storeImage(blob, blob instanceof File ? blob.name : 'image', owner);
+      } catch (err) {
+        console.error(err);
+        addToast('That picture could not be stored in the browser', 'error', 5000);
+        break;
+      }
       done++;
+      // another notebook came up in the meantime, the pictures belong to the first
+      if (editor()?.doc !== doc) break;
       if (!asset) {
         addToast('That picture could not be read', 'warning');
         continue;
@@ -136,7 +147,7 @@ export async function insertImages(blobs: Blob[], at: Point | null, centre = fal
     if (toast) dismissToast(toast);
   }
   const ed = editor();
-  if (!ed || placed.length === 0 || spot.index >= ed.doc.pageCount) return;
+  if (!ed || ed.doc !== doc || placed.length === 0 || spot.index >= ed.doc.pageCount) return;
   activeTool.set('select');
   ed.select.insert(spot.index, placed);
 }
@@ -151,9 +162,10 @@ export async function insertImageBlob(
   source?: ImageSource,
   corner?: Point
 ): Promise<ImageItem | null> {
-  const asset = await storeImage(blob);
+  const doc = editor()?.doc;
+  const asset = await storeImage(blob, 'image', get(notebookId));
   const ed = editor();
-  if (!asset || !ed) return null;
+  if (!asset || !ed || ed.doc !== doc) return null;
   const item = imageItemFor(asset, index, cx, cy, source, corner);
   if (!item) return null;
   activeTool.set('select');
