@@ -69,10 +69,16 @@ let penTimer: ReturnType<typeof setTimeout> | null = null;
 // pdf.js is big, it only comes in once the first pdf is opened. all files
 // share one worker, starting a worker for each took half a second
 function pdfjs(): Promise<{ pdf: PdfLib; worker: PDFWorker }> {
-  lib ??= import('pdfjs-dist').then((pdf) => {
-    pdf.GlobalWorkerOptions.workerSrc = workerUrl;
-    return { pdf, worker: new pdf.PDFWorker() };
-  });
+  lib ??= import('pdfjs-dist')
+    .then((pdf) => {
+      pdf.GlobalWorkerOptions.workerSrc = workerUrl;
+      return { pdf, worker: new pdf.PDFWorker() };
+    })
+    .catch((err) => {
+      // a load that failed once (no network) is tried again next time
+      lib = null;
+      throw err;
+    });
   return lib;
 }
 
