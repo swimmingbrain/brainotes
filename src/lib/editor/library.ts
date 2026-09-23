@@ -106,6 +106,8 @@ function start(notebook: Notebook, ready: boolean) {
     state: (state) => {
       saveState.set(state);
       if (state === 'saved') dropRescue(notebook.id);
+      // the dot alone is easy to miss, it keeps trying in the meantime
+      if (state === 'failed') addToast('Could not save, the browser storage may be full. Trying again...', 'error', 8000);
     },
     saved: updateRow
   });
