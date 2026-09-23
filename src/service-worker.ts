@@ -112,12 +112,14 @@ async function handleDefault(request: Request, url: URL): Promise<Response> {
     if (response.status === 200) await put(CACHE_NAME, request, response.clone());
     return response;
   } catch (err) {
-    const cached = await caches.match(request).catch(() => undefined);
-    if (cached) return cached;
+    // a page comes from this build, the kept older build must not win
     if (request.mode === 'navigate') {
-      const page = (await caches.match(url.pathname).catch(() => undefined)) || (await caches.match('/').catch(() => undefined));
+      const app = await openCache(APP_CACHE);
+      const page = (await app?.match(url.pathname).catch(() => undefined)) || (await app?.match('/').catch(() => undefined));
       if (page) return page;
     }
+    const cached = await caches.match(request).catch(() => undefined);
+    if (cached) return cached;
     throw err;
   }
 }
