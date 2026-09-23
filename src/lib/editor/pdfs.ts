@@ -97,7 +97,13 @@ export async function writeOn(files: File[], layout: PdfLayout, target: PdfTarge
     if (!pdf) continue;
     const doc = openDoc();
     if (target === 'append' && doc) {
-      await putAsset(pdfAsset(file, pdf, doc.notebook.id));
+      try {
+        await putAsset(pdfAsset(file, pdf, doc.notebook.id));
+      } catch (err) {
+        console.error(err);
+        addToast(`${file.name} could not be stored in the browser`, 'error', 5000);
+        continue;
+      }
       if (openDoc() !== doc) return;
       addPages(doc.pageCount, pagesOf(pdf, layout, doc.kind));
       continue;
