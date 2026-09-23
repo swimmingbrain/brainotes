@@ -117,7 +117,9 @@ async function parse(data: Blob): Promise<PDFDocumentProxy> {
     iccUrl: dataUrl('iccs'),
     // pages drawn on the gpu: a big page took 20 ms of the main thread just
     // to get its pixels out of a software canvas
-    enableHWA: true
+    enableHWA: true,
+    // a broken file gets a toast, pdf.js need not fill the console about it
+    verbosity: 0
   }).promise;
 }
 
