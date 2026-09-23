@@ -15,7 +15,7 @@ import { PageLoader } from '$lib/storage/loader';
 import { packItems } from '$lib/storage/pack';
 import { dropRescue, keepRescue, recover } from '$lib/storage/rescue';
 import { Saver } from '$lib/storage/saver';
-import { lockNotebook, openElsewhere, unlockNotebook } from './locks';
+import { lockNotebook, unlockNotebook } from './locks';
 import {
   activeTool,
   addToast,
@@ -292,15 +292,20 @@ plugActions({
       return;
     }
     void run(async () => {
-      // the tab that has it open would write its old name back
-      if (await openElsewhere(id)) {
+      // the tab that has it open would write its old name back. the lock is
+      // held while renaming, so no tab opens it halfway
+      if (!(await lockNotebook(id))) {
         addToast(`${await nameOf(id)} is open in another tab, rename it there`, 'warning', 5000);
         return;
       }
-      const notebook = await getNotebook(id);
-      if (!notebook) return;
-      notebook.name = name;
-      await putNotebook(notebook);
+      try {
+        const notebook = await getNotebook(id);
+        if (!notebook) return;
+        notebook.name = name;
+        await putNotebook(notebook);
+      } finally {
+        unlockNotebook(id);
+      }
       await refresh();
     });
   },
@@ -313,13 +318,16 @@ plugActions({
         current.saver.close();
         // a write that was already on its way finishes before the delete
         await current.saver.settled();
-        unlockNotebook(id);
         hide();
-      } else if (await openElsewhere(id)) {
+      } else if (!(await lockNotebook(id))) {
         addToast(`${await nameOf(id)} is open in another tab, close it there first`, 'warning', 5000);
         return;
       }
-      await deleteNotebook(id);
+      try {
+        await deleteNotebook(id);
+      } finally {
+        unlockNotebook(id);
+      }
       dropRescue(id);
       await refresh();
     });

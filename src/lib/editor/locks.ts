@@ -28,10 +28,3 @@ export function unlockNotebook(id: string) {
   held.get(id)?.();
   held.delete(id);
 }
-
-export async function openElsewhere(id: string): Promise<boolean> {
-  if (held.has(id)) return false;
-  if (!(await lockNotebook(id))) return true;
-  unlockNotebook(id);
-  return false;
-}
