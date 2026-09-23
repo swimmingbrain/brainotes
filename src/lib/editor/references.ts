@@ -1,13 +1,13 @@
 import { get } from 'svelte/store';
 import { plugActions, type Point } from './actions';
 import { currentPage, editor, openDoc, spotAt } from './canvas';
-import { insertImageBlob, isImage, pickFiles } from './images';
+import { insertImageBlob, isImage, MAX_SIDE, pickFiles } from './images';
 import { addNotebook } from './library';
 import { baseName, isPdf, pdfAsset, readFile, writeOnPage } from './pdfs';
 import { newId, newNotebook } from '$lib/engine/doc';
 import type { ImageSource } from '$lib/engine/types';
 import { layoutOf } from '$lib/pdf/layout';
-import { openPdf, renderPart, warmPdf, type Part } from '$lib/pdf/pdf';
+import { capScale, openPdf, renderPart, warmPdf, type Part } from '$lib/pdf/pdf';
 import { deleteAsset, getAsset, listAssets, listPages, putAsset } from '$lib/storage/db';
 import { activeTool, addToast, notebookId, panels, updatePanels, workspace } from '$lib/stores/app';
 import { preferences } from '$lib/stores/preferences';
@@ -181,7 +181,10 @@ export async function snip(file: string, page: number, part?: Part) {
   if (!spot || !editor()) return;
   try {
     const whole = part ?? { x: 0, y: 0, ...(await pageSize(file, page)) };
-    const blob = await toPng(await renderPart(file, page, SNIP_SCALE, part));
+    // a poster sized page would be too big a picture, the stored one is
+    // made smaller to this anyway
+    const scale = Math.min(capScale(whole.w, whole.h, SNIP_SCALE), MAX_SIDE / Math.max(whole.w, whole.h));
+    const blob = await toPng(await renderPart(file, page, scale, part));
     const item = await insertImageBlob(blob, spot.index, spot.x, spot.y, { assetId: file, page, ...whole }, underLast(spot));
     lastClip = item?.id ?? '';
   } catch (err) {
