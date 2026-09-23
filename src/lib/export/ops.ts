@@ -195,6 +195,28 @@ export function pdfMatrix(
   return [a, b, c, d, m[4] * sx + rect.x - (a * crop.x + c * crop.y), m[5] * sy + rect.y - (b * crop.x + d * crop.y)];
 }
 
+// where the look of a pdf annotation goes: its box, turned by its own
+// matrix, is stretched onto the rectangle of the annotation
+export function annotMatrix(rect: number[], bbox: number[], m: number[]): number[] | null {
+  const [a, b, c, d, e, f] = m;
+  const corners = [
+    [bbox[0], bbox[1]],
+    [bbox[2], bbox[1]],
+    [bbox[0], bbox[3]],
+    [bbox[2], bbox[3]]
+  ];
+  const xs = corners.map(([x, y]) => a * x + c * y + e);
+  const ys = corners.map(([x, y]) => b * x + d * y + f);
+  const x0 = Math.min(...xs);
+  const y0 = Math.min(...ys);
+  const w = Math.max(...xs) - x0;
+  const h = Math.max(...ys) - y0;
+  if (w <= 0 || h <= 0) return null;
+  const sx = Math.abs(rect[2] - rect[0]) / w;
+  const sy = Math.abs(rect[3] - rect[1]) / h;
+  return [sx, 0, 0, sy, Math.min(rect[0], rect[2]) - x0 * sx, Math.min(rect[1], rect[3]) - y0 * sy];
+}
+
 // a picture drawn into rect, the first row of the picture at the top
 export function imageMatrix(x: number, y: number, w: number, h: number): number[] {
   return [w, 0, 0, -h, x, y + h];

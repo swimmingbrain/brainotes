@@ -2,14 +2,16 @@ import {
   decodePDFRawStream,
   PDFArray,
   PDFContentStream,
+  PDFDict,
   PDFDocument,
   PDFName,
+  PDFNumber,
   PDFObjectCopier,
   PDFRawStream,
+  PDFRef,
   PDFStream,
   type PDFObject,
-  type PDFPage,
-  type PDFRef
+  type PDFPage
 } from '@pdfme/pdf-lib';
 import { drawItem, HIGHLIGHTER_ALPHA, inkColor, isDark, isMarker, PDF_EDGE, type Frame } from '$lib/engine/render';
 import { PENS } from '$lib/engine/stroke';
@@ -19,6 +21,7 @@ import { PAPER_COLORS } from '$lib/editor/paper';
 import { capScale, pdfDark, renderPart } from '$lib/pdf/pdf';
 import { isJpeg, jpegOrientation } from './jpeg';
 import {
+  annotMatrix,
   blendOver,
   boardFrame,
   dotsOf,
@@ -56,6 +59,8 @@ interface Form {
   ref: PDFRef;
   crop: { x: number; y: number; w: number; h: number };
   rotate: number;
+  // highlights, notes and filled in fields that sit on the original page
+  annots: { ref: PDFRef; m: number[] }[];
 }
 
 interface Source {
@@ -80,6 +85,16 @@ function pause(): Promise<void> {
 async function deflate(bytes: Uint8Array): Promise<Uint8Array> {
   const stream = new Blob([bytes as Uint8Array<ArrayBuffer>]).stream().pipeThrough(new CompressionStream('deflate'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+function numbers(obj: PDFObject | undefined): number[] {
+  if (!(obj instanceof PDFArray)) return [];
+  const out: number[] = [];
+  for (let i = 0; i < obj.size(); i++) {
+    const n = obj.lookup(i);
+    if (n instanceof PDFNumber) out.push(n.asNumber());
+  }
+  return out;
 }
 
 function rect(x: number, y: number, w: number, h: number): string {
@@ -246,7 +261,8 @@ class PdfWriter {
     const parts = [`1 g ${box} f`];
     const form = await this.formOf(bg.assetId, bg.page);
     if (form) {
-      parts.push(`q ${box} W n ${matrix(pdfMatrix(form.crop, form.rotate, bg))} /${res.xobject(form.ref)} Do Q`);
+      const annots = form.annots.map((a) => ` q ${matrix(a.m)} /${res.xobject(a.ref)} Do Q`).join('');
+      parts.push(`q ${box} W n ${matrix(pdfMatrix(form.crop, form.rotate, bg))} /${res.xobject(form.ref)} Do${annots} Q`);
     } else {
       const picture = await this.rasterOf(bg);
       if (picture) parts.push(`q ${matrix(imageMatrix(bg.x, bg.y, bg.w, bg.h))} /${res.xobject(picture)} Do Q`);
@@ -344,7 +360,45 @@ class PdfWriter {
     set('Resources', resources ? source.copier.copy(resources) : context.obj({}));
     const group = node.get(PDFName.of('Group'));
     if (group) set('Group', source.copier.copy(group));
-    return { ref, crop, rotate };
+    return { ref, crop, rotate, annots: this.annotsOf(source, node) };
+  }
+
+  // a viewer draws the annotations of a page with their own looks, pdf.js
+  // shows them on screen, so the export draws them as well
+  private annotsOf(source: Source, node: PDFDict): { ref: PDFRef; m: number[] }[] {
+    const out: { ref: PDFRef; m: number[] }[] = [];
+    const list = node.lookup(PDFName.of('Annots'));
+    if (!(list instanceof PDFArray)) return out;
+    const context = source.doc.context;
+    for (let i = 0; i < list.size(); i++) {
+      const annot = list.lookup(i);
+      if (!(annot instanceof PDFDict)) continue;
+      const kind = annot.lookup(PDFName.of('Subtype'));
+      if (kind === PDFName.of('Link') || kind === PDFName.of('Popup')) continue;
+      // hidden or not for the screen
+      const flags = annot.lookup(PDFName.of('F'));
+      if (flags instanceof PDFNumber && (flags.asNumber() & 34) !== 0) continue;
+      const looks = annot.lookup(PDFName.of('AP'));
+      if (!(looks instanceof PDFDict)) continue;
+      let look = looks.get(PDFName.of('N'));
+      let stream = look ? context.lookup(look) : undefined;
+      // a check box has one look per state
+      if (stream instanceof PDFDict) {
+        const state = annot.lookup(PDFName.of('AS'));
+        look = state instanceof PDFName ? stream.get(state) : undefined;
+        stream = look ? context.lookup(look) : undefined;
+      }
+      if (!look || !(stream instanceof PDFStream)) continue;
+      const rect = numbers(annot.lookup(PDFName.of('Rect')));
+      const bbox = numbers(stream.dict.lookup(PDFName.of('BBox')));
+      const own = numbers(stream.dict.lookup(PDFName.of('Matrix')));
+      if (rect.length !== 4 || bbox.length !== 4) continue;
+      const m = annotMatrix(rect, bbox, own.length === 6 ? own : [1, 0, 0, 1, 0, 0]);
+      if (!m) continue;
+      const copy = source.copier.copy(look);
+      out.push({ ref: copy instanceof PDFRef ? copy : this.out.context.register(copy), m });
+    }
+    return out;
   }
 
   // a pdf page pdf-lib can not read is drawn by pdf.js as a picture

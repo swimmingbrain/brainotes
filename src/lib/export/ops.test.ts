@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PageMeta, Shape } from '$lib/engine/types';
 import {
+  annotMatrix,
   blendOver,
   BOARD_MARGIN,
   boardFrame,
@@ -126,5 +127,15 @@ describe('export ops', () => {
     const big = pageSetup({ x: 0, y: 0, w: MAX_SIDE * 2, h: 1000 });
     expect(big.w).toBe(MAX_SIDE);
     expect(big.h).toBe(500);
+  });
+
+  it('stretches the look of an annotation onto its rectangle', () => {
+    const plain = annotMatrix([100, 200, 160, 230], [0, 0, 60, 30], [1, 0, 0, 1, 0, 0])!;
+    expect(apply(plain, 0, 0)).toEqual([100, 200]);
+    expect(apply(plain, 60, 30)).toEqual([160, 230]);
+    const moved = annotMatrix([100, 200, 220, 230], [10, 10, 70, 40], [1, 0, 0, 1, 0, 0])!;
+    expect(apply(moved, 10, 10)).toEqual([100, 200]);
+    expect(apply(moved, 70, 40)).toEqual([220, 230]);
+    expect(annotMatrix([0, 0, 10, 10], [0, 0, 0, 10], [1, 0, 0, 1, 0, 0])).toBeNull();
   });
 });
