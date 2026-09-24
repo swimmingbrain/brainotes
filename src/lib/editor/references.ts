@@ -259,10 +259,11 @@ async function sweep(id: string) {
 
 notebookId.subscribe((id) => void loadRefs(id));
 
-// the snip tool cuts from the reference panel, so it comes up with it
+// the snip tool cuts from the reference panel, so it comes up with it, in
+// the study workspace where the notes keep their room
 activeTool.subscribe((tool) => {
   if (tool !== 'snip' || !openDoc()) return;
-  showReferencePanel();
+  if (!get(panels).rightOpen) showReferencePanel(true);
   if (get(references).length === 0) addToast('Open a pdf on the side to snip from it', 'info', 4000);
 });
 
