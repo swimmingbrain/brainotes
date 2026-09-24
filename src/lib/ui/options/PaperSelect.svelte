@@ -3,17 +3,30 @@
   import Menu from '../Menu.svelte';
   import { actions } from '$lib/editor/actions';
   import { PAPER_STYLES } from '$lib/editor/commands';
-  import { addToast, paperStyle, type MenuItem } from '$lib/stores/app';
-  import { preferences } from '$lib/stores/preferences';
+  import { PAPER_COLORS } from '$lib/editor/paper';
+  import { addToast, paperColor, paperStyle, type MenuItem } from '$lib/stores/app';
+  import { preferences, type PaperColor } from '$lib/stores/preferences';
 
   function makeDefault() {
     const style = $paperStyle;
-    preferences.update((p) => ({ ...p, paper: { ...p.paper, style } }));
-    addToast(`New pages start on ${style} paper`, 'success');
+    const color = $paperColor;
+    preferences.update((p) => ({ ...p, paper: { ...p.paper, style, color } }));
+    addToast(`New pages start on ${PAPER_COLORS[color].label.toLowerCase()} ${style} paper`, 'success');
   }
 
+  // the color of the page on screen, dark is the blackboard
   const items = $derived<MenuItem[]>([
-    { label: 'Make default paper', checked: $preferences.paper.style === $paperStyle, action: makeDefault }
+    ...(Object.keys(PAPER_COLORS) as PaperColor[]).map((color) => ({
+      label: PAPER_COLORS[color].label,
+      checked: $paperColor === color,
+      action: () => actions.setPaperColor(color)
+    })),
+    { separator: true, label: '' },
+    {
+      label: 'Make default paper',
+      checked: $preferences.paper.style === $paperStyle && $preferences.paper.color === $paperColor,
+      action: makeDefault
+    }
   ]);
 </script>
 

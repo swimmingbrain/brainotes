@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { actions } from './actions';
 import { openNotebookFile } from './notebook-file';
+import { PAPER_COLORS } from './paper';
 import { togglePresent } from './present';
 import { tools, type ToolId } from './tools';
 import {
@@ -16,7 +17,7 @@ import {
   type MenuItem,
   type NotebookSummary
 } from '$lib/stores/app';
-import type { PaperStyle } from '$lib/stores/preferences';
+import type { PaperColor, PaperStyle } from '$lib/stores/preferences';
 
 export interface Command {
   id: string;
@@ -123,6 +124,10 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
   }
   for (const style of PAPER_STYLES) {
     commands.push(c(`paper-${style.id}`, `Paper: ${style.label}`, 'Pages', () => actions.setPaperStyle(style.id)));
+  }
+  for (const color of Object.keys(PAPER_COLORS) as PaperColor[]) {
+    const label = PAPER_COLORS[color].label;
+    commands.push(c(`paper-${color}`, `Paper color: ${label}`, 'Pages', () => actions.setPaperColor(color)));
   }
   for (const tool of tools) {
     if (!visible[tool.id]) continue;

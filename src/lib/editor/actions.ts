@@ -1,5 +1,5 @@
 import { notebookName, notebookOpen, notebookKind, paperStyle, type NotebookKind } from '$lib/stores/app';
-import type { PaperStyle } from '$lib/stores/preferences';
+import type { PaperColor, PaperStyle } from '$lib/stores/preferences';
 import type { ImageSource } from '$lib/engine/types';
 
 export type ExportFormat = 'pdf' | 'png' | 'brainotes';
@@ -28,7 +28,8 @@ export interface Actions {
   previousPage: () => void;
   // the page on screen
   setPaperStyle: (style: PaperStyle) => void;
-  setPagePaper: (index: number, style: PaperStyle) => void;
+  setPaperColor: (color: PaperColor) => void;
+  setPagePaper: (index: number, paper: { style?: PaperStyle; color?: PaperColor }) => void;
   // the paper of page index goes on every page
   paperOnAllPages: (index: number) => void;
   deleteSelection: () => void;
@@ -78,6 +79,7 @@ export const actions: Actions = {
   nextPage: nothing,
   previousPage: nothing,
   setPaperStyle: (style) => paperStyle.set(style),
+  setPaperColor: nothing,
   setPagePaper: nothing,
   paperOnAllPages: nothing,
   deleteSelection: nothing,

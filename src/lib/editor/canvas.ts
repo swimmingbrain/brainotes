@@ -34,13 +34,14 @@ import {
   pageCount,
   pageIndex,
   pageList,
+  paperColor,
   paperStyle,
   selectionCount,
   toolOptions,
   zoomPercent,
   type ToolOptions
 } from '$lib/stores/app';
-import { preferences, type PaperStyle, type Preferences } from '$lib/stores/preferences';
+import { preferences, type PaperColor, type PaperStyle, type Preferences } from '$lib/stores/preferences';
 
 // the open notebook with what keeps it in storage
 export interface Session {
@@ -127,7 +128,10 @@ function syncPage() {
   const index = current();
   pageIndex.set(index);
   pageCount.set(doc.pageCount);
-  if (doc.pageCount > 0) paperStyle.set(doc.notebook.pages[index].paper.style);
+  if (doc.pageCount > 0) {
+    paperStyle.set(doc.notebook.pages[index].paper.style);
+    paperColor.set(doc.notebook.pages[index].paper.color);
+  }
   syncCount();
 }
 
@@ -430,10 +434,12 @@ async function duplicatePage(index: number) {
   view?.goToPage(at + 1);
 }
 
-function setPagePaper(index: number, style: PaperStyle) {
+function setPagePaper(index: number, change: { style?: PaperStyle; color?: PaperColor }) {
   const meta = doc?.notebook.pages[index];
-  if (!history || !meta || meta.paper.style === style) return;
-  history.run({ type: 'paper', pageId: meta.id, before: { ...meta.paper }, after: { ...meta.paper, style } });
+  if (!history || !meta) return;
+  const after = { ...meta.paper, ...change };
+  if (after.style === meta.paper.style && after.color === meta.paper.color) return;
+  history.run({ type: 'paper', pageId: meta.id, before: { ...meta.paper }, after });
 }
 
 function paperOnAllPages(index: number) {
@@ -529,7 +535,10 @@ plugActions({
   nextPage: () => view?.goToPage(current() + 1),
   previousPage: () => view?.goToPage(current() - 1),
   setPaperStyle: (style) => {
-    if (doc && doc.pageCount > 0) setPagePaper(current(), style);
+    if (doc && doc.pageCount > 0) setPagePaper(current(), { style });
+  },
+  setPaperColor: (color) => {
+    if (doc && doc.pageCount > 0) setPagePaper(current(), { color });
   },
   setPagePaper,
   paperOnAllPages,

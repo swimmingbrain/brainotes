@@ -1,6 +1,6 @@
 import { derived, get, writable } from 'svelte/store';
 import { browser } from '$app/environment';
-import { preferences, type PaperStyle, type PenPreset, type PenType } from './preferences';
+import { preferences, type PaperColor, type PaperStyle, type PenPreset, type PenType } from './preferences';
 import type { ToolId } from '$lib/editor/tools';
 
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
@@ -259,6 +259,7 @@ export const notebookName = writable('');
 export const notebookKind = writable<NotebookKind>('paper');
 export const pageList = writable<PageInfo[]>([]);
 export const paperStyle = writable<PaperStyle>(get(preferences).paper.style);
+export const paperColor = writable<PaperColor>(get(preferences).paper.color);
 export const zoomPercent = writable(100);
 export const pageIndex = writable(0);
 export const pageCount = writable(1);

@@ -3,8 +3,10 @@
   import { actions } from '$lib/editor/actions';
   import { openDoc } from '$lib/editor/canvas';
   import { PAPER_STYLES } from '$lib/editor/commands';
+  import { PAPER_COLORS } from '$lib/editor/paper';
   import { Thumbs } from '$lib/editor/thumbs';
   import { contextMenu, notebookKind, pageIndex, pageList } from '$lib/stores/app';
+  import type { PaperColor } from '$lib/stores/preferences';
 
   const thumbs = new Thumbs();
   $effect(() => () => thumbs.destroy());
@@ -84,7 +86,7 @@
 
   function openMenu(e: MouseEvent, index: number) {
     e.preventDefault();
-    const style = openDoc()?.notebook.pages[index]?.paper.style;
+    const paper = openDoc()?.notebook.pages[index]?.paper;
     const last = $pageList.length - 1;
     contextMenu.set({
       x: e.clientX,
@@ -96,11 +98,19 @@
         { separator: true, label: '' },
         {
           label: 'Paper',
-          children: PAPER_STYLES.map((paper) => ({
-            label: paper.label,
-            checked: style === paper.id,
-            action: () => actions.setPagePaper(index, paper.id)
-          }))
+          children: [
+            ...PAPER_STYLES.map((s) => ({
+              label: s.label,
+              checked: paper?.style === s.id,
+              action: () => actions.setPagePaper(index, { style: s.id })
+            })),
+            { separator: true, label: '' },
+            ...(Object.keys(PAPER_COLORS) as PaperColor[]).map((color) => ({
+              label: PAPER_COLORS[color].label,
+              checked: paper?.color === color,
+              action: () => actions.setPagePaper(index, { color })
+            }))
+          ]
         },
         { label: `Use this paper on all ${word}s`, disabled: last === 0, action: () => actions.paperOnAllPages(index) },
         { separator: true, label: '' },
