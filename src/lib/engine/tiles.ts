@@ -401,7 +401,8 @@ export class TileLayer {
         this.work(tx, ty, deadline);
       }
     }
-    return false;
+    // the last tile may be half drawn, it goes on in the next frame
+    return this.pending.size > 0;
   }
 
   private open(tile: Tile, scale: number): TileCtx {

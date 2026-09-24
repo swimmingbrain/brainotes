@@ -764,6 +764,11 @@ export class CanvasView {
 
     const deadline = this.full ? Infinity : start + (penIsDown() ? BUDGET_PEN_DOWN : BUDGET);
     const prefetch = !penIsDown();
+    // tiles left half drawn while the pen was down go on once it lifts
+    if (prefetch) {
+      this.inkDirty ||= this.inkLayer.busy;
+      this.hlDirty ||= this.hlLayer.busy;
+    }
     if (this.inkDirty) {
       this.inkDirty = this.inkLayer.compose(this.inkCtx, this.cam, this.dpr, this.width, this.height, deadline, prefetch);
     }
