@@ -69,6 +69,9 @@ export class Input {
     el.addEventListener('pointermove', this.onmove);
     el.addEventListener('pointerup', this.onup);
     el.addEventListener('pointercancel', this.oncancel);
+    // a capture lost without an up (alt tab in the middle of a drag) ends
+    // the stroke too, else the next press would wait for it forever
+    el.addEventListener('lostpointercapture', this.oncancel);
     el.addEventListener('pointerleave', this.onleave);
     el.addEventListener('wheel', this.onwheel, { passive: false });
   }
@@ -80,6 +83,7 @@ export class Input {
     el.removeEventListener('pointermove', this.onmove);
     el.removeEventListener('pointerup', this.onup);
     el.removeEventListener('pointercancel', this.oncancel);
+    el.removeEventListener('lostpointercapture', this.oncancel);
     el.removeEventListener('pointerleave', this.onleave);
     el.removeEventListener('wheel', this.onwheel);
     this.active?.tool.cancel();
