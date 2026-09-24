@@ -265,10 +265,8 @@ export interface Frame {
   h: number;
 }
 
-// a whole page drawn a few items at a time: step(count) draws up to count
-// more and says when the page is done. the page sits at the top left of
-// the canvas at scale device pixels per unit. a board has no edges, frame
-// is the part of it to draw. nothing else may draw on ctx in between
+// a whole page drawn a few items at a time, step(count) says when it is done.
+// on a board frame is the part to draw
 export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
   const paper = page.meta.paper;
   const part = frame ?? { x: 0, y: 0, w: page.meta.w, h: page.meta.h };

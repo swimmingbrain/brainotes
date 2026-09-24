@@ -44,10 +44,8 @@ export class PenTool implements Tool {
   private size = 2;
   private follow = 0.66;
   private sensitivity = 0.5;
-  // all in scaled page units. keys are the smoothed samples, pts the line
-  // so far with curved points filled in where samples were far apart (it
-  // ends one key short, that gap is curved once the next key is known).
-  // the newest sample stays raw in tip, so the line always reaches the pen
+  // keys are the smoothed samples, pts the line with curves filled in, the
+  // newest sample stays raw in tip so the line always reaches the pen
   private keys: number[][] = [];
   private pts: number[][] = [];
   private tip: number[] | null = null;
