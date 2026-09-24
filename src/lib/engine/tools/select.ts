@@ -3,6 +3,7 @@ import { pageAt } from '../camera';
 import type { DocChange, PageData, Placed } from '../doc';
 import type { Op } from '../history';
 import { itemAt, lassoHits } from '../hit';
+import { penIsDown } from '../input';
 import { drawImageItem, drawItem, HIGHLIGHTER_ALPHA, isDark, isMarker } from '../render';
 import { moveBy, recolorItem, transformItem, type Change } from '../transform';
 import type { Box, ImageItem, ImageSource, Item, TextItem } from '../types';
@@ -130,8 +131,9 @@ export class SelectTool implements Tool {
     if (this.prepTimer) clearTimeout(this.prepTimer);
     this.prepTimer = this.items.length > 0 ? setTimeout(this.prepare, PREPARE) : null;
     this.hooks.changed?.(this.items.length);
-    // the box is drawn by whatever tool the view shows, so this one takes over
-    if (this.items.length > 0) this.view.tool = this;
+    // the box is drawn by whatever tool the view shows, so this one takes
+    // over, but not from the eraser end of a pen that is still erasing
+    if (this.items.length > 0 && !penIsDown()) this.view.tool = this;
     this.view.requestLive();
   }
 
