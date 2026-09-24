@@ -138,4 +138,15 @@ describe('the .brainotes file', () => {
     const newer = zipSync({ 'manifest.json': strToU8(JSON.stringify({ format: 'brainotes', version: 99, assets: [] })) });
     await expect(readNotebookFile(new Blob([newer]))).rejects.toMatchObject({ newer: true });
   });
+
+  it('turns down a notebook with a paper it does not know or a page twice', async () => {
+    const manifest = strToU8(JSON.stringify({ format: 'brainotes', version: 1, assets: [] }));
+    const file = (notebook: unknown) => new Blob([zipSync({ 'manifest.json': manifest, 'notebook.json': strToU8(JSON.stringify(notebook)) })]);
+    const good = sample().notebook;
+    await expect(readNotebookFile(file(good))).resolves.toBeTruthy();
+    const purple = { ...good, pages: [{ ...good.pages[0], paper: { style: 'dots', spacing: 24, color: 'purple' } }] };
+    await expect(readNotebookFile(file(purple))).rejects.toThrow('the notebook in it is broken');
+    const twice = { ...good, pages: [good.pages[0], good.pages[0]] };
+    await expect(readNotebookFile(file(twice))).rejects.toThrow('the notebook in it is broken');
+  });
 });

@@ -121,6 +121,24 @@ function json(bytes: Uint8Array | undefined): unknown {
   }
 }
 
+const STYLES = ['blank', 'lines', 'grid', 'dots'];
+const COLORS = ['white', 'cream', 'dark'];
+
+function isNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
+// a page the canvas can draw, a paper it does not know would break it
+function isPage(p: PageMeta): boolean {
+  if (!p || typeof p.id !== 'string' || !isNumber(p.w) || !isNumber(p.h) || p.w <= 0 || p.h <= 0) return false;
+  const paper = p.paper;
+  if (!paper || !STYLES.includes(paper.style) || !COLORS.includes(paper.color) || !isNumber(paper.spacing) || paper.spacing <= 0) {
+    return false;
+  }
+  const bg = p.pdf;
+  return !bg || (typeof bg.assetId === 'string' && [bg.page, bg.x, bg.y, bg.w, bg.h].every(isNumber));
+}
+
 function isNotebook(value: unknown): value is Notebook {
   const nb = value as Notebook;
   return (
@@ -129,7 +147,8 @@ function isNotebook(value: unknown): value is Notebook {
     typeof nb.name === 'string' &&
     (nb.kind === 'paper' || nb.kind === 'board') &&
     Array.isArray(nb.pages) &&
-    nb.pages.every((p: PageMeta) => p && typeof p.id === 'string' && p.w > 0 && p.h > 0 && !!p.paper)
+    nb.pages.every(isPage) &&
+    new Set(nb.pages.map((p) => p.id)).size === nb.pages.length
   );
 }
 
