@@ -217,7 +217,10 @@ export function startLibrary(): () => void {
 
   // a tab on its way out may not finish the write, what it holds goes into
   // local storage as well
+  // the text still being typed goes along, a hidden tab on a tablet can be
+  // closed without another word
   const flush = () => {
+    if (session) commitText();
     keepRescue(session?.saver.unsaved() ?? null);
     void session?.saver.flush();
   };
@@ -226,13 +229,8 @@ export function startLibrary(): () => void {
     if (document.visibilityState === 'hidden') flush();
     else void run(refresh);
   };
-  // a closing tab also keeps the text that was still being typed
-  const onpagehide = () => {
-    if (session) commitText();
-    flush();
-  };
   document.addEventListener('visibilitychange', onvisibility);
-  window.addEventListener('pagehide', onpagehide);
+  window.addEventListener('pagehide', flush);
 
   void run(async () => {
     try {
@@ -262,7 +260,7 @@ export function startLibrary(): () => void {
 
   return () => {
     document.removeEventListener('visibilitychange', onvisibility);
-    window.removeEventListener('pagehide', onpagehide);
+    window.removeEventListener('pagehide', flush);
   };
 }
 
