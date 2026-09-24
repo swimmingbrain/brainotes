@@ -99,6 +99,7 @@ export class SelectTool implements Tool {
 
   // the items keep the order they have on the page
   select(index: number, items: Item[]) {
+    this.stopDrag();
     const page = this.view.doc.pageAt(index);
     this.pageId = items.length > 0 ? page.meta.id : '';
     if (items.length > 1) {
@@ -111,10 +112,17 @@ export class SelectTool implements Tool {
   }
 
   clear() {
+    this.stopDrag();
     if (this.items.length === 0 && !this.pageId) return;
     this.items = [];
     this.pageId = '';
     this.show();
+  }
+
+  // a selection that changes while it is dragged (escape, a tool key, an
+  // undo) lands back where it was, its items show again
+  private stopDrag() {
+    if (this.mode === 'move' || this.mode === 'scale') this.cancel();
   }
 
   private show() {
