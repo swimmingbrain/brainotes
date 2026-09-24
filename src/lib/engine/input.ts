@@ -141,6 +141,11 @@ export class Input {
         return;
       }
     }
+    // the pen wins over a palm or a finger that rests on the page
+    if (kind !== 'touch' && this.gesture) {
+      this.gesture = null;
+      this.track = [];
+    }
     if (this.active || this.gesture) return;
 
     let tool: Tool | null;
