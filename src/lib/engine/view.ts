@@ -571,14 +571,20 @@ export class CanvasView {
 
   private applySize() {
     this.sizeDirty = false;
-    this.dpr = window.devicePixelRatio || 1;
+    const dpr = window.devicePixelRatio || 1;
+    // another screen: the old tiles are of no use, the screen is drawn anew
+    // in one go instead of tile by tile over an empty canvas
+    if (dpr !== this.dpr) this.full = true;
+    this.dpr = dpr;
     const w = Math.max(1, Math.round(this.width * this.dpr));
     const h = Math.max(1, Math.round(this.height * this.dpr));
     for (const canvas of [this.bg, this.hl, this.ink, this.live]) {
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
     }
-    // a canvas that changed size starts out empty
+    // the overlay starts out empty, also when the size in pixels stayed
+    this.liveCtx.setTransform(1, 0, 0, 1, 0, 0);
+    this.liveCtx.clearRect(0, 0, w, h);
     this.liveBox = null;
     this.liveClean = true;
     this.bgDirty = this.inkDirty = this.hlDirty = this.liveDirty = true;
