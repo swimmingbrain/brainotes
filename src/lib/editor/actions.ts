@@ -61,10 +61,8 @@ export interface Actions {
 
 function nothing() {}
 
-// every button and key goes through here. the canvas, the storage and the
-// pdf code put their own functions in later, the ui never has to change.
-// until then each one is harmless, the few that only touch the mirrors
-// already do that much
+// every button and key goes through here, the canvas, the storage and the
+// pdf code plug their own functions in
 export const actions: Actions = {
   undo: nothing,
   redo: nothing,

@@ -223,10 +223,8 @@ export async function writeOnReferencePage(file: string, page: number) {
   writeOnPage(file, page, size, here?.pdf ? layoutOf(here) : 'full');
 }
 
-// a pdf a notebook stored once (to read it on the side) and that nothing
-// uses any more is deleted the next time the notebook opens. clips keep
-// the pdf they came from, so the stored ink is searched for its id too.
-// not while there is anything to undo, an undo could bring a page back
+// a pdf stored to read on the side that nothing uses any more (no tab, no
+// page, no clip) goes, but not while an undo could bring a page back
 async function sweep(id: string) {
   await new Promise((resolve) => setTimeout(resolve, SWEEP_DELAY));
   const doc = openDoc();

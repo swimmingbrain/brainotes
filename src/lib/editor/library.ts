@@ -215,10 +215,8 @@ export function addNotebook(notebook: Notebook, items: Record<string, Item[]> = 
 export function startLibrary(): () => void {
   void navigator.storage?.persist?.().catch(() => {});
 
-  // a tab on its way out may not finish the write, what it holds goes into
-  // local storage as well
-  // the text still being typed goes along, a hidden tab on a tablet can be
-  // closed without another word
+  // a tab on its way out may not finish the write, what it holds (also the
+  // text being typed) goes into local storage as well
   const flush = () => {
     if (session) commitText();
     keepRescue(session?.saver.unsaved() ?? null);

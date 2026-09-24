@@ -66,10 +66,8 @@ export async function storeImage(blob: Blob, name = 'image', owner = get(noteboo
   return { assetId, w: bitmap.width, h: bitmap.height };
 }
 
-// an image item for the asset, centred on (cx, cy) of page index or with its
-// top left at a corner, about 60 percent of the page wide and never bigger
-// than the page. a small picture keeps its own size, a clip of a pdf the
-// size it has in the pdf
+// about 60 percent of the page wide and never bigger than the page, a small
+// picture or a clip of a pdf keeps its own size
 export function imageItemFor(
   asset: ImageAsset,
   index: number,
