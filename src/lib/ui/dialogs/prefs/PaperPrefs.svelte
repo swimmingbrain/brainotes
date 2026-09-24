@@ -18,7 +18,7 @@
   const preview = $derived(paperPattern(paper.style, paper.color, paper.spacing / 2));
 </script>
 
-<h3 class="section">New pages</h3>
+<h3 class="section">New notebooks</h3>
 <Field label="Style">
   <div class="segments" role="radiogroup" aria-label="Paper style">
     {#each PAPER_STYLES as style (style.id)}
@@ -57,7 +57,8 @@
 </Field>
 <div class="preview" style="background: {preview}" aria-hidden="true"></div>
 <p class="help">
-  New pages start on this paper. The options bar changes the page you are on, dark paper turns it into a blackboard.
+  New notebooks start on this paper, a new page takes the paper of the page you are on. The options bar changes that
+  page, dark paper turns it into a blackboard.
 </p>
 
 <style>

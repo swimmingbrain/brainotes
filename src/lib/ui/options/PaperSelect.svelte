@@ -11,7 +11,7 @@
     const style = $paperStyle;
     const color = $paperColor;
     preferences.update((p) => ({ ...p, paper: { ...p.paper, style, color } }));
-    addToast(`New pages start on ${PAPER_COLORS[color].label.toLowerCase()} ${style} paper`, 'success');
+    addToast(`New notebooks start on ${PAPER_COLORS[color].label.toLowerCase()} ${style} paper`, 'success');
   }
 
   // the color of the page on screen, dark is the blackboard
