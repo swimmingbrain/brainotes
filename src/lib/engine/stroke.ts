@@ -188,20 +188,3 @@ export function strokeLine(stroke: Stroke): Path2D {
 export function hasLine(stroke: Stroke): boolean {
   return derived(stroke).line !== undefined;
 }
-
-// the outline as svg path data in page units, for exports
-export function strokeSvgPath(stroke: Stroke): string {
-  const outline = outlineOf(scaledPoints(stroke.pts), stroke.pen, stroke.size);
-  const n = outline.length;
-  if (n < 3) return '';
-  const k = 1 / PF_SCALE;
-  const f = (v: number) => (v * k).toFixed(2);
-  const mid = (a: number[], b: number[], i: number) => f((a[i] + b[i]) / 2);
-  let d = `M${mid(outline[n - 1], outline[0], 0)},${mid(outline[n - 1], outline[0], 1)}`;
-  for (let i = 0; i < n; i++) {
-    const a = outline[i];
-    const b = outline[i + 1 === n ? 0 : i + 1];
-    d += `Q${f(a[0])},${f(a[1])} ${mid(a, b, 0)},${mid(a, b, 1)}`;
-  }
-  return d + 'Z';
-}
