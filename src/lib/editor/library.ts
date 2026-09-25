@@ -76,11 +76,6 @@ async function refresh() {
   library.set(newestFirst(all.map(summary)));
 }
 
-// for code that writes notebooks into storage on its own, like an import
-export function refreshLibrary(): Promise<void> {
-  return run(refresh);
-}
-
 // the open notebook's row follows what is in memory, it is added when it
 // came into storage some other way
 function updateRow() {

@@ -62,8 +62,6 @@
     info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.4v4M8 4.8v.4"/>',
     palette: '<path d="M8 1.8a6.2 6.2 0 0 0 0 12.4c.9 0 1.4-.6 1.4-1.3 0-.4-.2-.7-.4-1-.2-.3-.4-.5-.4-.9 0-.6.5-1.1 1.1-1.1h1.3a3.2 3.2 0 0 0 3.2-3.2c0-2.8-2.8-4.9-6.2-4.9z"/><circle cx="5.2" cy="6.2" r=".9" fill="currentColor" stroke="none"/><circle cx="8" cy="4.6" r=".9" fill="currentColor" stroke="none"/><circle cx="10.9" cy="6" r=".9" fill="currentColor" stroke="none"/>'
   };
-
-  export type IconName = keyof typeof paths;
 </script>
 
 <script lang="ts">
