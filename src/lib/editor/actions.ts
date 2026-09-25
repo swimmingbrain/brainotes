@@ -1,4 +1,4 @@
-import { notebookName, notebookOpen, notebookKind, paperStyle, type NotebookKind } from '$lib/stores/app';
+import type { NotebookKind } from '$lib/stores/app';
 import type { PaperColor, PaperStyle } from '$lib/stores/preferences';
 import type { ImageSource } from '$lib/engine/types';
 
@@ -76,7 +76,7 @@ export const actions: Actions = {
   goToPage: nothing,
   nextPage: nothing,
   previousPage: nothing,
-  setPaperStyle: (style) => paperStyle.set(style),
+  setPaperStyle: nothing,
   setPaperColor: nothing,
   setPagePaper: nothing,
   paperOnAllPages: nothing,
@@ -89,16 +89,10 @@ export const actions: Actions = {
   copySelection: nothing,
   cutSelection: nothing,
   paste: nothing,
-  newNotebook: (kind) => {
-    notebookKind.set(kind);
-    notebookName.set(kind === 'board' ? 'Whiteboard' : 'My notes');
-    notebookOpen.set(true);
-  },
+  newNotebook: nothing,
   openNotebook: nothing,
-  closeNotebook: () => notebookOpen.set(false),
-  renameNotebook: (name, id) => {
-    if (!id) notebookName.set(name);
-  },
+  closeNotebook: nothing,
+  renameNotebook: nothing,
   deleteNotebook: nothing,
   importFiles: nothing,
   openReference: nothing,
