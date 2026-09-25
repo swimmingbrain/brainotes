@@ -57,7 +57,6 @@ let lib: Promise<{ pdf: PdfLib; worker: PDFWorker }> | null = null;
 let loader: Loader | null = null;
 const docs = new Map<string, Promise<PDFDocumentProxy>>();
 const sizes = new Map<string, Promise<PageSize[]>>();
-const files = new Map<string, PdfFile>();
 const parsed = new Map<string, number[]>();
 const failed = new Set<string>();
 const cache = new ShotCache(CACHE_PIXELS, 8, 4);
@@ -161,7 +160,7 @@ function sizesOf(id: string, progress?: (done: number, total: number) => void): 
   if (!list) {
     list = docOf(id).then((doc) => readSizes(doc, progress));
     sizes.set(id, list);
-    void list.then((pages) => files.set(id, { id, pages })).catch(() => sizes.delete(id));
+    void list.catch(() => sizes.delete(id));
   }
   return list;
 }
@@ -185,10 +184,6 @@ export async function readPdf(blob: Blob, id: string, progress?: (done: number, 
 export async function openPdf(id: string): Promise<PdfFile> {
   const pages = await sizesOf(id);
   return { id, pages };
-}
-
-export function pdfFile(id: string): PdfFile | null {
-  return files.get(id) ?? null;
 }
 
 export async function pdfPage(id: string, page: number): Promise<PDFPageProxy> {
@@ -226,7 +221,6 @@ export function keepPdfs(keep: Set<string>) {
     void docs.get(id)?.then((doc) => doc.loadingTask.destroy()).catch(() => {});
     docs.delete(id);
     sizes.delete(id);
-    files.delete(id);
     parsed.delete(id);
     cache.clear(id);
   }
