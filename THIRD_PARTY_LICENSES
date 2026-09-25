@@ -66,10 +66,8 @@ iccs: CC0 1.0
 wasm: openjpeg BSD 2-Clause, jbig2 BSD 3-Clause (PDFium), qcms MIT, QuickJS MIT, and the
 pdf.js wrappers around them Apache-2.0, BSD 2-Clause and MIT
 standard_fonts: the Foxit fonts are BSD 3-Clause (PDFium). Liberation Sans is GPL 2 with
-Red Hat's font exception, the single thing in here that is not MIT or close to it. pdf.js
-only uses it to draw a pdf that names Helvetica or Arial without embedding the font, and
-the exception means a page drawn with it is not covered by the GPL. Its license text is in
-standard_fonts/LICENSE_LIBERATION next to the font.
+Red Hat's font exception, so a page drawn with it is not covered by the GPL. Its license
+text is in standard_fonts/LICENSE_LIBERATION.
 
 Fonts are loaded at runtime from Google Fonts and are not redistributed here:
 Instrument Serif, JetBrains Mono and Inter, all under the SIL Open Font License 1.1.
