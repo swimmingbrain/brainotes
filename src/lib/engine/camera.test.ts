@@ -12,8 +12,6 @@ import {
   pageAt,
   snapCamera,
   stepZoom,
-  toScreenX,
-  toScreenY,
   toWorldX,
   toWorldY,
   visiblePages,
@@ -23,12 +21,10 @@ import {
 const A4 = { w: 595, h: 842 };
 
 describe('camera', () => {
-  it('turns screen points into world points and back', () => {
+  it('turns screen points into world points', () => {
     const cam = { x: 100, y: -50, zoom: 2 };
     expect(toWorldX(cam, 40)).toBe(120);
     expect(toWorldY(cam, 40)).toBe(-30);
-    expect(toScreenX(cam, toWorldX(cam, 123))).toBeCloseTo(123);
-    expect(toScreenY(cam, toWorldY(cam, 77))).toBeCloseTo(77);
   });
 
   it('keeps the point under the cursor in place when zooming', () => {

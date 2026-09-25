@@ -65,14 +65,6 @@ export function toWorldY(cam: Camera, sy: number): number {
   return cam.y + sy / cam.zoom;
 }
 
-export function toScreenX(cam: Camera, wx: number): number {
-  return (wx - cam.x) * cam.zoom;
-}
-
-export function toScreenY(cam: Camera, wy: number): number {
-  return (wy - cam.y) * cam.zoom;
-}
-
 // the world point under (sx, sy) stays where it is
 export function zoomAt(cam: Camera, sx: number, sy: number, zoom: number): Camera {
   const next = clampZoom(zoom);
