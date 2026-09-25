@@ -294,10 +294,8 @@ function pump() {
   }
 }
 
-// pdf.js draws a page in slices of up to 15 ms, each in a frame of its
-// own. two renders at once put two slices in one frame, so the slices wait
-// here and only one goes on per frame, the most urgent render first. none
-// while the pen writes
+// pdf.js draws in slices of up to 15 ms. only one slice goes on per frame,
+// the most urgent render first, and none while the pen writes
 const slices: { go: () => void; priority: number }[] = [];
 let releasing = false;
 

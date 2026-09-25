@@ -123,11 +123,8 @@
     if (x !== pos.x || y !== pos.y) pos = { x, y };
   });
 
-  // a menu hung under a trigger near the bottom of a panel would lay itself
-  // out below the window. it flips above the trigger when there is room there
-  // and is pulled back inside on both axes when there is not. it is placed in
-  // window coordinates because a panel that clips its content would otherwise
-  // cut the menu down to a sliver
+  // flips above the trigger near the bottom of the window, and sits in window
+  // coordinates so a panel that clips its content can not cut it
   $effect(() => {
     if (positioned || !open || !panel || !root) return;
     const trigger = root.getBoundingClientRect();
@@ -171,11 +168,8 @@
     if (positioned) open = true;
   });
 
-  // the list drives itself from the keyboard once it is up, but only the top
-  // level takes focus: a submenu that opens on hover must not steal it. the
-  // focus waits for the placement to reach the dom, because a menu that is
-  // still hidden cannot take it and would leave escape and the arrows to
-  // whatever opened it
+  // only the top level takes the keyboard focus, a submenu that opens on
+  // hover must not steal it
   $effect(() => {
     if (!open || !panel || nested) return;
     if (!positioned && !anchorPos) return;
