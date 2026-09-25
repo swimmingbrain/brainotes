@@ -26,7 +26,7 @@
         { keys: ['Ctrl', 'Enter'], what: 'New page' },
         { keys: ['PageDown'], what: 'Next page' },
         { keys: ['PageUp'], what: 'Previous page' },
-        { keys: ['←/→'], what: 'Previous / next page on the board, with nothing selected' }
+        { keys: ['←/→'], what: 'Previous / next page on a whiteboard or in Board, with nothing selected' }
       ]
     },
     {

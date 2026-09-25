@@ -8,6 +8,7 @@ import {
   commandPaletteOpen,
   contextMenu,
   dialog,
+  notebookKind,
   selectionCount,
   selectTool,
   toggleLeftPanel,
@@ -60,7 +61,8 @@ function bind(fn: () => unknown): KeybindingHandler {
 }
 
 // the arrows move a selection, with shift in bigger steps. without one
-// they only turn pages on the board, where nothing else wants them
+// they only turn pages on a whiteboard or in the board workspace, where
+// nothing else wants them
 function arrow(dx: number, dy: number, page: () => unknown): KeybindingHandler {
   return (e) => {
     if (get(selectionCount) > 0) {
@@ -69,7 +71,7 @@ function arrow(dx: number, dy: number, page: () => unknown): KeybindingHandler {
       actions.nudgeSelection(dx * step, dy * step);
       return;
     }
-    if (get(workspace) !== 'board' || e.shiftKey) return;
+    if ((get(workspace) !== 'board' && get(notebookKind) !== 'board') || e.shiftKey) return;
     e.preventDefault();
     void page();
   };
