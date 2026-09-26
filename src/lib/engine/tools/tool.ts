@@ -12,8 +12,7 @@ export interface Sample {
   shift?: boolean;
 }
 
-// every tool (pen, eraser, hand and later select, shape, text, laser) has
-// the same few hooks. the input calls them, the view draws their overlay
+// the input calls these hooks, the view draws the overlay
 export interface Tool {
   down(s: Sample, kind: PointerKind): void;
   move(s: Sample): void;

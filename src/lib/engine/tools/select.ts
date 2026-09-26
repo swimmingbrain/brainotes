@@ -17,7 +17,6 @@ const HANDLE = 4;
 const HANDLE_HIT = 10;
 const CLICK = 4;
 const PICK = 6;
-// ms between the two clicks of a double click
 const DOUBLE = 400;
 // the biggest picture of the selection that is moved around while dragging
 const SPRITE_PIXELS = 16_000_000;
@@ -46,7 +45,6 @@ interface Sprite {
   y: number;
 }
 
-// where each item of the page is, for the ops that put new ones in their place
 function placesOf(page: PageData, items: Item[]): Placed[] {
   const wanted = new Set(items);
   const out: Placed[] = [];
@@ -82,7 +80,6 @@ export class SelectTool implements Tool {
   private prepared: Sprite | null = null;
   private prepTimer: ReturnType<typeof setTimeout> | null = null;
   private lastClick = { time: 0, item: null as Item | null };
-  // shift adds to the selection or takes out of it
   private adding = false;
 
   constructor(
@@ -120,8 +117,7 @@ export class SelectTool implements Tool {
     this.show();
   }
 
-  // a selection that changes while it is dragged (escape, a tool key, an
-  // undo) lands back where it was, its items show again
+  // a selection changed mid drag (escape, a tool key, an undo) lands back where it was
   private stopDrag() {
     if (this.mode === 'move' || this.mode === 'scale') this.cancel();
   }
@@ -131,13 +127,11 @@ export class SelectTool implements Tool {
     if (this.prepTimer) clearTimeout(this.prepTimer);
     this.prepTimer = this.items.length > 0 ? setTimeout(this.prepare, PREPARE) : null;
     this.hooks.changed?.(this.items.length);
-    // the box is drawn by whatever tool the view shows, so this one takes
-    // over, but not from the eraser end of a pen that is still erasing
+    // the view draws the box of the tool it shows, but not while a pen is still erasing
     if (this.items.length > 0 && !penIsDown()) this.view.tool = this;
     this.view.requestLive();
   }
 
-  // the doc changed under the selection: an undo, a redo, or an op of this tool
   docChanged(change: DocChange) {
     if (this.items.length === 0) return;
     if (change.type === 'pages') {
@@ -153,7 +147,6 @@ export class SelectTool implements Tool {
     else this.select(this.index, kept);
   }
 
-  // the box of the selection in page units
   box(): Box | null {
     if (this.items.length === 0) return null;
     const box = emptyBox();
@@ -177,7 +170,6 @@ export class SelectTool implements Tool {
     return [b.minX, b.minY, b.maxX, b.minY, b.maxX, b.maxY, b.minX, b.maxY];
   }
 
-  // which corner handle is under the point, -1 for none
   private handleAt(x: number, y: number): number {
     const box = this.box();
     if (!box || !this.shown()) return -1;
@@ -202,8 +194,7 @@ export class SelectTool implements Tool {
     return item.type === 'image' && item.source ? item : null;
   }
 
-  // the badge in css pixels, over the top right corner of the box or under
-  // it when the box reaches the top of the view
+  // css pixels, under the box when there is no room above it
   private badge(): (Box & { label: string }) | null {
     const item = this.clip();
     const box = this.box();
@@ -299,7 +290,6 @@ export class SelectTool implements Tool {
     this.view.requestLive();
   }
 
-  // the page under a point of the screen, or the one in the middle of the view
   private pageNear(x: number, y: number): number {
     const index = this.view.pageAtScreen(x, y);
     return index >= 0 ? index : this.view.currentPage;
@@ -332,8 +322,7 @@ export class SelectTool implements Tool {
     else this.clear();
   }
 
-  // a shift click puts an item into the selection or takes it out. on
-  // another page it starts a new selection there
+  // a shift click on another page starts a new selection there
   private toggle(index: number, hit: Item | null) {
     if (!hit) return;
     if (this.items.length === 0 || this.index !== index) {
@@ -353,14 +342,12 @@ export class SelectTool implements Tool {
       my += pts[i + 1];
     }
     const n = pts.length / 2;
-    // the page where the loop started, or else the one it is around
     let index = this.view.pageAtScreen(pts[0], pts[1]);
     if (index < 0) index = this.pageNear(mx / n, my / n);
     if (index < 0) return;
     const poly: number[] = [];
     for (let i = 0; i < pts.length; i += 2) poly.push(...this.toPage(index, pts[i], pts[i + 1]));
     const hits = lassoHits(this.view.doc.pageAt(index).items, poly);
-    // with shift the loop adds to what is selected on the same page
     if (this.adding && this.items.length > 0 && this.index === index) {
       const more = hits.filter((item) => !this.items.includes(item));
       this.select(index, [...this.items, ...more]);
@@ -460,7 +447,6 @@ export class SelectTool implements Tool {
     this.replace(this.view.doc.pageAt(index), (item) => recolorItem(item, color));
   }
 
-  // new items on top of page index, they become the selection
   insert(index: number, items: Item[]) {
     if (index < 0 || items.length === 0) return;
     const page = this.view.doc.pageAt(index);
@@ -581,7 +567,6 @@ export class SelectTool implements Tool {
     return covered;
   }
 
-  // an accent tag with the page number and a small arrow
   private drawBadge(ctx: CanvasRenderingContext2D, b: Box & { label: string }, dpr: number): Box {
     const x = Math.round(b.minX * dpr);
     const y = Math.round(b.minY * dpr);
@@ -597,7 +582,6 @@ export class SelectTool implements Tool {
     ctx.translate(x, y);
     ctx.scale(dpr, dpr);
     ctx.fillText(b.label, 8, BADGE_H / 2 + 0.5);
-    // an arrow out of the box, like a link that opens somewhere else
     const ax = w / dpr - 15;
     ctx.strokeStyle = '#111111';
     ctx.lineWidth = 1.3;

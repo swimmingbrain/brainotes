@@ -26,7 +26,6 @@ export function constrain(kind: ShapeKind, x1: number, y1: number, x2: number, y
   return [x1 + (dx < 0 ? -side : side), y1 + (dy < 0 ? -side : side)];
 }
 
-// draws shapes the way you drag them, shown on the live canvas until they land
 export class ShapeTool implements Tool {
   private shape: Shape | null = null;
   private page = -1;
@@ -72,7 +71,6 @@ export class ShapeTool implements Tool {
     this.shape = null;
     this.view.requestLive();
     if (!shape) return;
-    // a click without a drag makes nothing
     const min = 3 / this.view.cam.zoom;
     if (Math.abs(shape.x2 - shape.x1) < min && Math.abs(shape.y2 - shape.y1) < min) return;
     const page = this.view.doc.page(this.pageId);

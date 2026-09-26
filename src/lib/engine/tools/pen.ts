@@ -20,15 +20,13 @@ export interface PenSettings {
 
 // css pixels per ms where a mouse or finger line is at its thinnest
 const FAST = 2.5;
-// a pen that rests this long (ms) within this many css pixels turns its
-// line into a clean shape
+// ms and css pixels a pen rests before its line becomes a clean shape
 const HOLD = 500;
 const HOLD_MOVE = 3;
 // css pixels, smaller lines are writing, not shapes
 const SNAP_MIN = 28;
 
-// p mirrored away from q, a made up neighbour for the ends of a line so
-// the curve leaves them at full speed
+// a made up neighbour for the ends, so the curve leaves them at full speed
 function mirror(p: number[], q: number[]): number[] {
   return [p[0] * 2 - q[0], p[1] * 2 - q[1], p[2]];
 }
@@ -44,8 +42,7 @@ export class PenTool implements Tool {
   private size = 2;
   private follow = 0.66;
   private sensitivity = 0.5;
-  // keys are the smoothed samples, pts the line with curves filled in, the
-  // newest sample stays raw in tip so the line always reaches the pen
+  // keys are smoothed, the newest sample stays raw in tip so the line reaches the pen
   private keys: number[][] = [];
   private pts: number[][] = [];
   private tip: number[] | null = null;
@@ -56,13 +53,11 @@ export class PenTool implements Tool {
   private lastX = 0;
   private lastY = 0;
   private lastTime = 0;
-  // a finished stroke stays on the live canvas for one more frame, until
-  // the ink canvas surely shows it
+  // a finished stroke stays on the live canvas one more frame, until the ink canvas shows it
   private ghost: Item | null = null;
   private ghostPage = 0;
   private ghostColor = '';
-  // draw and hold: where the pen rests since when, and the shape it became.
-  // after the snap the pen moves the end of a line by as much as it moves
+  // draw and hold: after the snap the pen drags the end of a line or arrow
   private snapping = false;
   private holdX = 0;
   private holdY = 0;
@@ -94,8 +89,7 @@ export class PenTool implements Tool {
     this.size = set.size;
     this.follow = followFactor(set.smoothing);
     this.sensitivity = set.pressure;
-    // filled in points about half a pen width apart, closer ones the
-    // outline drops anyway
+    // half a pen width apart, the outline drops closer points anyway
     this.step = Math.max(0.75, set.size * 0.6) * PF_SCALE;
     this.keys = [];
     this.pts = [];
@@ -279,7 +273,6 @@ export class PenTool implements Tool {
     if (!first && dist < 0.5 / this.view.dpr) return;
 
     if (this.snapped) {
-      // a snapped line or arrow follows the pen with its end
       const kind = this.snapped.kind;
       if (kind === 'line' || kind === 'arrow') {
         const [px, py] = this.toPage(s, 0);
@@ -320,9 +313,7 @@ export class PenTool implements Tool {
       this.keys.push(point);
       this.pts.push(point);
     } else {
-      // the old tip moves into the line, pulled towards it as much as the
-      // smoothing allows. smoothing is for the small jitter of a slow hand,
-      // a fast move far from the last sample has none and should not lag
+      // smoothing is for the jitter of a slow hand, a fast move has none and should not lag
       const tip = this.tip;
       if (tip) {
         const prev = this.keys[this.keys.length - 1];

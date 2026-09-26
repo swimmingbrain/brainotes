@@ -4,8 +4,7 @@ import type { Box } from '../types';
 import type { CanvasView } from '../view';
 import type { Sample, Tool } from './tool';
 
-// ms until a point of the trail has faded, and the css pixels over which
-// the tail thins out
+// ms until a point fades, css pixels over which the tail thins out
 const DECAY = 1000;
 const DECAY_LENGTH = 50;
 const SIZE = 5;
@@ -74,7 +73,6 @@ export class LaserTool implements Tool {
 
   drawLive(ctx: CanvasRenderingContext2D): Box | null {
     const now = performance.now();
-    // a trail is gone once all of its points faded
     this.trails = this.trails.filter((t) => now - t.last < DECAY + 100);
     const all = this.trails.map((t) => t.trail);
     if (this.current) all.push(this.current);
@@ -87,7 +85,6 @@ export class LaserTool implements Tool {
     for (const trail of all) {
       const outline = trail.getStrokeOutline();
       if (outline.length < 3) continue;
-      // a soft red glow, then a light core on top
       ctx.shadowColor = 'rgba(255, 40, 40, 0.9)';
       ctx.shadowBlur = GLOW * dpr;
       ctx.fillStyle = '#ff2d2d';

@@ -12,7 +12,6 @@ export interface TextSettings {
 
 // page units kept free at the right edge of a paper page
 const EDGE = 8;
-// the smallest width a text can wrap at
 const MIN_WIDTH = 40;
 
 interface Editing {
@@ -27,8 +26,7 @@ interface Editing {
   max: number;
 }
 
-// click and type: a textarea sits over the canvas exactly where the text
-// will be drawn, at the same size and with the same line breaks
+// a textarea over the canvas, with the size and line breaks of the drawn text
 export class TextTool implements Tool {
   private area: HTMLTextAreaElement | null = null;
   private editing: Editing | null = null;
@@ -145,7 +143,6 @@ export class TextTool implements Tool {
       this.close();
       return;
     }
-    // another board came up, the text stays on its own
     if (this.view.isBoard && index !== this.view.board) {
       this.commit();
       return;
