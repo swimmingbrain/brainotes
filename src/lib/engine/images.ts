@@ -1,5 +1,4 @@
-// decoded pictures by asset id. a decoded photo is big, so only so many
-// pixels stay around, the ones used longest ago are closed first
+// decoded photos are big, past this many pixels the least recently used close
 const MAX_PIXELS = 40_000_000;
 // these stay whatever their size, so the pictures on screen never thrash
 const KEEP = 6;
@@ -17,12 +16,10 @@ const cache = new Map<string, Entry>();
 const listeners = new Set<(assetId: string) => void>();
 let pixels = 0;
 
-// where the blobs come from, the storage hands its reader in
 export function setImageLoader(fn: Loader) {
   load = fn;
 }
 
-// called with the asset id once a picture is ready to draw
 export function onBitmap(fn: (assetId: string) => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -111,7 +108,6 @@ export function bitmapReady(assetId: string): Promise<ImageBitmap | null> {
   });
 }
 
-// another notebook opens, its pictures are others
 export function clearBitmaps() {
   for (const entry of cache.values()) entry.bitmap?.close();
   cache.clear();

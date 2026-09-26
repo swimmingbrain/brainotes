@@ -10,8 +10,7 @@ const TRACK = 100;
 // px per ms, a slower lift just stops
 const MIN_FLING = 0.3;
 
-// true while a pen, a mouse or a finger is putting something on the page.
-// heavy work (pdf pages, far tiles, thumbnails, saving) waits for it
+// heavy work (pdf pages, far tiles, thumbnails, saving) waits while this is true
 export function penIsDown(): boolean {
   return drawing;
 }
@@ -22,14 +21,12 @@ export function penBusy(pause: number): boolean {
 }
 
 export interface InputTools {
-  // the tool of the rail for a press with the pen tip, the mouse or a finger
   pick: () => Tool | null;
   eraser: Tool;
   hand: Tool;
 }
 
 export interface InputHooks {
-  // what pressed on the canvas last
   kind?: (kind: PointerKind) => void;
   fingerDraws: () => boolean;
 }
@@ -50,7 +47,7 @@ export class Input {
   private active: { id: number; tool: Tool; kind: PointerKind } | null = null;
   private touches = new Map<number, { x: number; y: number }>();
   private gesture: Gesture | null = null;
-  // where the fingers were lately, for the speed they had when they lifted
+  // recent finger positions, for the fling speed
   private track: { x: number; y: number; t: number }[] = [];
   private raw: boolean;
   // some pointers never send raw updates, then pointermove has the samples
@@ -69,8 +66,7 @@ export class Input {
     el.addEventListener('pointermove', this.onmove);
     el.addEventListener('pointerup', this.onup);
     el.addEventListener('pointercancel', this.oncancel);
-    // a capture lost without an up (alt tab in the middle of a drag) ends
-    // the stroke too, else the next press would wait for it forever
+    // alt tab mid drag loses the capture without an up, else the next press waits forever
     el.addEventListener('lostpointercapture', this.oncancel);
     el.addEventListener('pointerleave', this.onleave);
     el.addEventListener('wheel', this.onwheel, { passive: false });
@@ -91,7 +87,6 @@ export class Input {
     drawing = false;
   }
 
-  // the rail switched tools, a hover preview of the old one has to go
   toolChanged() {
     if (this.active) return;
     if (this.view.tool) {
@@ -122,7 +117,6 @@ export class Input {
   private ondown = (e: PointerEvent) => {
     const kind = kindOf(e);
     this.hooks.kind?.(kind);
-    // the page stands still before anything lands on it
     this.view.settle();
     const focused = document.activeElement;
     if (focused instanceof HTMLElement) focused.blur();
@@ -258,8 +252,7 @@ export class Input {
       this.view.zoomAt(e.clientX - this.view.left, e.clientY - this.view.top, this.view.cam.zoom * factor);
       return;
     }
-    // a mouse wheel moves in whole steps of 100 or so and those glide, a
-    // touchpad sends small pixel steps that follow the fingers directly
+    // a mouse wheel steps by about 100 and glides, a touchpad follows the fingers
     const stepped =
       e.deltaMode !== 0 ||
       ((dx === 0 || dy === 0) && Math.abs(dx + dy) >= 50 && Number.isInteger(dx) && Number.isInteger(dy));
@@ -304,7 +297,6 @@ export class Input {
     while (this.track.length > 2 && now - this.track[0].t > TRACK) this.track.shift();
   }
 
-  // a pan that was still moving when the fingers lifted goes on for a bit
   private flingOut() {
     const track = this.track;
     this.track = [];

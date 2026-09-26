@@ -1,6 +1,5 @@
-// draw and hold: a rough line, arrow, box or ellipse becomes a clean one.
-// the idea follows excalidraw's convertToShape (MIT): the path is spread
-// into evenly spaced points and a few numbers about them tell the shapes apart
+// draw and hold turns a rough line, arrow, box or ellipse into a clean one,
+// after excalidraw's convertToShape (MIT)
 
 export type SnapKind = 'line' | 'arrow' | 'rect' | 'ellipse';
 
@@ -30,9 +29,8 @@ const MAX_TURN = 2.8 * Math.PI;
 const TURN_WINDOW = 3;
 const MAX_DISTANCE = 1.5;
 
-// what a clean box and a clean ellipse look like, with how much a hand
-// drawn one may be off: hull area over box area, the share of the turning
-// in the four strongest corners, and the kurtosis of x times the one of y
+// a clean box and ellipse: hull area over box area, share of the turning in
+// the four strongest corners, and the kurtosis of x times the one of y
 const SHAPES = [
   { kind: 'rect' as const, fill: 1, corners: 0.95, kurtosis: 1.83 },
   { kind: 'ellipse' as const, fill: Math.PI / 4, corners: 0.55, kurtosis: 2.25 }
@@ -158,7 +156,6 @@ function totalTurn(pts: Pt[]): number {
   return sum;
 }
 
-// the share of the turning that happens in the four strongest corners.
 // near 1 for a box, about a half for an ellipse
 function cornerShare(pts: Pt[]): number {
   const turns: number[] = [];
@@ -227,8 +224,7 @@ function openShape(raw: Pt[], pts: Pt[], length: number): Snapped | null {
   if (reach === 0) return null;
   const dx = (tip[0] - start[0]) / reach;
   const dy = (tip[1] - start[1]) / reach;
-  // away from the tip nothing may stray far from the line to it, that
-  // turns down elbows, arcs and handwriting
+  // a far stray away from the tip means an elbow, an arc or handwriting
   for (const p of pts) {
     if (dist(p, tip) <= HEAD_ZONE * reach) continue;
     if (Math.abs((p[0] - start[0]) * dy - (p[1] - start[1]) * dx) > MAX_DEVIATION * reach) return null;
@@ -240,9 +236,8 @@ function openShape(raw: Pt[], pts: Pt[], length: number): Snapped | null {
     return { kind: 'line', x1: first[0], y1: first[1], x2: last[0], y2: last[1] };
   }
 
-  // an arrow: a straight shaft to the tip, then a short head that stays
-  // near the tip and reaches out to both sides of the shaft. the head
-  // comes back to the tip, so the shaft ends where the tip is first reached
+  // an arrow: a straight shaft, then a short head near the tip reaching to both
+  // sides. the head comes back to the tip, so the shaft ends where it is first reached
   let s = 0;
   while (dist(pts[s], start) < 0.95 * reach) s++;
   if (pathLength(pts.slice(0, s + 1)) > STRAIGHT * reach) return null;

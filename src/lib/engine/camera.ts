@@ -1,5 +1,4 @@
-// x and y are the world point at the top left corner of the view,
-// zoom is css pixels per world unit
+// x, y is the world point at the top left of the view, zoom is css px per world unit
 export interface Camera {
   x: number;
   y: number;
@@ -25,7 +24,6 @@ export function clampZoom(zoom: number): number {
   return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
 }
 
-// the next step up or down from the zoom we are at
 export function stepZoom(zoom: number, dir: 1 | -1): number {
   if (dir > 0) return ZOOM_STEPS.find((z) => z > zoom * 1.01) ?? MAX_ZOOM;
   for (let i = ZOOM_STEPS.length - 1; i >= 0; i--) {
@@ -78,8 +76,7 @@ export function fitWidthZoom(contentW: number, viewW: number): number {
   return clampZoom((viewW - MARGIN * 2) / contentW);
 }
 
-// keeps the pages in reach: centred while they fit, else no further than
-// the margin past their edges
+// centred while the pages fit, else no further than the margin past their edges
 export function clampCamera(cam: Camera, content: Rect, viewW: number, viewH: number): Camera {
   const m = MARGIN / cam.zoom;
   const w = viewW / cam.zoom;
@@ -92,8 +89,7 @@ export function clampCamera(cam: Camera, content: Rect, viewW: number, viewH: nu
   return { x, y, zoom: cam.zoom };
 }
 
-// moves the camera onto whole device pixels, so cached tiles are copied
-// one to one and never get blurry
+// whole device pixels, so cached tiles are copied one to one and stay sharp
 export function snapCamera(cam: Camera, dpr: number): Camera {
   const s = cam.zoom * dpr;
   return { x: Math.round(cam.x * s) / s, y: Math.round(cam.y * s) / s, zoom: cam.zoom };

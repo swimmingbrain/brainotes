@@ -1,8 +1,7 @@
 import type { Camera } from './camera';
 import type { Box } from './types';
 
-// tiles are squares of the world rendered at one exact scale (device
-// pixels per unit). drawing a frame is then only a few drawImage calls
+// world squares rendered at one exact scale, so a frame is a few drawImage calls
 export const TILE = 512;
 const MIN_CANVASES = 64;
 const MAX_TILES = 4096;
@@ -30,8 +29,7 @@ export interface TileRange {
   y1: number;
 }
 
-// the drawing of one tile. draw puts up to count more items on the tile
-// (set to world units) and says when it is through
+// draw puts up to count more items on the tile, in world units, true when done
 export interface TileJob {
   draw(ctx: TileCtx, count: number): boolean;
 }
@@ -80,8 +78,7 @@ export class TileLayer {
   private tiles = new Map<number, Tile>();
   // tiles half way through their drawing, they only show once complete
   private pending = new Map<number, { tile: Tile; job: TileJob }>();
-  // a copy of the screen from when the scale changed. it is shown
-  // stretched where the new tiles are not ready yet
+  // the screen at the old scale, stretched where new tiles are not ready yet
   private old: { x: number; y: number; scale: number } | null = null;
   private oldCanvas: TileCanvas | null = null;
   private oldCtx: TileCtx | null = null;
@@ -127,8 +124,7 @@ export class TileLayer {
     this.scale = scale;
   }
 
-  // draws the tiles on screen into ctx and renders the missing ones until
-  // the deadline. true means there is more to do next frame
+  // true means there is more to do next frame
   compose(
     ctx: CanvasRenderingContext2D,
     cam: Camera,
@@ -204,8 +200,7 @@ export class TileLayer {
     }
   }
 
-  // tiles on screen are rendered again right away so nothing flickers,
-  // the others are dropped and come back when needed
+  // tiles on screen render again at once so nothing flickers, others when needed
   invalidate(box: Box) {
     this.dropPending(box);
     const range = this.range;
@@ -225,8 +220,7 @@ export class TileLayer {
     }
   }
 
-  // forgets the tiles in box, the frames render them again in their budget.
-  // for ink that arrives from storage, where nothing on screen goes away
+  // for ink from storage, nothing on screen goes away so frames redraw in budget
   drop(box: Box) {
     this.dropPending(box);
     this.each(this.tiles, this.scale, box, (tile) => {
@@ -235,8 +229,7 @@ export class TileLayer {
     });
   }
 
-  // a new canvas costs a few ms the first time it is drawn on, so some are
-  // made ahead in idle time and a stroke on an empty spot never waits
+  // a new canvas costs a few ms on its first draw, so spares are made when idle
   reserve() {
     while (this.pool.length < SPARE) {
       const canvas = makeCanvas();
@@ -254,8 +247,7 @@ export class TileLayer {
     this.old = null;
   }
 
-  // starts or goes on with the drawing of a tile. returns the tile once it
-  // is complete, null while it still needs more frames
+  // the tile once it is complete, null while it still needs more frames
   private work(tx: number, ty: number, deadline: number): Tile | null {
     const key = tileKey(tx, ty);
     let entry = this.pending.get(key);
@@ -274,8 +266,7 @@ export class TileLayer {
     if (deadline === Infinity) {
       done = job.draw(this.open(tile, this.scale), Infinity);
     } else {
-      // canvas draws lazily, so after each chunk the tile is made to
-      // rasterize and the clock sees what it really cost
+      // canvas draws lazily, a flush per chunk lets the clock see the real cost
       while (!done) {
         done = job.draw(this.open(tile, this.scale), CHUNK);
         this.flush(tile);
@@ -351,8 +342,7 @@ export class TileLayer {
     else ctx.drawImage(tile.canvas, x, y, (TILE * target) / this.scale, (TILE * target) / this.scale);
   }
 
-  // the copy of the old screen, stretched to the camera, only where new
-  // tiles are missing. one piece per tile, a clip of many rects is slow
+  // one piece per missing tile, a clip of many rects is slow
   private drawOld(ctx: CanvasRenderingContext2D, cam: Camera, target: number) {
     const old = this.old;
     const canvas = this.oldCanvas;

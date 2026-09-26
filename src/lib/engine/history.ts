@@ -51,14 +51,12 @@ export class History {
     return this.undone.length > 0;
   }
 
-  // plays the op and keeps it
   run(op: Op) {
     applyOp(this.doc, op, false);
     this.push(op);
   }
 
-  // keeps an op that already happened, like an eraser gesture that changed
-  // the page while it went
+  // an op that already happened, like an eraser gesture that changed the page as it went
   push(op: Op) {
     this.done.push(op);
     if (this.done.length > HISTORY_LIMIT) this.done.shift();

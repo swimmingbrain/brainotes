@@ -55,8 +55,7 @@ interface Group {
 export interface ViewHooks {
   // the zoom or the page in the middle of the view changed
   state?: () => void;
-  // the scroll position of a paper notebook, as shares of the whole. a
-  // size of 1 means it all fits
+  // the scroll of a paper notebook as shares of the whole, size 1 means it all fits
   scroll?: (start: number, size: number) => void;
   // the pages on screen and two on each side, they should be in memory
   near?: (first: number, last: number) => void;
@@ -68,8 +67,7 @@ export interface ViewHooks {
 const NEAR = 2;
 // ms, a wheel step glides most of its way in about three times this
 const GLIDE = 40;
-// device pixels, a sharp part of a pdf page is cut on this grid so a small
-// pan does not ask for a new one
+// device pixels, sharp pdf parts are cut on this grid so a small pan needs no new one
 const PART_GRID = 256;
 // ms, how fast a flung page slows down after the fingers lifted
 const FRICTION = 260;
@@ -97,7 +95,6 @@ export class CanvasView {
   top = 0;
   rects: Rect[] = [];
   board = 0;
-  // the tool whose overlay is drawn
   tool: Tool | null = null;
   // work time of the last frame in ms, for measuring
   lastFrame = 0;
@@ -136,8 +133,7 @@ export class CanvasView {
   private shownScroll = -1;
   private shownSize = -1;
   private shownNear = '';
-  // screen px a wheel step still has to move the pages, and the speed in
-  // px per ms of a touch pan that goes on after the fingers lifted
+  // screen px a wheel step still has to move, and a fling's speed in px per ms
   private glideX = 0;
   private glideY = 0;
   private flingX = 0;
@@ -146,14 +142,13 @@ export class CanvasView {
   // idle work: are the outlines near the view built, and the pending callback
   private warm = false;
   private idle: (() => void) | null = null;
-  // items a tool holds (a selection on the move, a text being edited) are
-  // left out of the layers until they come back
+  // items a tool holds (a moving selection, a text in edit) stay off the layers
   private hidden: Set<Item> | null = null;
   private hiddenPage = -1;
   private offDoc: () => void;
   private offBitmap: () => void;
   private offShot: () => void;
-  // the zoom changed and the pdf pages wait for it to rest before they are drawn sharp
+  // pdf pages wait for the zoom to rest before they are drawn sharp
   private pdfWait = false;
   private observer: ResizeObserver;
   private dprQuery: MediaQueryList | null = null;
@@ -183,12 +178,11 @@ export class CanvasView {
     this.hlLayer = new TileLayer((box, scale) => this.paint(box, scale, true));
     this.inkLayer = new TileLayer((box, scale) => this.paint(box, scale, false));
     this.offDoc = doc.on(this.onChange);
-    // a picture that finished decoding shows up on the paper layer
     this.offBitmap = onBitmap(() => {
       this.bgDirty = true;
       this.requestFrame();
     });
-    // and a pdf page that was rendered, it may turn out to be a dark one
+    // a rendered pdf page may turn out to be a dark one
     this.offShot = onShot(() => {
       this.bgDirty = true;
       this.updateBlend();
@@ -220,7 +214,6 @@ export class CanvasView {
     for (const canvas of [this.bg, this.hl, this.ink, this.live]) canvas.remove();
   }
 
-  // another notebook takes the place of this one
   setDoc(doc: Doc, history: History) {
     this.offDoc();
     this.doc = doc;
@@ -242,7 +235,6 @@ export class CanvasView {
     return this.doc.kind === 'board';
   }
 
-  // the page in the middle of the view, or the board on show
   get currentPage(): number {
     if (this.isBoard) return this.board;
     return nearestPage(this.rects, this.cam.y + this.height / 2 / this.cam.zoom);
@@ -257,14 +249,12 @@ export class CanvasView {
     this.requestFrame();
   }
 
-  // a live highlighter stroke is drawn on the highlighter canvas, which is
-  // put together again for it
+  // a live highlighter stroke is drawn on the highlighter canvas, so it is redone
   requestUnder() {
     this.hlDirty = true;
     this.requestFrame();
   }
 
-  // drops every cached tile and draws the screen again in one go
   redrawAll() {
     this.warm = false;
     this.hlLayer.clear();
@@ -274,8 +264,6 @@ export class CanvasView {
     this.updateBlend();
     this.requestFrame();
   }
-
-  // camera
 
   setCamera(next: Camera) {
     if (!this.isBoard) next = clampCamera(next, this.content, this.width, this.height);
@@ -302,7 +290,6 @@ export class CanvasView {
     this.setCamera({ x: x - dx / zoom, y: y - dy / zoom, zoom });
   }
 
-  // a mouse wheel step moves the pages by dx, dy in a short ease
   glide(dx: number, dy: number) {
     this.flingX = this.flingY = 0;
     this.glideX += dx;
@@ -319,8 +306,7 @@ export class CanvasView {
     this.requestFrame();
   }
 
-  // something touched the page: a glide lands where it was going right
-  // away, a fling stops where it is
+  // a touch lands a glide where it was going and stops a fling where it is
   settle() {
     if (this.glideX !== 0 || this.glideY !== 0) this.panBy(this.glideX, this.glideY);
     this.halt();
@@ -336,7 +322,6 @@ export class CanvasView {
     return this.glideX !== 0 || this.glideY !== 0 || this.flingX !== 0 || this.flingY !== 0;
   }
 
-  // one step of a glide or a fling, from the frame loop
   private move(now: number) {
     const dt = this.movedAt ? Math.min(50, now - this.movedAt) : 16;
     this.movedAt = now;
@@ -373,8 +358,7 @@ export class CanvasView {
     this.zoomAt(this.width / 2, this.height / 2, stepZoom(this.cam.zoom, dir));
   }
 
-  // paper fits the page width, a board goes back to 100 percent. a resize
-  // keeps the top of the view, the panels coming and going would push it down
+  // keepTop on a resize, or panels coming and going would push the view down
   zoomReset(keepTop = false) {
     if (this.isBoard) {
       this.zoomAt(this.width / 2, this.height / 2, 1);
@@ -386,7 +370,6 @@ export class CanvasView {
     this.setCamera({ x: this.cam.x, y: keepTop ? this.cam.y : mid - this.height / 2 / zoom, zoom });
   }
 
-  // where a notebook starts: the top of the first page, or the middle of the board
   private home() {
     if (this.isBoard) {
       this.setCamera(this.boardHome());
@@ -395,13 +378,11 @@ export class CanvasView {
     const zoom = fitWidthZoom(this.content.w, this.width);
     this.fitted = true;
     this.setCamera({ x: 0, y: this.content.y - MARGIN / zoom, zoom });
-    // a notebook that just opened has no old pictures to stretch, its pdf
-    // pages are drawn sharp right away
+    // nothing old to stretch yet, so pdf pages are drawn sharp right away
     this.pdfWait = false;
   }
 
-  // a board starts at its middle at 100 percent, one with a pdf page on it
-  // shows the whole pdf page
+  // a board with a pdf page on it shows the whole pdf page
   private boardHome(): Camera {
     const bg = this.doc.notebook.pages[this.board]?.pdf;
     if (!bg) return { x: -this.width / 2, y: -this.height / 2, zoom: 1 };
@@ -441,9 +422,6 @@ export class CanvasView {
     this.setCamera({ x: this.cam.x, y: this.content.y - m + fraction * total, zoom: this.cam.zoom });
   }
 
-  // pages
-
-  // is any of the page on screen
   pageShown(index: number): boolean {
     if (this.isBoard) return index === this.board;
     const r = this.rects[index];
@@ -467,7 +445,6 @@ export class CanvasView {
     return this.isBoard ? 0 : this.rects[index].y;
   }
 
-  // sets ctx up to draw in page units of page index, clipped to the page
   applyPage(ctx: CanvasRenderingContext2D, index: number) {
     const s = this.cam.zoom * this.dpr;
     const ox = this.pageX(index);
@@ -494,7 +471,7 @@ export class CanvasView {
     };
   }
 
-  // takes items of page index off the layers, a tool draws them itself for a while
+  // a tool draws these items itself for a while
   hide(index: number, items: Item[]) {
     this.unhide(true);
     this.hidden = new Set(items);
@@ -502,15 +479,13 @@ export class CanvasView {
     this.refresh(index, items);
   }
 
-  // the hidden items come back. no redraw when a change of the doc that
-  // follows right away draws their place anyway
+  // no redraw when a doc change that follows right away draws their place anyway
   unhide(redraw: boolean) {
     const hidden = this.hidden;
     this.hidden = null;
     if (hidden && redraw) this.refresh(this.hiddenPage, [...hidden]);
   }
 
-  // draws the place of these items again on the layers they are on
   private refresh(index: number, items: Item[]) {
     if (index < 0 || index >= this.doc.pageCount) return;
     const box = emptyBox();
@@ -530,7 +505,6 @@ export class CanvasView {
     this.requestFrame();
   }
 
-  // the pages that reach into a box of world units
   pagesIn(box: Box): number[] {
     if (this.isBoard) return [this.board];
     const [from, to] = visiblePages(this.rects, box.minY, box.maxY);
@@ -541,8 +515,6 @@ export class CanvasView {
     }
     return out;
   }
-
-  // inside
 
   private measure = () => {
     const rect = this.host.getBoundingClientRect();
@@ -562,7 +534,6 @@ export class CanvasView {
     this.dprQuery.addEventListener('change', this.onDpr);
   }
 
-  // the window went to a screen with another pixel density
   private onDpr = () => {
     this.sizeDirty = true;
     this.watchDpr();
@@ -572,8 +543,7 @@ export class CanvasView {
   private applySize() {
     this.sizeDirty = false;
     const dpr = window.devicePixelRatio || 1;
-    // another screen: the old tiles are of no use, the screen is drawn anew
-    // in one go instead of tile by tile over an empty canvas
+    // another screen makes old tiles useless, draw anew in one go, not tile by tile
     if (dpr !== this.dpr) this.full = true;
     this.dpr = dpr;
     const w = Math.max(1, Math.round(this.width * this.dpr));
@@ -609,8 +579,7 @@ export class CanvasView {
     if (this.hl.style.mixBlendMode !== blend) this.hl.style.mixBlendMode = blend;
   }
 
-  // what a tile of one layer has to draw, page by page, in a job the tile
-  // layer can spread over frames
+  // a tile's drawing as a job the tile layer can spread over frames
   private paint(box: Box, scale: number, marker: boolean): TileJob | null {
     const groups: Group[] = [];
     if (this.isBoard) {
@@ -749,8 +718,7 @@ export class CanvasView {
     tool?.frame?.();
     if (this.sizeDirty) this.applySize();
 
-    // a zoom keeps showing the old tiles stretched until it rests, or
-    // right away when it went so far out that they would be too many
+    // old tiles stretch until the zoom rests, unless so far out they would be too many
     const target = this.cam.zoom * this.dpr;
     const scale = this.inkLayer.scale;
     if (scale !== 0 && scale !== target && (start - this.zoomedAt >= ZOOM_SETTLE || target / scale < 0.5)) {
@@ -795,8 +763,7 @@ export class CanvasView {
     else if (!this.warm) this.warmLater();
   };
 
-  // builds the outlines of the strokes near the view while nothing else
-  // happens, so a zoom out or a scroll finds them ready
+  // stroke outlines near the view are built when idle, so a zoom out finds them ready
   private warmLater() {
     if (this.idle) return;
     if ('requestIdleCallback' in window) {
@@ -816,7 +783,6 @@ export class CanvasView {
     }
     this.inkLayer.reserve();
     this.hlLayer.reserve();
-    // the pages on screen and two more on each side
     let first = this.board;
     let last = this.board;
     if (!this.isBoard) {
@@ -872,8 +838,7 @@ export class CanvasView {
     this.wantPdf(from, to);
   }
 
-  // the pdf page under a page, from the best pictures there are of it. a
-  // picture made for this very scale is copied pixel for pixel
+  // a picture made for this very scale is copied pixel for pixel
   private drawPdf(ctx: CanvasRenderingContext2D, index: number) {
     const meta = this.doc.notebook.pages[index];
     const bg = meta?.pdf;
@@ -912,7 +877,6 @@ export class CanvasView {
     ctx.restore();
   }
 
-  // the renders the pdf pages on screen and the ones next to them need:
   // a quick picture first, a sharp one for this zoom once it rests
   private wantPdf(from: number, to: number) {
     const pages = this.doc.notebook.pages;
@@ -943,8 +907,7 @@ export class CanvasView {
     want('canvas', list);
   }
 
-  // the part of a pdf page on screen, a little more, on a grid of device
-  // pixels. a very big screen gets no more than what it shows
+  // the part on screen plus a margin on the grid, a huge screen gets no margin
   private pdfPart(index: number, bg: PdfBackground, s: number): Part | null {
     const z = this.cam.zoom;
     const left = this.cam.x - this.pageX(index) - bg.x;
@@ -961,7 +924,6 @@ export class CanvasView {
     return null;
   }
 
-  // the pictures of a page that are on screen, over its paper
   private drawImages(ctx: CanvasRenderingContext2D, index: number) {
     const page = this.doc.pageAt(index);
     const images = imagesOf(page);

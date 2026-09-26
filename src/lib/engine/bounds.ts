@@ -51,8 +51,7 @@ export function itemBox(item: Item): Box {
   if (d.box) return d.box;
   let box: Box;
   if (item.type === 'stroke') {
-    // the outline never reaches further than the pen size from the line,
-    // the extra unit is room for anti aliasing
+    // the outline stays within the pen size of the line, plus 1 for anti aliasing
     box = pointsBox(item.pts, item.size + 1);
   } else if (item.type === 'shape') {
     const pad = shapePad(item);

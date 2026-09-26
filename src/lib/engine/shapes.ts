@@ -1,7 +1,6 @@
 import { derived } from './cache';
 import type { Shape } from './types';
 
-// the angle of the two arrow head strokes to the shaft
 const HEAD_ANGLE = (28 * Math.PI) / 180;
 const ELLIPSE_STEPS = 48;
 

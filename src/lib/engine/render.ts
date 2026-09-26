@@ -9,18 +9,15 @@ import type { ImageItem, Item, PageMeta, Paper, PdfBackground } from './types';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
-// the highlighter layer is laid over the paper with this opacity, so
-// overlapping marks never get darker
+// one layer at this opacity, so overlapping highlighter marks never get darker
 export const HIGHLIGHTER_ALPHA = 0.5;
 
 const PAGE_BORDER = '#2e2e33';
-// a pdf page that is still on its way
 export const PDF_WAITING = '#f1f1f3';
 // the edge of a pdf page that shares its page with room for notes
 export const PDF_EDGE = 'rgba(60, 60, 70, 0.18)';
 
-// a pdf page under the ink, in page units, with the best picture there is
-// of it. false while there is none yet
+// in page units, from the best picture there is, false while there is none yet
 export function drawPdfBackground(ctx: Ctx, bg: PdfBackground, scale: number, page: { w: number; h: number }): boolean {
   const { base } = pickShots(shotsOf(bg.assetId, bg.page), scale);
   ctx.globalAlpha = 1;
@@ -44,8 +41,7 @@ export function isDark(paper: Paper): boolean {
   return paper.color === 'dark';
 }
 
-// the highlighter is laid on normally where the page is dark, on dark
-// paper or a dark pdf page. multiply would hide it there
+// on dark paper or a dark pdf page multiply would hide the highlighter
 export function darkUnder(meta: PageMeta): boolean {
   return isDark(meta.paper) || (meta.pdf !== undefined && pdfIsDark(meta.pdf.assetId, meta.pdf.page));
 }
@@ -82,8 +78,7 @@ function luminance(color: string): number {
 
 const shownColors = new Map<string, string>();
 
-// black ink turns light on dark paper and white ink turns dark on light
-// paper, so the default pens always show
+// black ink turns light on dark paper and white ink dark on light, so pens show
 export function inkColor(color: string, dark: boolean): string {
   const key = dark ? 'd' + color : color;
   let shown = shownColors.get(key);
@@ -96,8 +91,7 @@ export function inkColor(color: string, dark: boolean): string {
   return shown;
 }
 
-// scale is device pixels per unit, it picks the plain line for strokes
-// that are too thin on screen for their outline to matter
+// scale (device px per unit) picks a plain line for strokes too thin for an outline
 export function drawItem(ctx: Ctx, item: Item, dark: boolean, scale: number) {
   if (item.type === 'shape') {
     ctx.globalAlpha = 1;
@@ -165,8 +159,7 @@ function dotPattern(ctx: Ctx, color: string, step: number, dot: number): CanvasP
   return pattern;
 }
 
-// the pattern of the paper in device pixels. the page origin sits at
-// (ox, oy), s is device pixels per unit and x0..y1 is the part to cover.
+// in device pixels: origin (ox, oy), s px per unit, x0..y1 the part to cover.
 // a page starts its pattern one step in, a board has it everywhere
 export function drawPattern(
   ctx: Ctx,
@@ -194,8 +187,7 @@ export function drawPattern(
     // thousands of dots as paths are slow to rasterize, one pattern fill is not
     const pattern = dotPattern(ctx, PAPER_COLORS[paper.color].rule, step, Math.max(1.5, s * 1.4));
     if (!pattern) return;
-    // the pattern tile is a whole number of pixels, the transform stretches it
-    // to the exact step so the dots never drift away from the ink
+    // the tile is whole pixels, stretched to the exact step so dots never drift
     const k = step / Math.max(4, Math.min(512, Math.round(step)));
     pattern.setTransform(new DOMMatrix([k, 0, 0, k, ox - step / 2, oy - step / 2]));
     ctx.fillStyle = pattern;
@@ -223,8 +215,7 @@ export function drawPattern(
   ctx.stroke();
 }
 
-// a paper page on the background canvas: x, y, w, h is the page in device
-// pixels, the view rect is what is on screen
+// x, y, w, h is the page in device pixels, viewW and viewH the screen
 export function drawSheet(
   ctx: Ctx,
   paper: Paper,
@@ -265,8 +256,7 @@ export interface Frame {
   h: number;
 }
 
-// a whole page drawn a few items at a time, step(count) says when it is done.
-// on a board frame is the part to draw
+// step(count) draws a few more items, true when done. on a board frame is the part
 export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
   const paper = page.meta.paper;
   const part = frame ?? { x: 0, y: 0, w: page.meta.w, h: page.meta.h };
@@ -331,8 +321,7 @@ export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale
   };
 }
 
-// a whole page with its ink in one go, for the png export. a pdf page is
-// drawn from the pictures there are of it, ensureShot makes a sharp one first
+// for the png export, call ensureShot first so the pdf page is sharp
 export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
   pageJob(ctx, page, scale, frame).step(Infinity);
 }

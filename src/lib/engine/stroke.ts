@@ -2,9 +2,8 @@ import { getStroke, getStrokeOutlinePoints, type StrokeOptions, type StrokePoint
 import { derived } from './cache';
 import type { PenType, Stroke } from './types';
 
-// perfect-freehand measures a few things in absolute units (it skips the
-// last 3 units of a line), which is a lot for a page in points. so the
-// points go in scaled up and the outline comes back scaled down
+// perfect-freehand skips the last 3 units of a line, a lot for a page in points,
+// so the points go in scaled up and the outline comes back scaled down
 export const PF_SCALE = 4;
 
 interface PenLook {
@@ -25,8 +24,7 @@ export const PENS: Record<PenType, PenLook> = {
 
 const OUTLINE_SMOOTHING = 0.6;
 
-// the options only depend on the pen and its size, so a stroke looks the
-// same every time it is drawn, whatever the preferences say by then
+// only pen and size, so a stroke looks the same whatever the preferences say later
 export function penOptions(pen: PenType, size: number): StrokeOptions {
   const look = PENS[pen];
   const s = size * PF_SCALE;
@@ -42,25 +40,22 @@ export function penOptions(pen: PenType, size: number): StrokeOptions {
   };
 }
 
-// the smoothing preference as the share of the way a new point pulls the
-// line towards the pen. 0 follows the pen, 1 smooths a lot
+// smoothing 0 follows the pen, 1 smooths a lot
 export function followFactor(smoothing: number): number {
   const streamline = 0.15 + smoothing * 0.5;
   return 0.15 + (1 - streamline) * 0.85;
 }
 
-// light writing should already look like normal writing, the sensitivity
-// (the preference, 0.5 is normal) then widens or narrows the range around
-// the middle
+// light writing already looks normal, the sensitivity (0.5 is normal) widens
+// or narrows the range around the middle
 export function mapPressure(raw: number, sensitivity: number): number {
   const curved = Math.pow(Math.max(0, Math.min(1, raw)), 0.65);
   const p = 0.5 + (curved - 0.5) * sensitivity * 2;
   return Math.max(0.05, Math.min(1, p));
 }
 
-// points on a centripetal catmull-rom curve from b to c, about step apart,
-// for samples that came in far apart. a and d are the neighbours, b and c
-// themselves are not added. centripetal never loops or overshoots on a zigzag
+// catmull-rom points strictly between b and c, about step apart. centripetal,
+// as that never loops or overshoots on a zigzag
 export function curveBetween(a: number[], b: number[], c: number[], d: number[], step: number, out: number[][]) {
   const dist = Math.hypot(c[0] - b[0], c[1] - b[1]);
   const n = Math.ceil(dist / step);
@@ -91,9 +86,8 @@ export function scaledPoints(pts: Float32Array): number[][] {
   return out;
 }
 
-// what perfect-freehand's getStrokePoints makes, minus its streamline (the
-// pen tool smooths already) and minus how it drops every point within one
-// pen width of the start, which left a taper with only two outline points
+// getStrokePoints without its streamline (the pen tool smooths already) and without
+// dropping the points near the start, which left a taper with two outline points
 function strokePoints(points: number[][]): StrokePoint[] {
   const out: StrokePoint[] = [];
   let run = 0;
@@ -126,8 +120,7 @@ export function outlineOf(points: number[][], pen: PenType, size: number): numbe
   return getStrokeOutlinePoints(strokePoints(points), penOptions(pen, size));
 }
 
-// a closed curve through the middles of the outline edges, with the
-// corners as control points. it rounds off what is left of the polygon
+// curves through the edge middles round off the corners of the polygon
 export function traceOutline(ctx: CanvasPath, outline: number[][]) {
   const n = outline.length;
   if (n < 3) return;
@@ -156,12 +149,9 @@ export function hasPath(stroke: Stroke): boolean {
   return derived(stroke).path !== undefined;
 }
 
-// device pixels under which a stroke is drawn as a plain line, at that
-// width the outline looks the same and only costs time
+// device px below which a plain line looks like the outline and costs less
 export const THIN = 1.5;
 
-// the line through the points, with the ones closer than most of a pen
-// width left out
 export function strokeLine(stroke: Stroke): Path2D {
   const d = derived(stroke);
   if (d.line) return d.line;

@@ -4,8 +4,7 @@ import { derived } from './cache';
 import type { Box, ImageItem, Item, Notebook, NotebookKind, PageMeta, Paper } from './types';
 import type { PageSize } from '$lib/stores/preferences';
 
-// what the spatial index holds. z is the place of the item in the page,
-// tiles sort by it so the newest ink stays on top
+// z is the place in the page, tiles sort by it so the newest ink stays on top
 export interface Entry extends Box {
   item: Item;
   z: number;
@@ -86,7 +85,6 @@ export function newPageData(meta: PageMeta, items: Item[] = [], ready = true): P
   return { meta, items, tree, ready };
 }
 
-// the same item under a new id, nothing shared with the original
 export function copyItem(item: Item): Item {
   if (item.type === 'stroke') return { ...item, id: newId(), pts: item.pts.slice() };
   if (item.type === 'image' && item.source) return { ...item, id: newId(), source: { ...item.source } };
@@ -95,8 +93,7 @@ export function copyItem(item: Item): Item {
 
 const imageLists = new WeakMap<PageData, { items: Item[]; count: number; images: ImageItem[] }>();
 
-// the pictures of a page in paint order. the items only change as a new
-// list or by a push at the end, so the list and its length say when to look again
+// items change only as a new list or by a push, so list and length tell when to look again
 export function imagesOf(page: PageData): ImageItem[] {
   const cached = imageLists.get(page);
   if (cached && cached.items === page.items && cached.count === page.items.length) return cached.images;
@@ -105,7 +102,6 @@ export function imagesOf(page: PageData): ImageItem[] {
   return images;
 }
 
-// for duplicating a page: same size, paper, background and ink
 export function copyPage(page: PageData): PageData {
   const meta: PageMeta = { ...page.meta, id: newId(), paper: { ...page.meta.paper } };
   if (page.meta.pdf) meta.pdf = { ...page.meta.pdf };
@@ -157,8 +153,7 @@ export class Doc {
     return page;
   }
 
-  // the items of a page arrive from storage. ink that went on the page while
-  // it was on its way stays on top
+  // ink drawn while the items were loading stays on top
   fill(pageId: string, items: Item[]) {
     const page = this.page(pageId);
     if (!page || page.ready) return;
@@ -186,9 +181,8 @@ export class Doc {
     for (const fn of this.listeners) fn(change);
   }
 
-  // takes `remove` out and puts `insert` in. insert is sorted by index and
-  // the indices count in the array as it is afterwards. returns where the
-  // removed items were, so the change can be undone
+  // insert is sorted by index, counted in the array as it is afterwards.
+  // returns where the removed items were, for undo
   changeItems(pageId: string, remove: Item[], insert: Placed[]): Placed[] {
     const page = this.page(pageId);
     if (!page) return [];
@@ -253,8 +247,7 @@ export class Doc {
     );
   }
 
-  // after inserts in the middle the z values are renumbered once, the next
-  // time someone needs them in order
+  // z values are renumbered lazily after inserts in the middle
   ensureOrder(page: PageData) {
     if (!this.unordered.has(page)) return;
     const items = page.items;
@@ -265,8 +258,7 @@ export class Doc {
     this.unordered.delete(page);
   }
 
-  // the font of the texts changed (inter came in after they were measured),
-  // their boxes are worked out again
+  // inter loaded after the texts were measured, so their boxes are redone
   remeasureText() {
     for (const page of this.pages.values()) {
       for (const item of page.items) {

@@ -15,8 +15,7 @@ export function moveBy(dx: number, dy: number): Change {
   return { k: 1, ax: 0, ay: 0, dx, dy };
 }
 
-// the outline of a stroke only moves and grows with it, so the old one is
-// reused instead of being built again. moving 500 strokes stays cheap
+// the outline only moves and grows, reusing it keeps moving 500 strokes cheap
 function carryPaths(from: Stroke, to: Stroke, c: Change) {
   if (typeof Path2D === 'undefined' || typeof DOMMatrix === 'undefined') return;
   const old = derived(from);

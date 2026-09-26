@@ -1,8 +1,7 @@
 import { derived } from './cache';
 import type { TextItem } from './types';
 
-// the textarea that edits a text uses the same font and line height, so
-// the text stays where it is when the editing ends
+// the textarea editor uses the same font and line height, so the text never moves
 export const TEXT_FONT = 'Inter, system-ui, sans-serif';
 export const LINE_HEIGHT = 1.4;
 
@@ -14,13 +13,11 @@ export interface TextLayout {
   lines: string[];
   // the widest line, never more than the width it was laid out in
   width: number;
-  // where the first baseline sits under the top of the text
   baseline: number;
 }
 
-// one line of text broken like css pre-wrap does it: at spaces, the spaces
-// before a break hang at the end of the line, and a word longer than the
-// whole line is cut between letters
+// breaks like css pre-wrap: at spaces, which hang at the end of the line, and
+// a word longer than the whole line is cut between letters
 function wrapLine(line: string, max: number, measure: Measure, out: string[]) {
   if (measure(line) <= max) {
     out.push(line);
@@ -65,7 +62,7 @@ export function fontOf(size: number): string {
 let ctx: CanvasRenderingContext2D | null = null;
 let epoch = 0;
 
-// the font came in, text measured with the fallback font is measured again
+// text measured with the fallback font is measured again
 export function fontLoaded() {
   epoch++;
 }
@@ -86,8 +83,7 @@ export function measurer(size: number): Measure {
   };
 }
 
-// the line box of css: ascent and descent of the font sit in the middle
-// of the line height
+// like the css line box: ascent and descent sit in the middle of the line height
 export function firstBaseline(size: number): number {
   const c = context();
   let ascent = size * 0.97;

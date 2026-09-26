@@ -65,8 +65,7 @@ export function pointInPolygon(x: number, y: number, poly: ArrayLike<number>): b
   return inside;
 }
 
-// does the line through pts (x, y, pressure) come closer than r to the
-// segment a to b
+// pts are x, y, pressure
 export function strokeNear(pts: ArrayLike<number>, ax: number, ay: number, bx: number, by: number, r: number): boolean {
   if (pts.length < 6) return pts.length >= 2 && distToSegment(pts[0], pts[1], ax, ay, bx, by) < r;
   for (let i = 3; i < pts.length; i += 3) {
@@ -75,8 +74,7 @@ export function strokeNear(pts: ArrayLike<number>, ax: number, ay: number, bx: n
   return false;
 }
 
-// what an eraser of radius r leaves of a line when it moves from a to b.
-// null means it never touched the line, an empty list means nothing is left
+// null means the eraser never touched the line, an empty list that nothing is left
 export function cutStroke(
   pts: ArrayLike<number>,
   ax: number,
@@ -87,7 +85,6 @@ export function cutStroke(
 ): Float32Array[] | null {
   const n = pts.length / 3;
   const dist = (i: number) => distToSegment(pts[i * 3], pts[i * 3 + 1], ax, ay, bx, by);
-  // the distance of a point part way along the segment from i to i + 1
   const along = (i: number, t: number) => {
     const x = pts[i * 3] + (pts[i * 3 + 3] - pts[i * 3]) * t;
     const y = pts[i * 3 + 1] + (pts[i * 3 + 4] - pts[i * 3 + 1]) * t;
@@ -164,7 +161,6 @@ export function cutStroke(
   return touched ? pieces : null;
 }
 
-// does the polyline (x, y, x, y, ...) come closer than r to the segment a to b
 function linesNear(lines: number[][], ax: number, ay: number, bx: number, by: number, r: number): boolean {
   for (const line of lines) {
     for (let i = 2; i < line.length; i += 2) {
@@ -174,14 +170,12 @@ function linesNear(lines: number[][], ax: number, ay: number, bx: number, by: nu
   return false;
 }
 
-// does the ink of a stroke or a shape come closer than r to the segment a to b
 export function inkNear(item: Item, ax: number, ay: number, bx: number, by: number, r: number): boolean {
   if (item.type === 'stroke') return strokeNear(item.pts, ax, ay, bx, by, r + item.size / 2);
   if (item.type === 'shape') return linesNear(shapeLines(item), ax, ay, bx, by, r + item.size / 2);
   return false;
 }
 
-// is the point on the item. r is how close counts, in page units
 export function itemNear(item: Item, x: number, y: number, r: number): boolean {
   const box = itemBox(item);
   if (x < box.minX - r || x > box.maxX + r || y < box.minY - r || y > box.maxY + r) return false;
@@ -190,7 +184,6 @@ export function itemNear(item: Item, x: number, y: number, r: number): boolean {
   return inkNear(item, x, y, x, y, r);
 }
 
-// the topmost item at the point
 export function itemAt(items: Item[], x: number, y: number, r: number): Item | null {
   for (let i = items.length - 1; i >= 0; i--) {
     if (itemNear(items[i], x, y, r)) return items[i];
