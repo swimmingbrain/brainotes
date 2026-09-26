@@ -5,8 +5,10 @@
   import { mountCanvas } from '$lib/editor/canvas';
   import { installClipboard } from '$lib/editor/clipboard';
   import { PAPER_STYLES } from '$lib/editor/commands';
+  import { PAPER_COLORS } from '$lib/editor/paper';
   import { toolById } from '$lib/editor/tools';
-  import { activeTool, contextMenu, history, inputType, paperStyle, selectionCount, type MenuItem } from '$lib/stores/app';
+  import { activeTool, contextMenu, history, inputType, paperColor, paperStyle, selectionCount, type MenuItem } from '$lib/stores/app';
+  import type { PaperColor } from '$lib/stores/preferences';
 
   const cursor = $derived(toolById($activeTool).cursor);
 
@@ -51,11 +53,19 @@
         { separator: true, label: '' },
         {
           label: 'Paper',
-          children: PAPER_STYLES.map((style) => ({
-            label: style.label,
-            checked: $paperStyle === style.id,
-            action: () => actions.setPaperStyle(style.id)
-          }))
+          children: [
+            ...PAPER_STYLES.map((style) => ({
+              label: style.label,
+              checked: $paperStyle === style.id,
+              action: () => actions.setPaperStyle(style.id)
+            })),
+            { separator: true, label: '' },
+            ...(Object.keys(PAPER_COLORS) as PaperColor[]).map((color) => ({
+              label: PAPER_COLORS[color].label,
+              checked: $paperColor === color,
+              action: () => actions.setPaperColor(color)
+            }))
+          ]
         },
         { label: 'Fit the page width', shortcut: 'Ctrl+0', action: () => actions.zoomReset() },
         { separator: true, label: '' },
