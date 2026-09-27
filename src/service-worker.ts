@@ -3,8 +3,7 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
-// keeps every file of the app, the pdf.js worker and its data around, so it
-// works without a network and a page always gets chunks of its own build
+// keeps the app and pdf.js offline, a page always gets chunks of its own build
 
 import { build, files, prerendered, version } from '$service-worker';
 
@@ -22,8 +21,7 @@ const PRECACHE = [
   ...files.filter((f) => /^\/(favicon\.svg|manifest\.json)$/.test(f) || (f.startsWith('/pdfjs/') && !/LICENSE|version\.txt$/.test(f)))
 ];
 
-// caches can be unavailable (private windows in some browsers), the app has
-// to keep working without them
+// caches can be missing (private windows in some browsers)
 async function openCache(name: string): Promise<Cache | null> {
   try {
     return await caches.open(name);
@@ -49,8 +47,7 @@ sw.addEventListener('activate', (event) => {
     (async () => {
       try {
         const names = await caches.keys();
-        // the build before this one stays, a tab that still runs it may ask
-        // for one of its chunks. caches.keys() lists them oldest first
+        // the build before stays for tabs still on it, keys() lists oldest first
         const older = names.filter((n) => n.startsWith(APP_PREFIX) && n !== APP_CACHE);
         const keep = [APP_CACHE, CACHE_NAME, FONT_CACHE, older[older.length - 1]];
         await Promise.all(names.filter((n) => !keep.includes(n)).map((n) => caches.delete(n)));
@@ -77,8 +74,7 @@ async function put(name: string, request: Request, response: Response) {
   }
 }
 
-// the app's own files never change under a given name, so the copy from
-// the build they belong to wins, whatever the server has by now
+// an app file never changes under its name, the copy of its own build wins
 async function handleImmutable(request: Request): Promise<Response> {
   const hit = await caches.match(request).catch(() => undefined);
   if (hit) return hit;
@@ -104,8 +100,7 @@ async function handleFont(request: Request, url: URL): Promise<Response> {
   }
 }
 
-// network first, with what we have as the fallback: the page from this
-// build for navigations, the last good copy for everything else
+// network first, then this build's page for a navigation or the last good copy
 async function handleDefault(request: Request, url: URL): Promise<Response> {
   try {
     const response = await fetch(request);
@@ -141,7 +136,6 @@ sw.addEventListener('fetch', (event) => {
     return;
   }
 
-  // whatever goes wrong inside, the browser gets a real answer, never a
-  // broken interception
+  // the browser always gets a real answer, never a broken interception
   event.respondWith(handleDefault(request, url).catch(() => fetch(request)));
 });
