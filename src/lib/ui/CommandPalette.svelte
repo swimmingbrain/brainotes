@@ -19,8 +19,7 @@
     );
   });
 
-  // the palette is only in the dom while it is open, so the field has to be
-  // given the keyboard every time it appears, not once on mount
+  // only in the dom while open, so the field needs the focus each time it appears
   $effect(() => {
     if ($commandPaletteOpen) void focusInput();
   });
@@ -41,17 +40,13 @@
     cmd.action();
   }
 
-  // arrowing past the bottom of the list has to bring the row into view,
-  // otherwise the selection walks off screen
   function move(step: number) {
     selectedIndex = (selectedIndex + step + filtered.length) % filtered.length;
     resultsEl?.children[selectedIndex]?.scrollIntoView({ block: 'nearest' });
   }
 
   function onkeydown(e: KeyboardEvent) {
-    // the input and the backdrop share this handler, the key must not reach
-    // both or enter runs one command from the filtered list and another from
-    // the full one
+    // input and backdrop share this handler, a key reaching both would run two commands
     e.stopPropagation();
     if (e.key === 'Escape') {
       e.preventDefault();

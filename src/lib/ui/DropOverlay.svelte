@@ -3,8 +3,7 @@
   import { actions } from '$lib/editor/actions';
   import { warmPdf } from '$lib/pdf/pdf';
 
-  // enter/leave fire for every child the pointer crosses, a counter is the
-  // only reliable way to know when the drag has actually left the window
+  // enter and leave fire for every child crossed, only a counter knows when the drag left
   let depth = 0;
   let visible = $state(false);
   let overReference = $state(false);
@@ -26,9 +25,7 @@
     visible = true;
   }
 
-  // every dragover over the window has to be answered, everywhere: the one
-  // spot that forgets lets the browser open the dropped file and leave the
-  // notes behind
+  // every dragover must be answered, or the browser opens the file and leaves the notes
   function ondragover(e: DragEvent) {
     if (!hasFiles(e)) return;
     e.preventDefault();

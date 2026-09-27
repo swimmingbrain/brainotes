@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  // the label/control row every panel is built from. the label column has a
-  // fixed width so controls line up down a whole panel, whatever they are
+  // the label column has a fixed width so controls line up down a whole panel
   let {
     label,
     hint,

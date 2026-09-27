@@ -11,9 +11,7 @@
   const thumbs = new Thumbs();
   $effect(() => () => thumbs.destroy());
 
-  // only the rows near the visible part of the list exist, a notebook with
-  // hundreds of pages would take long to open otherwise. every row has a
-  // known height, the rest of the list is two spacers
+  // only rows near the visible part exist, hundreds of pages would open slowly otherwise
   const PAD = 14;
   const GAP = 10;
   // the gap under a sheet and its number
@@ -74,7 +72,6 @@
     };
   }
 
-  // the list keeps the page on screen in sight while the notes scroll
   $effect(() => {
     const index = $pageIndex;
     if (!list || dragFrom >= 0 || index + 1 >= tops.length) return;

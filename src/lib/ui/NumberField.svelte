@@ -1,7 +1,5 @@
 <script lang="ts">
-  // the scrubby number every parameter row uses: drag sideways to change it,
-  // click to type it. oninput fires all the way through a drag so the preview
-  // can follow, onchange only once the value has settled
+  // oninput fires all through a drag so the preview follows, onchange once the value settles
   let {
     value,
     onchange,
@@ -36,14 +34,12 @@
   function format(n: number): string {
     if (!Number.isFinite(n)) return '0';
     const fixed = n.toFixed(precision);
-    // drop the zeros a fixed precision leaves behind, keep the number readable
     return precision > 0 ? fixed.replace(/\.?0+$/, '') : fixed;
   }
 
   function clamp(n: number): number {
     if (!Number.isFinite(n)) return value;
-    // the step grid starts at the minimum, otherwise a range like 0.1..30 in
-    // steps of 0.5 would snap its own lowest value down to zero
+    // the grid starts at the minimum, or 0.1..30 in steps of 0.5 would snap 0.1 down to zero
     const base = min ?? 0;
     let snapped = step > 0 ? base + Math.round((n - base) / step) * step : n;
     if (min !== undefined && snapped < min) snapped = min;
@@ -68,8 +64,7 @@
   function commitDraft() {
     editing = false;
     const text = draft.replace(',', '.').replace(/[^0-9.eE+-]/g, '').trim();
-    // an empty box or something that isn't a number keeps the old value,
-    // it must never turn into a zero or a NaN behind someone's back
+    // an empty or bad entry keeps the old value, never a silent zero or NaN
     if (!text) return;
     const parsed = Number(text);
     if (Number.isFinite(parsed)) commit(parsed);
@@ -88,7 +83,6 @@
       if (!moved && Math.abs(dx) < 3) return;
       moved = true;
       dragging = true;
-      // shift is the fine pass, the modifier people already expect
       const scale = ev.shiftKey ? 0.1 : 1;
       const next = clamp(startValue + dx * step * scale);
       if (oninput) oninput(next);

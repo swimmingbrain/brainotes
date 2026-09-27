@@ -3,13 +3,11 @@
 
   let track: HTMLDivElement;
   let thumb: HTMLDivElement;
-  // plain values on purpose, this moves with every scroll frame and must
-  // not wake up any reactivity
+  // plain values, this moves every scroll frame and must not wake any reactivity
   let start = 0;
   let size = 1;
   let drag: { y: number; from: number; height: number } | null = null;
 
-  // the view calls this when the scroll position changes
   export function show(nextStart: number, nextSize: number) {
     start = nextStart;
     size = nextSize;

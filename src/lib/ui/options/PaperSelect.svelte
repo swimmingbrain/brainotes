@@ -14,7 +14,6 @@
     addToast(`New notebooks start on ${PAPER_COLORS[color].label.toLowerCase()} ${style} paper`, 'success');
   }
 
-  // the color of the page on screen, dark is the blackboard
   const items = $derived<MenuItem[]>([
     ...(Object.keys(PAPER_COLORS) as PaperColor[]).map((color) => ({
       label: PAPER_COLORS[color].label,

@@ -25,7 +25,6 @@
     right?: Snippet;
   } = $props();
 
-  // a middle click closes a tab, like in a browser
   function onauxclick(e: MouseEvent, id: string) {
     if (e.button !== 1 || !onclose) return;
     e.preventDefault();

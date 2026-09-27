@@ -13,8 +13,7 @@
   const marker = $derived($activeTool === 'highlighter');
   const pen = $derived(currentPen($activeTool, $toolOptions));
 
-  // pen and highlighter are one pen with a type, picking the other type
-  // switches the tool along with it
+  // pen and highlighter are one pen with a type, picking a type switches the tool too
   function setType(type: string) {
     const next = type as PenType;
     if (next === 'highlighter') {

@@ -37,7 +37,7 @@
   let viewH = $state(0);
   let scrollTop = $state(0);
   let zoom = $state(untrack(() => readingSpot(file)?.zoom ?? 1));
-  // device pixels per point the canvases are drawn at, it follows the zoom once it rests
+  // device pixels per point, follows the zoom once it rests
   let paintScale = $state(0);
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
   let spot = 0;
@@ -45,8 +45,7 @@
   let lastWidth = 0;
   let handledFocus = 0;
   let textTimer: ReturnType<typeof setTimeout> | null = null;
-  // pages whose text can be selected. laying it out is real work, pages
-  // flying past while scrolling never get it
+  // laying out text is real work, pages flying past while scrolling never get it
   let textPages = $state.raw(new Set<number>());
   const canvases = new Map<number, HTMLCanvasElement>();
 
@@ -111,8 +110,7 @@
     for (const n of canvases.keys()) draw(n);
   });
 
-  // the first time the pages are laid out: back to where this file was
-  // left, or to the spot a clip asked for
+  // on the first layout, back to where this file was left unless a clip asks for a spot
   $effect(() => {
     if (!layout || !scroller || restored) return;
     restored = true;
@@ -137,7 +135,6 @@
     lastWidth = w;
   });
 
-  // a clip asked to be shown: its page comes in sight and the part flashes
   $effect(() => {
     const focus = $referenceFocus;
     if (!focus || focus.file !== file || !layout || !scroller || !pdf || focus.at === handledFocus) return;
@@ -158,8 +155,7 @@
     }, 1600);
   });
 
-  // what the panel needs drawn: a quick picture of the pages in sight and
-  // next to them, a sharp one of those in sight once the zoom rests
+  // quick pictures of the pages in and near sight, sharp ones once the zoom rests
   $effect(() => {
     if (!pdf || !layout) return;
     const [from, to] = range;
@@ -233,7 +229,6 @@
     textTimer = setTimeout(() => (textPages = new Set(shown)), TEXT_WAIT);
   }
 
-  // the first pages and the ones after a zoom get their text once things rest
   $effect(() => {
     if (settled && shown.length > 0) untrack(textLater);
   });

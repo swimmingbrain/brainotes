@@ -17,8 +17,7 @@
 
   let draft = $state(untrack(() => value));
 
-  // the hex box is free to hold half typed values while someone edits it,
-  // the swatch keeps showing the last one that parsed
+  // the hex box may hold half typed values, the swatch keeps the last one that parsed
   $effect(() => {
     draft = value;
   });

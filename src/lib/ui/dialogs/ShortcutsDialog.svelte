@@ -9,8 +9,7 @@
     what: string;
   }
 
-  // the same map shortcuts.ts binds, written out for people. a '/' between
-  // keys means either one
+  // the map shortcuts.ts binds, a '/' between keys means either one
   const groups: { name: string; items: Shortcut[] }[] = [
     {
       name: 'Tools',

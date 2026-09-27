@@ -10,8 +10,7 @@
     preferences.update((p) => ({ ...p, pens: p.pens.map((pen) => (pen.id === id ? { ...pen, ...change } : pen)) }));
   }
 
-  // a highlighter is far wider than a pen, so switching the type brings the
-  // size along to something that makes sense for it
+  // a highlighter is far wider than a pen, the size follows the type
   function setType(pen: PenPreset, type: PenType) {
     if (type === pen.type) return;
     let size = pen.size;

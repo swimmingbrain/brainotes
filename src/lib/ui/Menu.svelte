@@ -4,9 +4,7 @@
   import Icon from './Icon.svelte';
   import Self from './Menu.svelte';
 
-  // two shapes of the same list: hung under a trigger button (a menu bar
-  // entry, a panel's "more" button) or dropped at a point (context menu).
-  // one component so both keep the same keys, colors and submenu behaviour
+  // menus under a button and at a point share one component, so keys and submenus match
   let {
     items,
     trigger,
@@ -33,8 +31,7 @@
   let scrolled = $state(0);
 
   const positioned = $derived(at !== null);
-  // the placement is only used once it has been measured, so a submenu never
-  // flashes at the wrong spot for a frame
+  // used only once measured, so a submenu never flashes at the wrong spot
   const subAt = $derived(subPos && subPos.index === openSubmenu ? subPos : null);
 
   // px of air kept between a menu and the edge of the window
@@ -113,8 +110,7 @@
     close();
   }
 
-  // a menu that would hang off the screen is pulled back inside instead of
-  // scrolling the page
+  // pulled back inside the window instead of scrolling the page
   $effect(() => {
     if (!positioned || nested || !panel || !at) return;
     const rect = panel.getBoundingClientRect();
@@ -123,8 +119,7 @@
     if (x !== pos.x || y !== pos.y) pos = { x, y };
   });
 
-  // flips above the trigger near the bottom of the window, and sits in window
-  // coordinates so a panel that clips its content can not cut it
+  // window coordinates, so a panel that clips its content cannot cut it
   $effect(() => {
     if (positioned || !open || !panel || !root) return;
     const trigger = root.getBoundingClientRect();
@@ -140,8 +135,6 @@
     if (!now || now.x !== x || now.y !== y) anchorPos = { x, y };
   });
 
-  // the same for a submenu: it opens to the right of its row, flips to the
-  // left when that would run off the screen and slides up until it fits
   $effect(() => {
     const el = subEl;
     const index = openSubmenu;
@@ -168,8 +161,7 @@
     if (positioned) open = true;
   });
 
-  // only the top level takes the keyboard focus, a submenu that opens on
-  // hover must not steal it
+  // a submenu that opens on hover must not steal the focus
   $effect(() => {
     if (!open || !panel || nested) return;
     if (!positioned && !anchorPos) return;

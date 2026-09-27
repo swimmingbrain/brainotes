@@ -26,8 +26,7 @@
 
   function oncontextmenu(e: MouseEvent) {
     e.preventDefault();
-    // a long press of the pen is a right click on windows, it must not
-    // open a menu in the middle of writing
+    // a long pen press is a right click on windows, no menu in the middle of writing
     if ($inputType !== 'mouse') return;
     const at = { x: e.clientX, y: e.clientY };
     const selected: MenuItem[] =

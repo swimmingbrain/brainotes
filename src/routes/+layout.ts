@@ -1,5 +1,4 @@
 export const prerender = true;
 
-// the notes only exist once there is a browser: pointer events, canvas and
-// local storage live there, none of it survives prerendering
+// pointer events, canvas and local storage only exist in a browser
 export const ssr = false;

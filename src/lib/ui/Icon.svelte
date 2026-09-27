@@ -1,7 +1,5 @@
 <script lang="ts" module>
-  // one place for every glyph in the app. 16px grid, 1.5 stroke, round
-  // caps, so a button never has to care which icon it holds. shapes that
-  // read better solid (dots, the laser point) override the stroke
+  // 16px grid, 1.5 stroke, round caps, shapes that read better solid override the stroke
   const paths: Record<string, string> = {
     select: '<path d="M4 2.5v9.2l2.4-2.3 1.6 3.6 1.9-.9-1.6-3.5h3.3z"/>',
     lasso: '<path d="M5.2 12C3.2 11.3 2 9.8 2 8c0-2.8 2.7-5 6-5s6 2.2 6 5-2.7 5-6 5c-.9 0-1.7-.2-2.5-.4"/><path d="M5.4 12.3c-.9.5-1.2 1.3-.7 2.2"/>',

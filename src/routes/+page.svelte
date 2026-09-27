@@ -33,7 +33,6 @@
 
   const commands = $derived(buildCommands($preferences.tools));
 
-  // what the panels can share once the rail and the splitters have their room
   const free = $derived(
     mainWidth - RAIL - ($panels.leftOpen ? SPLITTER : 0) - ($panels.rightOpen ? SPLITTER : 0)
   );
@@ -55,8 +54,7 @@
     updatePanels((p) => ({ ...p, leftWidth: next }));
   }
 
-  // the splitter sits on the left edge of the reference panel, dragging it
-  // left makes the panel wider
+  // the splitter sits on the panel's left edge, dragging it left widens the panel
   function resizeRight(delta: number) {
     const max = free - MIN_CANVAS - leftWidth;
     const next = Math.max(MIN_RIGHT, Math.min(rightWidth - delta, max));

@@ -7,7 +7,6 @@
   import { countPages, timeAgo } from '$lib/format';
   import { contextMenu, library, type NotebookSummary } from '$lib/stores/app';
 
-  // with nothing open this is the whole library, newest first
   const recents = $derived([...$library].sort((a, b) => b.modifiedAt - a.modifiedAt));
 
   function openMenu(e: MouseEvent, notebook: NotebookSummary) {

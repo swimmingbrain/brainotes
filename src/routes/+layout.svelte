@@ -9,17 +9,14 @@
 
   let { children }: { children: Snippet } = $props();
 
-  // after a deploy the chunks this tab knows about are gone from the server.
-  // a full page load on the next navigation picks up the new build instead
-  // of failing on a missing file
+  // after a deploy the old chunks are gone, a full load picks up the new build
   beforeNavigate(({ willUnload, to }) => {
     if (updated.current && !willUnload && to?.url) {
       location.href = to.url.href;
     }
   });
 
-  // the worker keeps the app working offline. the dev server builds it as a
-  // module on every change, it only runs in a real build
+  // the dev server rebuilds the worker on every change, it only runs in a real build
   onMount(() => {
     if (!browser || dev || !('serviceWorker' in navigator)) return;
     navigator.serviceWorker.register('/service-worker.js').catch(() => {});

@@ -6,8 +6,6 @@
   import PdfDialog from './dialogs/PdfDialog.svelte';
   import { dialog } from '$lib/stores/app';
 
-  // every dialog the app can open, in one switch, so the page never has to
-  // know which one is up. each body owns its own Dialog frame
   function close() {
     dialog.set(null);
   }
