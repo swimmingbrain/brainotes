@@ -151,8 +151,7 @@ export function patternOps(paper: Paper, frame: Frame, everywhere: boolean): str
   return parts.join('\n');
 }
 
-// dots are one repeated tile like on the canvas. a pattern lives in the
-// space of the page itself, so the tile gets the matrix of the page
+// a pattern lives in the space of the page, so the dot tile gets its matrix
 export function dotsOf(
   paper: Paper,
   frame: Frame,
@@ -195,8 +194,7 @@ export function pdfMatrix(
   return [a, b, c, d, m[4] * sx + rect.x - (a * crop.x + c * crop.y), m[5] * sy + rect.y - (b * crop.x + d * crop.y)];
 }
 
-// where the look of a pdf annotation goes: its box, turned by its own
-// matrix, is stretched onto the rectangle of the annotation
+// the box of an annotation look, turned by its own matrix, stretched onto its rect
 export function annotMatrix(rect: number[], bbox: number[], m: number[]): number[] | null {
   const [a, b, c, d, e, f] = m;
   const corners = [

@@ -1,5 +1,4 @@
-// a rendered pdf page, or a part of it, at some scale. the cache only
-// needs a size and a close, so tests can hand it plain objects
+// the cache only needs a size and a close, so tests can hand it plain objects
 export interface Picture {
   width: number;
   height: number;
@@ -31,8 +30,7 @@ export function shotId(key: string, scale: number, part?: Part): string {
   return part ? `${key}@${s}:${part.x},${part.y},${part.w},${part.h}` : `${key}@${s}`;
 }
 
-// is a whole page shot good enough to show at this scale: not blurry and
-// not so big that it is a waste to draw
+// not blurry and not so big that drawing it is a waste
 export function sharp(shot: { scale: number }, scale: number): boolean {
   return shot.scale >= scale * 0.95 && shot.scale <= scale * 2;
 }
@@ -53,8 +51,7 @@ export function pickShots<P extends Picture>(shots: Shot<P>[], scale: number): {
   return { base: above ?? base, parts };
 }
 
-// shots by page, the ones not looked at for the longest are closed first
-// once they hold too many pixels
+// the shots not looked at for the longest close first once there are too many pixels
 export class ShotCache<P extends Picture = ImageBitmap> {
   pixels = 0;
   private lru = new Map<string, Shot<P>>();

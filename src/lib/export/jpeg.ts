@@ -1,5 +1,4 @@
-// a jpeg goes into a pdf as it is, but a pdf ignores the exif turn a phone
-// photo may carry. such a photo is drawn again the right way up instead
+// a pdf ignores the exif turn of a phone photo, such a jpeg is drawn again upright
 
 export function isJpeg(bytes: Uint8Array): boolean {
   return bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;

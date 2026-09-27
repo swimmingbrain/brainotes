@@ -3,13 +3,11 @@ export interface Job {
   priority: number;
 }
 
-// the renders the canvas, the reference panel and the thumbnails want.
-// each of them says again and again what it needs right now, a job nobody
-// asks for any more is dropped
+// each owner says again and again what it needs now, the rest is dropped
 export class RenderQueue<T extends Job> {
   private owners = new Map<string, Map<string, T>>();
 
-  // replaces what owner wanted before. returns the ids no one wants now
+  // returns the ids no one wants any more
   want(owner: string, jobs: T[]): string[] {
     const before = this.owners.get(owner);
     const next = new Map<string, T>();

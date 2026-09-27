@@ -41,7 +41,6 @@ export interface ExportPage {
   items: Item[];
 }
 
-// where the pages and the stored files come from
 export interface ExportInput {
   page: (index: number) => Promise<ExportPage>;
   asset: (id: string) => Promise<Blob | undefined>;
@@ -68,8 +67,7 @@ interface Source {
   copier: PDFObjectCopier;
 }
 
-// device pixels per point of a text and of a pdf page that has to be drawn
-// as a picture because its file could not be read
+// pixels per point of a text and of a pdf page pdf-lib could not read
 const TEXT_SCALE = 4;
 const TEXT_PIXELS = 8_000_000;
 const RASTER_SCALE = 200 / 72;
@@ -119,7 +117,6 @@ function viewBox(page: PDFPage): { x: number; y: number; w: number; h: number } 
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
-// the pictures and graphics states one page uses, under short names
 class PageResources {
   xobjects: Dict = {};
   states: Dict = {};
@@ -168,7 +165,6 @@ class PdfWriter {
     private hooks: ExportHooks
   ) {}
 
-  // a long page lets a frame through now and then
   async breathe() {
     if (this.hooks.stopped?.()) throw new DOMException('the export was stopped', 'AbortError');
     if (performance.now() - this.started < SLICE) return;
@@ -254,8 +250,7 @@ class PdfWriter {
     return found;
   }
 
-  // the pdf page on white, like the picture pdf.js draws of it, and a thin
-  // edge when it shares its page with room for notes
+  // white under the page like pdf.js draws it, a thin edge when notes share the page
   private async background(bg: PdfBackground, meta: PageMeta, res: PageResources): Promise<string> {
     const box = rect(bg.x, bg.y, bg.w, bg.h);
     const parts = [`1 g ${box} f`];
@@ -313,8 +308,7 @@ class PdfWriter {
     return found;
   }
 
-  // the original page as a form, so its text and drawings stay vectors. the
-  // copier is shared by all pages of a file, its fonts go in only once
+  // a form keeps the page vectors, one copier per file puts its fonts in once
   private async copyPage(source: Source, index: number): Promise<Form> {
     const page = source.doc.getPage(index);
     const node = page.node;
@@ -363,8 +357,7 @@ class PdfWriter {
     return { ref, crop, rotate, annots: this.annotsOf(source, node) };
   }
 
-  // a viewer draws the annotations of a page with their own looks, pdf.js
-  // shows them on screen, so the export draws them as well
+  // pdf.js shows the annotations on screen, so the export draws them too
   private annotsOf(source: Source, node: PDFDict): { ref: PDFRef; m: number[] }[] {
     const out: { ref: PDFRef; m: number[] }[] = [];
     const list = node.lookup(PDFName.of('Annots'));
@@ -495,8 +488,7 @@ class PdfWriter {
     return this.stream(color, dict);
   }
 
-  // all highlighter strokes in one group, laid on at once with the opacity
-  // and the blend of the canvas, so where they overlap it gets no darker
+  // the strokes go in one group so overlaps get no darker, like on the canvas
   private async highlighter(marks: Item[], meta: PageMeta, frame: Frame, res: PageResources): Promise<string> {
     const dark = isDark(meta.paper);
     const parts: string[] = [];
@@ -543,8 +535,7 @@ class PdfWriter {
   }
 }
 
-// the pages of a notebook as one pdf, a page at a time so the app keeps
-// running. a board page becomes a page as big as its ink
+// a page at a time so the app keeps running, a board page is as big as its ink
 export async function exportPdf(notebook: Notebook, indices: number[], input: ExportInput, hooks: ExportHooks = {}): Promise<Blob> {
   const out = await PDFDocument.create();
   out.setTitle(notebook.name);

@@ -13,8 +13,7 @@ export function fileName(name: string, kind: FileKind): string {
   return `${(clean || 'notebook').slice(0, 120)}${KINDS[kind].ext}`;
 }
 
-// the dialog opens while the click still counts, the file is written once
-// it is ready. false when the dialog was closed
+// the dialog opens while the click still counts, false when it was closed
 export async function saveFile(blob: Promise<Blob>, name: string, kind: FileKind): Promise<boolean> {
   const { ext, description, mime } = KINDS[kind];
   try {

@@ -1,6 +1,4 @@
-// pdf pages whose quick picture is dark on average, like slides with a
-// dark background. the highlighter is laid on them normally, multiply
-// would make it almost invisible there
+// on a dark slide multiply hides the highlighter, it is laid on normally there
 const DARK = 0.4;
 const SAMPLE = 24;
 

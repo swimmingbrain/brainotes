@@ -8,8 +8,7 @@ export const PDF_LAYOUTS: { id: PdfLayout; label: string }[] = [
   { id: 'beside', label: 'Notes beside' }
 ];
 
-// a notebook page made from a pdf page: its size and where the pdf page
-// sits on it, all in points
+// a page made from a pdf page: its size and where the pdf page sits, in points
 export interface PdfPlacement {
   w: number;
   h: number;
@@ -23,8 +22,7 @@ const BESIDE = 0.6;
 
 export function placePdfPage(pw: number, ph: number, layout: PdfLayout): PdfPlacement {
   if (layout === 'below') {
-    // at least as much room as the slide takes, and never flatter than a
-    // portrait sheet, so a wide slide gets a page like a handout
+    // never flatter than a portrait sheet, so a wide slide gets a page like a handout
     const h = Math.round(Math.max(ph * 2, pw * Math.SQRT2));
     return { w: pw, h, x: 0, y: 0, pw, ph };
   }

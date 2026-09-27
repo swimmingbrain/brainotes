@@ -9,8 +9,7 @@ export type { Part, Shot };
 
 type PdfLib = typeof import('pdfjs-dist');
 
-// the biggest picture one render makes. a page that would be bigger is
-// drawn whole at a lower scale and the part on screen sharp on top
+// a bigger page is drawn whole at a lower scale, the part on screen sharp on top
 export const MAX_PIXELS = 16_000_000;
 export const PREVIEW_WIDTH = 480;
 const CACHE_PIXELS = 64_000_000;
@@ -65,8 +64,7 @@ const running = new Map<string, Slot>();
 const listeners = new Set<(file: string, page: number) => void>();
 let penTimer: ReturnType<typeof setTimeout> | null = null;
 
-// pdf.js is big, it only comes in once the first pdf is opened. all files
-// share one worker, starting a worker for each took half a second
+// pdf.js loads with the first pdf. one shared worker, one per file took half a second
 function pdfjs(): Promise<{ pdf: PdfLib; worker: PDFWorker }> {
   lib ??= import('pdfjs-dist')
     .then((pdf) => {
@@ -114,8 +112,7 @@ async function parse(data: Blob): Promise<PDFDocumentProxy> {
     standardFontDataUrl: dataUrl('standard_fonts'),
     wasmUrl: dataUrl('wasm'),
     iccUrl: dataUrl('iccs'),
-    // pages drawn on the gpu: a big page took 20 ms of the main thread just
-    // to get its pixels out of a software canvas
+    // on the gpu, a big page took 20 ms of main thread to leave a software canvas
     enableHWA: true,
     // a broken file gets a toast, pdf.js need not fill the console about it
     verbosity: 0
@@ -165,8 +162,7 @@ function sizesOf(id: string, progress?: (done: number, total: number) => void): 
   return list;
 }
 
-// a pdf that is not stored yet, under the id it is going to get. throws
-// when pdf.js can not read it, a password is one reason
+// throws when pdf.js can not read the file, a password is one reason
 export async function readPdf(blob: Blob, id: string, progress?: (done: number, total: number) => void): Promise<PdfFile> {
   const doc = parse(blob);
   docs.set(id, doc);
@@ -190,8 +186,7 @@ export async function pdfPage(id: string, page: number): Promise<PDFPageProxy> {
   return (await docOf(id)).getPage(page);
 }
 
-// invisible text over a page so it can be selected and copied, scale is
-// css pixels per point. what it returns takes the text away again
+// selectable text over a page, scale is css pixels per point
 export function pdfText(id: string, page: number, container: HTMLElement, scale: number): () => void {
   let layer: TextLayer | null = null;
   let stopped = false;
@@ -244,8 +239,7 @@ export function touchShot(shot: Shot) {
   cache.touch(shot);
 }
 
-// says what owner needs drawn now, most urgent first. what nobody needs
-// any more is dropped, a render already on its way is cancelled
+// what nobody wants any more is dropped, a running render is cancelled
 export function want(owner: string, list: Wanted[]) {
   const jobs: Job[] = [];
   for (const w of list) {
@@ -288,8 +282,7 @@ function pump() {
   }
 }
 
-// pdf.js draws in slices of up to 15 ms. only one slice goes on per frame,
-// the most urgent render first, and none while the pen writes
+// pdf.js draws in slices of up to 15 ms, one per frame, none while the pen writes
 const slices: { go: () => void; priority: number }[] = [];
 let releasing = false;
 
@@ -311,7 +304,6 @@ function scheduleSlice() {
   }
 }
 
-// go asks pdf.js for the slice in the next frame, the next one waits a frame more
 function releaseSlice() {
   releasing = false;
   if (penBusy(PEN_PAUSE)) {
@@ -374,8 +366,7 @@ async function draw(page: PDFPageProxy, job: Wanted & { id: string; key: string 
   if (width * height > MAX_PIXELS * 1.05) throw new Error('a pdf render that big is not allowed');
   const viewport = page.getViewport({ scale, offsetX: -x0, offsetY: -y0 });
   const canvas = new OffscreenCanvas(width, height);
-  // pdf.js only touches the 2d context of the canvas, an offscreen one
-  // does the same work without being in the page
+  // pdf.js only uses the 2d context, an offscreen canvas does the same work
   const task = page.render({ canvas: canvas as unknown as HTMLCanvasElement, viewport, background: '#ffffff' });
   task.onContinue = (go: () => void) => nextSlice(go, job.priority);
   if (slot) slot.task = task;
@@ -397,8 +388,7 @@ async function draw(page: PDFPageProxy, job: Wanted & { id: string; key: string 
   };
 }
 
-// one picture of a page or a part of it, for a snip or an export. it is not
-// kept and not dropped by the queue
+// for a snip or an export, not cached and not dropped by the queue
 export async function renderPart(file: string, page: number, scale: number, part?: Part): Promise<ImageBitmap> {
   const doc = await docOf(file);
   const proxy = await doc.getPage(page);
@@ -408,8 +398,7 @@ export async function renderPart(file: string, page: number, scale: number, part
   return shot.picture;
 }
 
-// a whole page picture at about this scale is in the cache once this is
-// done, so renderPage and the thumbnails draw it sharp
+// caches a whole page picture so renderPage and the thumbnails draw it sharp
 export async function ensureShot(file: string, page: number, scale: number): Promise<Shot | null> {
   const key = pageKey(file, page);
   const doc = await docOf(file);
@@ -431,14 +420,12 @@ function keep(shot: Shot) {
   if (shot.full) measureDark(shot.key, shot.picture);
 }
 
-// a dark pdf page gets the highlighter laid on normally. false while there
-// is no picture of it yet
+// a dark page gets the highlighter laid on normally, false until it has a picture
 export function pdfIsDark(file: string, page: number): boolean {
   return knownDark(pageKey(file, page)) ?? false;
 }
 
-// the same for an export, a tiny picture is made when there is none. w is
-// the width of the page in points
+// for an export, a tiny picture is made when there is none. w is in points
 export async function pdfDark(file: string, page: number, w: number): Promise<boolean> {
   const key = pageKey(file, page);
   if (knownDark(key) === undefined) {
