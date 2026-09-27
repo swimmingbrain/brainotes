@@ -2,7 +2,6 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Notebook } from '$lib/engine/types';
 import type { PackedItems } from './pack';
 
-// the items of a page are packed, see pack.ts
 export interface PageRecord extends PackedItems {
   id: string;
   notebookId: string;
@@ -56,8 +55,6 @@ export function database(): Promise<Database> {
   return opening;
 }
 
-// notebooks
-
 export async function listNotebooks(): Promise<Notebook[]> {
   return (await database()).getAll('notebooks');
 }
@@ -70,8 +67,7 @@ export async function putNotebook(notebook: Notebook) {
   await (await database()).put('notebooks', notebook);
 }
 
-// what one save writes, in one transaction so the page list and the pages
-// never disagree
+// one transaction, so the page list and the pages never disagree
 export interface Changes {
   notebook?: Notebook;
   pages: PageRecord[];
@@ -88,7 +84,6 @@ export async function writeChanges(changes: Changes) {
   await tx.done;
 }
 
-// a whole notebook at once: a new one, or one read from a file
 export async function importNotebook(notebook: Notebook, pages: PageRecord[], assets: AssetRecord[] = []) {
   const db = await database();
   const tx = db.transaction(['notebooks', 'pages', 'assets'], 'readwrite');
@@ -98,7 +93,6 @@ export async function importNotebook(notebook: Notebook, pages: PageRecord[], as
   await tx.done;
 }
 
-// the notebook with its pages and its files
 export async function deleteNotebook(id: string) {
   const db = await database();
   const tx = db.transaction(['notebooks', 'pages', 'assets'], 'readwrite');
@@ -110,8 +104,6 @@ export async function deleteNotebook(id: string) {
   }
   await tx.done;
 }
-
-// pages
 
 export async function getPage(id: string): Promise<PageRecord | undefined> {
   return (await database()).get('pages', id);
@@ -128,8 +120,6 @@ export async function getPages(ids: string[]): Promise<(PageRecord | undefined)[
 export async function listPages(notebookId: string): Promise<PageRecord[]> {
   return (await database()).getAllFromIndex('pages', 'notebookId', notebookId);
 }
-
-// assets
 
 export async function getAsset(id: string): Promise<AssetRecord | undefined> {
   return (await database()).get('assets', id);

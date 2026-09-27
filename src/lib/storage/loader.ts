@@ -8,8 +8,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// pages are read when they get near the view and then stay in memory, so
-// hundreds of pages open as fast as one
+// pages are read near the view and then stay, so hundreds open as fast as one
 export class PageLoader {
   private waiting = new Map<string, Promise<void>>();
   private closed = false;

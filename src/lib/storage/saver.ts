@@ -12,7 +12,6 @@ export interface SaveReport {
   notebook: boolean;
 }
 
-// what is not safely in storage yet
 export interface Unsaved {
   notebook: Notebook;
   pages: Record<string, Item[]>;
@@ -28,8 +27,7 @@ export interface SaverHooks {
 export const SAVE_DELAY = 800;
 const PEN_WAIT = 200;
 const RETRY = 5000;
-// new ink alone does not touch the notebook record, only its date is
-// refreshed now and then so the library knows when it was last changed
+// new ink only refreshes the notebook date now and then, for the library
 const TOUCH_EVERY = 60000;
 
 function sleep(ms: number): Promise<void> {
@@ -42,8 +40,7 @@ async function breather() {
   while (penIsDown()) await sleep(PEN_WAIT);
 }
 
-// writes the open notebook by itself. only the pages that changed are
-// written, the notebook record only when its page list, name or paper did
+// only changed pages are written, the notebook record only when it changed
 export class Saver {
   state: SaveState = 'saved';
   last: SaveReport | null = null;
@@ -73,8 +70,7 @@ export class Saver {
     return this.dirty.size > 0 || this.notebookDirty || this.timer !== null;
   }
 
-  // writes what is left right away, also with the pen down. for hiding the
-  // tab, closing the notebook and switching to another one
+  // also with the pen down, for hiding the tab and closing or switching notebooks
   flush(): Promise<void> {
     this.stop();
     this.queue = this.queue.then(() => this.write(true));
@@ -85,8 +81,7 @@ export class Saver {
     return this.queue;
   }
 
-  // the pages a write would take along right now and the ones still being
-  // written, for the copy a closing tab keeps. null when all is stored
+  // pages not safely stored yet, for the copy a closing tab keeps
   unsaved(): Unsaved | null {
     if (!this.pending && !this.inFlight) return null;
     const notebook = this.doc.notebook;

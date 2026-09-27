@@ -21,8 +21,8 @@ export interface RefFocus {
 
 export const referenceFocus = writable<RefFocus | null>(null);
 
-// where a file was left: the page at the top with how far into it it was
-// scrolled (2.5 is half way down page 3), and the zoom over fit width
+// at is the page at the top and how far down it (2.5 is half way down page 3),
+// zoom is over fit width
 export interface ReadingSpot {
   at: number;
   zoom: number;

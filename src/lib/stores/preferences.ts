@@ -71,8 +71,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// only takes the keys the defaults know, and only with the same type, so a
-// value from an older version or a broken hand edit falls back to the default
+// only known keys of the same type, so an old or broken value falls back to the default
 function pick<T extends object>(base: T, stored: unknown): T {
   if (!isObject(stored)) return base;
   const out = { ...base };

@@ -1,8 +1,7 @@
 import type { Item, Stroke } from '$lib/engine/types';
 
-// a page as it is stored: all points as 32 bit floats and the rest as json,
-// both blobs made of small ones. storing 10,000 strokes as objects made the
-// browser copy them in one go for about 75 ms
+// points as 32 bit floats, the rest as json. 10,000 strokes stored as objects
+// took the browser about 75 ms to copy in one go
 export interface PackedItems {
   items: Blob;
   pts: Blob;

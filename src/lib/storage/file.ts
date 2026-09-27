@@ -4,8 +4,7 @@ import type { Item, Notebook, PageMeta } from '$lib/engine/types';
 import type { AssetKind, AssetRecord } from './db';
 import { itemsFromJson, itemsToJson } from './pack';
 
-// a notebook as a .brainotes file: a zip with manifest.json, notebook.json,
-// one json file per page with ink, and the pdfs and pictures as they are
+// a zip of manifest.json, notebook.json, a json per inked page and the assets as they are
 export const FORMAT = 'brainotes';
 export const VERSION = 1;
 
@@ -53,7 +52,6 @@ const EXTENSIONS: Record<string, string> = {
 };
 // a big file goes into the zip in pieces, with a breath in between
 const PIECE = 4 << 20;
-// pages read from the zip in one go
 const GROUP = 25;
 
 type Pause = () => Promise<void>;
@@ -206,8 +204,7 @@ export async function readNotebookFile(blob: Blob, pause: Pause = noPause): Prom
   return { notebook, pages, assets };
 }
 
-// an import is always a new notebook: every id in it is new, so the same
-// file read twice gives two notebooks that do not share anything
+// every id is new, so the same file read twice gives two separate notebooks
 export function withFreshIds(file: NotebookFile): NotebookFile {
   const ids = new Map<string, string>();
   const fresh = (id: string) => {

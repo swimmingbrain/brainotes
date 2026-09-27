@@ -19,7 +19,6 @@ export function addToast(message: string, type: ToastType = 'info', duration = 3
   return id;
 }
 
-// for a toast that tells how far something got
 export function updateToast(id: string, message: string) {
   toasts.update((t) => t.map((toast) => (toast.id === id ? { ...toast, message } : toast)));
 }
@@ -73,8 +72,7 @@ export interface PanelLayout {
   leftOpen: boolean;
   rightOpen: boolean;
   leftWidth: number;
-  // the reference panel grows with the window, so it is kept as a share of
-  // the main area and not in pixels
+  // a share of the main area, the reference panel grows with the window
   rightShare: number;
 }
 
@@ -83,8 +81,7 @@ export const MIN_RIGHT = 300;
 
 const LAYOUT_KEY = 'brainotes-layout';
 
-// a workspace only says which panels start open, they can still be
-// toggled by hand and every workspace remembers its own
+// a workspace only picks which panels start open, each one remembers its own
 function defaultLayout(): Record<Workspace, PanelLayout> {
   return {
     notes: { leftOpen: true, rightOpen: false, leftWidth: 220, rightShare: 0.45 },
@@ -133,7 +130,6 @@ function createLayout() {
 
 export const layout = createLayout();
 
-// the panels of the workspace that is up right now
 export const panels = derived([layout, workspace], ([$layout, $workspace]) => $layout[$workspace]);
 
 export function updatePanels(fn: (panels: PanelLayout) => PanelLayout) {
@@ -166,8 +162,7 @@ export type InkType = Exclude<PenType, 'highlighter'>;
 export type ShapeKind = 'line' | 'arrow' | 'rectangle' | 'ellipse';
 export type EraserMode = 'stroke' | 'area';
 
-// what the options bar shows and the canvas draws with. pen and highlighter
-// keep their own color and size, so switching between them loses nothing
+// pen and highlighter keep their own color and size, switching loses nothing
 export interface ToolOptions {
   penType: InkType;
   penColor: string;
@@ -225,14 +220,12 @@ export function usePen(pen: Omit<PenPreset, 'id'>) {
   }
 }
 
-// the pen the options bar is showing, written as a preset
 export function currentPen(tool: ToolId, o: ToolOptions): Omit<PenPreset, 'id'> {
   if (tool === 'highlighter') return { type: 'highlighter', color: o.highlighterColor, size: o.highlighterSize };
   return { type: o.penType, color: o.penColor, size: o.penSize };
 }
 
-// mirrors of the open notebook. the canvas and the storage write them, the
-// bars and panels only read them
+// mirrors of the open notebook, only the canvas and the storage write them
 export type SaveState = 'saved' | 'saving' | 'failed';
 export type InputType = 'pen' | 'mouse' | 'touch';
 export type NotebookKind = 'paper' | 'board';

@@ -3,9 +3,8 @@ import { writeChanges } from './db';
 import { itemsFromJson, itemsToJson, packItems } from './pack';
 import type { Unsaved } from './saver';
 
-// a closing tab gets no time to finish writing to indexeddb. what is not
-// stored yet goes into local storage, which writes at once, and into the
-// database the next time the notebook opens
+// a closing tab gets no time for indexeddb, local storage writes at once.
+// the next open of the notebook puts it into the database
 const PREFIX = 'brainotes-rescue-';
 
 interface Rescue {
