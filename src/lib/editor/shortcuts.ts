@@ -11,6 +11,7 @@ import {
   notebookKind,
   selectionCount,
   selectTool,
+  setWorkspace,
   toggleLeftPanel,
   toggleRightPanel,
   workspace
@@ -144,9 +145,9 @@ export function installShortcuts(target: Window = window): () => void {
     '$mod+Numpad0': bind(() => actions.zoomReset()),
     '$mod+b': bind(toggleLeftPanel),
     '$mod+Alt+b': bind(toggleRightPanel),
-    '$mod+1': bind(() => workspace.set('notes')),
-    '$mod+2': bind(() => workspace.set('study')),
-    '$mod+3': bind(() => workspace.set('board')),
+    '$mod+1': bind(() => setWorkspace('notes')),
+    '$mod+2': bind(() => setWorkspace('study')),
+    '$mod+3': bind(() => setWorkspace('board')),
     '$mod+Shift+f': bind(togglePresent),
 
     // app

@@ -9,7 +9,7 @@ import type { ImageSource } from '$lib/engine/types';
 import { layoutOf } from '$lib/pdf/layout';
 import { capScale, openPdf, renderPart, warmPdf, type Part } from '$lib/pdf/pdf';
 import { deleteAsset, getAsset, listAssets, listPages, putAsset } from '$lib/storage/db';
-import { activeTool, addToast, notebookId, panels, updatePanels, workspace } from '$lib/stores/app';
+import { activeTool, addToast, notebookId, panels, setWorkspace, updatePanels, workspace } from '$lib/stores/app';
 import { preferences } from '$lib/stores/preferences';
 import {
   activeReference,
@@ -29,7 +29,7 @@ const SWEEP_DELAY = 4000;
 // with both panels closed, or a file opened to read, the study workspace comes up
 export function showReferencePanel(study = false) {
   const p = get(panels);
-  if (get(workspace) !== 'study' && (study || (!p.leftOpen && !p.rightOpen))) workspace.set('study');
+  if (get(workspace) !== 'study' && (study || (!p.leftOpen && !p.rightOpen))) setWorkspace('study');
   if (!get(panels).rightOpen) updatePanels((q) => ({ ...q, rightOpen: true }));
 }
 

@@ -13,6 +13,7 @@
     notebookName,
     notebookOpen,
     saveState,
+    setWorkspace,
     showLeftTab,
     starting,
     workspace,
@@ -66,7 +67,7 @@
         class="tool-btn"
         class:active={$workspace === ws.id}
         title="{ws.label} ({ws.shortcut})"
-        onclick={() => workspace.set(ws.id)}>
+        onclick={() => setWorkspace(ws.id)}>
         {ws.label}
       </button>
     {/each}

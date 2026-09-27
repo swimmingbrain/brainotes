@@ -9,10 +9,10 @@ import {
   dialog,
   notebookName,
   pageIndex,
+  setWorkspace,
   showLeftTab,
   toggleLeftPanel,
   toggleRightPanel,
-  workspace,
   WORKSPACES,
   type MenuItem,
   type NotebookSummary
@@ -114,7 +114,7 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
   ];
 
   for (const ws of WORKSPACES) {
-    commands.push(c(`workspace-${ws.id}`, `Workspace: ${ws.label}`, 'View', () => workspace.set(ws.id), ws.shortcut));
+    commands.push(c(`workspace-${ws.id}`, `Workspace: ${ws.label}`, 'View', () => setWorkspace(ws.id), ws.shortcut));
   }
   for (const style of PAPER_STYLES) {
     commands.push(c(`paper-${style.id}`, `Paper: ${style.label}`, 'Pages', () => actions.setPaperStyle(style.id)));
