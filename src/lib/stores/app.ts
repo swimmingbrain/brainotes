@@ -81,7 +81,7 @@ export const MIN_RIGHT = 300;
 
 const LAYOUT_KEY = 'brainotes-layout';
 
-// a workspace only picks which panels start open, each one remembers its own
+// a workspace picks which panels are open, only the widths are remembered
 function defaultLayout(): Record<Workspace, PanelLayout> {
   return {
     notes: { leftOpen: true, rightOpen: false, leftWidth: 220, rightShare: 0.45 },
@@ -100,8 +100,6 @@ function readLayout(): Record<Workspace, PanelLayout> {
       const saved = stored[ws];
       if (!saved || typeof saved !== 'object') continue;
       const entry = layout[ws];
-      if (typeof saved.leftOpen === 'boolean') entry.leftOpen = saved.leftOpen;
-      if (typeof saved.rightOpen === 'boolean') entry.rightOpen = saved.rightOpen;
       if (typeof saved.leftWidth === 'number') entry.leftWidth = Math.max(MIN_LEFT, saved.leftWidth);
       if (typeof saved.rightShare === 'number') entry.rightShare = Math.max(0.1, Math.min(0.8, saved.rightShare));
     }
@@ -135,6 +133,17 @@ export const panels = derived([layout, workspace], ([$layout, $workspace]) => $l
 export function updatePanels(fn: (panels: PanelLayout) => PanelLayout) {
   const ws = get(workspace);
   layout.update((all) => ({ ...all, [ws]: fn(all[ws]) }));
+}
+
+// panels toggled by hand would make two workspaces look the same, so a switch
+// always goes back to the panels of that workspace
+export function setWorkspace(ws: Workspace) {
+  const fresh = defaultLayout()[ws];
+  layout.update((all) => ({
+    ...all,
+    [ws]: { ...all[ws], leftOpen: fresh.leftOpen, rightOpen: fresh.rightOpen }
+  }));
+  workspace.set(ws);
 }
 
 export function toggleLeftPanel() {
