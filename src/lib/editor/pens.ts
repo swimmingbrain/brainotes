@@ -30,8 +30,7 @@ export function addFavourite(pen: Pen) {
   addToast(added ? 'Added to your favourite pens' : 'That pen is already a favourite', added ? 'success' : 'info');
 }
 
-// the default pen has to be one of the favourites, so a pen that is not
-// one yet becomes one on the way
+// the default pen has to be a favourite, so it becomes one on the way
 export function makeDefaultPen(pen: Pen) {
   preferences.update((p) => {
     const match = p.pens.find((x) => samePen(x, pen));

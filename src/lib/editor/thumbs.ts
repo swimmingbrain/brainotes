@@ -25,8 +25,7 @@ interface Thumb {
   buffer: OffscreenCanvas | null;
 }
 
-// the part of a board a thumbnail shows: all of its ink, never closer
-// than the board frame itself
+// all of the ink of a board, never closer than the board frame itself
 function boardFrame(page: { meta: PageData['meta']; items: PageData['items'] }): Frame {
   const { w, h } = page.meta;
   const box = emptyBox();
@@ -39,8 +38,7 @@ function boardFrame(page: { meta: PageData['meta']; items: PageData['items'] }):
   return { x: (box.minX + box.maxX - fw) / 2, y: (box.minY + box.maxY - fh) / 2, w: fw, h: fh };
 }
 
-// the thumbnails of the pages panel, drawn when they scroll into sight and
-// a moment after their page changed. never while the pen is down
+// drawn in sight and a moment after a change, never while the pen is down
 export class Thumbs {
   private doc: Doc | null = openDoc();
   private byId = new Map<string, Thumb>();
@@ -110,7 +108,6 @@ export class Thumbs {
     want('thumbs', list);
   }
 
-  // a pdf page was rendered, the thumbnails that show it are drawn again
   private onShot = (file: string, page: number) => {
     let any = false;
     for (const thumb of this.byId.values()) {
@@ -133,7 +130,6 @@ export class Thumbs {
     this.schedule(change.type === 'loaded' ? 0 : REFRESH);
   };
 
-  // a picture finished decoding, the pages that show it are drawn again
   private onBitmap = (assetId: string) => {
     let any = false;
     for (const thumb of this.byId.values()) {

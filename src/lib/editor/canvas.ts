@@ -43,7 +43,6 @@ import {
 } from '$lib/stores/app';
 import { preferences, type PaperColor, type PaperStyle, type Preferences } from '$lib/stores/preferences';
 
-// the open notebook with what keeps it in storage
 export interface Session {
   doc: Doc;
   loader: PageLoader;
@@ -67,8 +66,7 @@ declare global {
   }
 }
 
-// the open notebook lives here, outside of any component, so closing the
-// canvas and opening it again keeps it
+// outside of any component, so closing and opening the canvas keeps the notebook
 let session: Session | null = null;
 let doc: Doc | null = null;
 let history: History | null = null;
@@ -79,7 +77,6 @@ let offDoc: (() => void) | null = null;
 // where the pointer is over the canvas, in window pixels
 let pointer: Point | null = null;
 
-// what the clipboard and the picture import work with
 export interface Editor {
   view: CanvasView;
   doc: Doc;
@@ -90,9 +87,8 @@ export function editor(): Editor | null {
   return view && doc && select ? { view, doc, select } : null;
 }
 
-// a point of the window as a page and a point on it in page units. no
-// point means the pointer while it is over the canvas, else the middle of
-// the view, which centre asks for always
+// a window point as a page and page units. no point means the pointer over
+// the canvas, else the middle of the view, which centre always asks for
 export function spotAt(at: Point | null, centre = false): { index: number; x: number; y: number } | null {
   if (!view || !doc || doc.pageCount === 0) return null;
   const p = at ?? (centre ? null : pointer);
@@ -146,8 +142,7 @@ function syncHistory() {
 
 function onDocChange(change: DocChange) {
   select?.docChanged(change);
-  // while the pen is down the counts wait, the gesture ends with a history
-  // change that brings them up to date
+  // while the pen is down the counts wait for the history change at its end
   if (change.type === 'items') {
     if (!penIsDown()) syncCount();
   } else if (change.type === 'loaded') {
@@ -204,13 +199,11 @@ export function commitText() {
   text?.commit();
 }
 
-// the page in the middle of the view, or the board on show
 export function currentPage(): number {
   return current();
 }
 
-// pages with these metas from index on, one undo step, and the view goes
-// to the first of them
+// one undo step, the view goes to the first new page
 export function addPages(index: number, metas: PageMeta[]) {
   if (!doc || !history || metas.length === 0) return;
   const at = Math.max(0, Math.min(index, doc.pageCount));
@@ -219,7 +212,6 @@ export function addPages(index: number, metas: PageMeta[]) {
   view?.goToPage(at);
 }
 
-// a page with all its items, read from storage when it is not in memory yet
 export async function loadPage(id: string): Promise<PageData | undefined> {
   if (!session) return undefined;
   return session.loader.ensure(id);
@@ -266,7 +258,6 @@ function textSettings() {
   return { size: options.textSize, color: options.textColor };
 }
 
-// the text under a point of page index, for editing it
 function textAt(index: number, x: number, y: number): TextItem | null {
   if (!doc || !view) return null;
   const items = doc.pageAt(index).items;
@@ -366,7 +357,6 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
       const before = tool;
       tool = t;
       if (t === before) return;
-      // switching tools ends the text being typed and drops the selection
       words.commit();
       if (t !== 'select') sel.clear();
       v.live.style.cursor = '';
@@ -397,8 +387,7 @@ function blankLike(meta: PageMeta | undefined): PageData {
   return newPageData({ id: newId(), w: meta.w, h: meta.h, paper: { ...meta.paper } });
 }
 
-// the undo of a page op keeps the page in memory, so its ink has to be
-// read before the page can go
+// undo keeps the removed page in memory, so its ink is read in first
 async function deletePage(index: number) {
   const d = doc;
   const h = history;
@@ -460,9 +449,8 @@ preferences.subscribe((p) => (prefs = p));
 if (typeof window !== 'undefined') {
   setImageLoader(async (id) => (await storage.getAsset(id))?.blob);
   setPdfLoader(async (id) => (await storage.getAsset(id))?.blob);
-  // text measured before inter arrived is measured again and drawn anew.
-  // the stylesheet with the font can come in after the first look, so every
-  // finished font load is checked until inter is there
+  // text measured before inter arrived is measured again. the font css can come
+  // in after the first paint, so every font load is checked until inter is there
   let interIn = false;
   const remeasure = () => {
     if (interIn || !document.fonts) return;
@@ -477,7 +465,6 @@ if (typeof window !== 'undefined') {
   document.fonts?.addEventListener('loadingdone', remeasure);
 }
 
-// duplicates sit a little down and to the right of what they copy
 const DUPLICATE_SHIFT = 16;
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {

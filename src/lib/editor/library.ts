@@ -27,12 +27,11 @@ import {
 } from '$lib/stores/app';
 import { preferences } from '$lib/stores/preferences';
 
-// the id of the notebook that was open last, empty once it was closed
+// the notebook open last, empty once it was closed
 const LAST_KEY = 'brainotes-last';
 
 let session: Session | null = null;
-// library work runs one step after the other, a double click must not
-// open two notebooks at once
+// one step after the other, a double click must not open two notebooks
 let queue: Promise<void> = Promise.resolve();
 
 function run(work: () => Promise<void>): Promise<void> {
@@ -76,8 +75,7 @@ async function refresh() {
   library.set(newestFirst(all.map(summary)));
 }
 
-// the open notebook's row follows what is in memory, it is added when it
-// came into storage some other way
+// the open notebook's row follows memory, it is added when stored some other way
 function updateRow() {
   if (!session) return;
   const row = summary(session.doc.notebook);
@@ -92,8 +90,7 @@ export function uniqueName(base: string): string {
   return `${base} ${i}`;
 }
 
-// ready means the pages are all in memory already, a new notebook has
-// nothing to read. the caller holds the lock of the notebook
+// ready means the pages are in memory already. the caller holds the lock
 function start(notebook: Notebook, ready: boolean) {
   const doc = new Doc(notebook, ready ? {} : null);
   const loader = new PageLoader(doc, (index) => addToast(`Page ${index + 1} could not be read from the browser storage`, 'error', 8000));
@@ -149,8 +146,7 @@ async function nameOf(id: string): Promise<string> {
   return name ? `"${name}"` : 'That notebook';
 }
 
-// a stored notebook opens unless another tab has it, then this tab stays
-// where it is. quiet leaves out the toast for a notebook that is gone
+// quiet leaves out the toast for a notebook that is gone
 async function openStored(id: string, quiet = false) {
   if (session?.doc.notebook.id === id) return;
   if (!(await lockNotebook(id))) {
@@ -174,8 +170,7 @@ async function openStored(id: string, quiet = false) {
   start(notebook, false);
 }
 
-// items by page id. a page without items is not written at all, it reads
-// as empty, so a pdf of 500 pages goes in as one record and its file
+// a page without items is not written, so a 500 page pdf goes in as one record and its file
 async function store(notebook: Notebook, items: Record<string, Item[]> = {}, assets: AssetRecord[] = []) {
   const pages = [];
   for (const meta of notebook.pages) {
@@ -185,8 +180,7 @@ async function store(notebook: Notebook, items: Record<string, Item[]> = {}, ass
   await importNotebook(notebook, pages, assets);
 }
 
-// a new notebook goes into storage before anything else changes, so a
-// failed write leaves the open one as it was
+// stored first, so a failed write leaves the open notebook as it was
 async function create(kind: NotebookKind, name: string): Promise<Notebook> {
   const notebook = newNotebook(kind, name, get(preferences).paper);
   await store(notebook);
@@ -194,8 +188,7 @@ async function create(kind: NotebookKind, name: string): Promise<Notebook> {
   return notebook;
 }
 
-// a whole notebook made somewhere else (a pdf to write on, a file) goes
-// into storage with its pages and files, then it opens
+// a notebook made somewhere else, from a pdf or a file
 export function addNotebook(notebook: Notebook, items: Record<string, Item[]> = {}, assets: AssetRecord[] = []) {
   return run(async () => {
     await store(notebook, items, assets);
@@ -205,13 +198,11 @@ export function addNotebook(notebook: Notebook, items: Record<string, Item[]> = 
   });
 }
 
-// reads the library and opens the notebook from last time. the very first
-// launch gets a notebook to write in right away
+// the very first launch gets a notebook to write in right away
 export function startLibrary(): () => void {
   void navigator.storage?.persist?.().catch(() => {});
 
-  // a tab on its way out may not finish the write, what it holds (also the
-  // text being typed) goes into local storage as well
+  // a tab on its way out may not finish the write, local storage gets it too
   const flush = () => {
     if (session) commitText();
     keepRescue(session?.saver.unsaved() ?? null);
@@ -241,8 +232,7 @@ export function startLibrary(): () => void {
         if (id) await openStored(id, true);
       }
     } catch (err) {
-      // no storage at all (a locked down browser): notes still work, they
-      // just do not stay
+      // no storage at all (a locked down browser): notes work but do not stay
       console.error(err);
       addToast('This browser does not let brainotes keep your notes', 'warning', 6000);
       start(newNotebook('paper', 'My notes', get(preferences).paper), true);
@@ -283,8 +273,7 @@ plugActions({
       return;
     }
     void run(async () => {
-      // the tab that has it open would write its old name back. the lock is
-      // held while renaming, so no tab opens it halfway
+      // a tab with it open would write the old name back, so the lock is held meanwhile
       if (!(await lockNotebook(id))) {
         addToast(`${await nameOf(id)} is open in another tab, rename it there`, 'warning', 5000);
         return;

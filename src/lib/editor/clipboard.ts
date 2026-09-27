@@ -10,8 +10,7 @@ import type { Box, Item } from '$lib/engine/types';
 import { getAsset, putAsset } from '$lib/storage/db';
 import { activeTool, notebookId, toolOptions } from '$lib/stores/app';
 
-// what a copy puts on the system clipboard, so a paste knows the items in
-// here are still the newest thing that was copied
+// put on the system clipboard, so a paste knows the items here are still the newest copy
 const MARK = 'brainotes items';
 
 interface Clip {
@@ -43,8 +42,7 @@ function cutSelection(): boolean {
   return true;
 }
 
-// a picture of another notebook gets its own copy of the file, so deleting
-// that notebook does not take it away
+// a picture from another notebook gets its own copy, so deleting that one keeps it
 async function ownAssets(items: Item[]): Promise<Item[]> {
   const id = get(notebookId);
   const copied = new Map<string, string>();
@@ -67,7 +65,6 @@ async function ownAssets(items: Item[]): Promise<Item[]> {
   return out;
 }
 
-// the copied items, centred on the pointer or the middle of the view
 async function pasteItems(at: { x: number; y: number } | null) {
   const c = clip;
   const spot = spotAt(at);
@@ -83,7 +80,6 @@ async function pasteItems(at: { x: number; y: number } | null) {
   ed.select.insert(spot.index, items);
 }
 
-// plain text from somewhere else becomes a text on the page
 function pasteText(text: string, at: { x: number; y: number } | null) {
   const spot = spotAt(at);
   const ed = editor();
@@ -131,8 +127,7 @@ function onPaste(e: ClipboardEvent) {
   else void pasteItems(null);
 }
 
-// the menu has no paste event, it reads the clipboard itself when the
-// browser lets it
+// the menu has no paste event, it reads the clipboard when the browser lets it
 async function pasteFromMenu(at: { x: number; y: number } | null) {
   try {
     const entries = await navigator.clipboard.read();

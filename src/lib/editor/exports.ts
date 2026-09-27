@@ -13,7 +13,6 @@ function stoppedError(): DOMException {
   return new DOMException('the export was stopped', 'AbortError');
 }
 
-// a page with all its items, as long as its notebook is still the open one
 async function pageOf(doc: Doc, id: string): Promise<{ meta: PageMeta; items: Item[] }> {
   if (openDoc() !== doc) throw stoppedError();
   const page = await loadPage(id);
@@ -27,8 +26,7 @@ async function assetBlob(id: string): Promise<Blob | undefined> {
   return (await getAsset(id))?.blob;
 }
 
-// the dialog opens at once and the work runs behind it with a toast that
-// counts. a closed dialog stops the work
+// the work runs behind the save dialog, closing the dialog stops it
 function run(kind: FileKind, name: string, label: string, work: (stopped: () => boolean, toast: string) => Promise<Blob>) {
   if (busy) {
     addToast('An export is already running', 'info');
@@ -38,8 +36,7 @@ function run(kind: FileKind, name: string, label: string, work: (stopped: () => 
   let stopped = false;
   const toast = addToast(`Exporting ${label}...`, 'info', 0);
   const blob = work(() => stopped, toast);
-  // the work can stop on its own (the notebook was closed), the file the
-  // dialog made is then left empty
+  // work that stops on its own (notebook closed) leaves the saved file empty
   let broke = false;
   blob.catch(() => (broke = true));
   void saveFile(blob, fileName(name, kind), kind)
@@ -97,8 +94,6 @@ function pause(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-// the stored files a notebook still uses: its pdf pages, the files on the
-// side, its pictures and the pdfs its clips came from
 function usedAssets(notebook: Notebook, pages: Record<string, Item[]>): Set<string> {
   const used = new Set(notebook.refs);
   for (const meta of notebook.pages) if (meta.pdf) used.add(meta.pdf.assetId);

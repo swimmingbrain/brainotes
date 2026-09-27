@@ -3,7 +3,6 @@ import type { PaperColor, PaperStyle } from '$lib/stores/preferences';
 import type { ImageSource } from '$lib/engine/types';
 
 export type ExportFormat = 'pdf' | 'png' | 'brainotes';
-// the whole notebook or the page on screen
 export type ExportPages = 'all' | 'page';
 
 // a point of the window in css pixels, like clientX and clientY
@@ -30,7 +29,6 @@ export interface Actions {
   setPaperStyle: (style: PaperStyle) => void;
   setPaperColor: (color: PaperColor) => void;
   setPagePaper: (index: number, paper: { style?: PaperStyle; color?: PaperColor }) => void;
-  // the paper of page index goes on every page
   paperOnAllPages: (index: number) => void;
   deleteSelection: () => void;
   duplicateSelection: () => void;
@@ -54,15 +52,13 @@ export interface Actions {
   openReference: (files?: File[]) => void;
   // a clip of a pdf goes back to its page on the side
   showSource: (source: ImageSource) => void;
-  // picks pictures and puts them at the point or the middle of the view
   insertImage: (at?: Point) => void;
   exportNotebook: (format: ExportFormat, pages?: ExportPages) => void;
 }
 
 function nothing() {}
 
-// every button and key goes through here, the canvas, the storage and the
-// pdf code plug their own functions in
+// every button and key goes through here, the other modules plug in their functions
 export const actions: Actions = {
   undo: nothing,
   redo: nothing,

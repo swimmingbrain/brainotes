@@ -10,8 +10,7 @@ import { warmPdf } from '$lib/pdf/pdf';
 import { putAsset } from '$lib/storage/db';
 import { activeTool, addToast, dismissToast, notebookId, updateToast } from '$lib/stores/app';
 
-// a photo is made smaller once when it comes in, longer sides than this
-// only cost memory
+// a photo is made smaller once on import, longer sides only cost memory
 export const MAX_SIDE = 2400;
 // share of the page width a new picture takes
 const SHARE = 0.6;
@@ -25,9 +24,8 @@ export interface ImageAsset {
   h: number;
 }
 
-// the picture goes into storage for the notebook, made smaller first when
-// it is big. a jpeg stays a jpeg, the rest becomes a png so see through
-// parts stay see through. null when the browser can not read it
+// a jpeg stays a jpeg, the rest becomes a png so see through parts stay see
+// through. null when the browser can not read it
 export async function storeImage(blob: Blob, name = 'image', owner = get(notebookId)): Promise<ImageAsset | null> {
   let bitmap: ImageBitmap;
   try {
@@ -66,8 +64,7 @@ export async function storeImage(blob: Blob, name = 'image', owner = get(noteboo
   return { assetId, w: bitmap.width, h: bitmap.height };
 }
 
-// about 60 percent of the page wide and never bigger than the page, a small
-// picture or a clip of a pdf keeps its own size
+// never bigger than the page, a small picture or a pdf clip keeps its own size
 export function imageItemFor(
   asset: ImageAsset,
   index: number,
@@ -101,8 +98,7 @@ export function imageItemFor(
   return item;
 }
 
-// pictures from files or the clipboard, put down around a point of the
-// window, the pointer or the middle of the view. they end up selected
+// around a window point, else the pointer or the middle of the view
 export async function insertImages(blobs: Blob[], at: Point | null, centre = false) {
   // the spot is taken now, the pointer may move on while the files are read
   const spot = spotAt(at, centre);
@@ -150,8 +146,7 @@ export async function insertImages(blobs: Blob[], at: Point | null, centre = fal
   ed.select.insert(spot.index, placed);
 }
 
-// for code that makes pictures itself (a snip of a pdf page): one picture
-// from a blob, centred on a point of page index in page units
+// for code that makes pictures itself (a snip of a pdf page), in page units
 export async function insertImageBlob(
   blob: Blob,
   index: number,
@@ -175,7 +170,6 @@ export function isImage(file: Blob): boolean {
   return file.type.startsWith('image/') && file.type !== 'image/svg+xml';
 }
 
-// a file picker that resolves with what was picked, nothing when it was closed
 export function pickFiles(accept: string, multiple = true): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
@@ -195,8 +189,6 @@ export function pickFiles(accept: string, multiple = true): Promise<File[]> {
   });
 }
 
-// pictures land at the point, pdfs ask what to do with them and a
-// .brainotes file becomes a notebook of its own
 function importAll(files: File[], at: Point | null) {
   const images = files.filter(isImage);
   const pdfs = files.filter(isPdf);

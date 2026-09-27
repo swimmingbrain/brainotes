@@ -50,7 +50,6 @@ export function confirmDeleteNotebook(notebook: NotebookSummary) {
   });
 }
 
-// the menu of a notebook in the library and on the start screen
 export function notebookMenu(notebook: NotebookSummary): MenuItem[] {
   return [
     { label: 'Open', action: () => actions.openNotebook(notebook.id) },
@@ -63,8 +62,7 @@ export function notebookMenu(notebook: NotebookSummary): MenuItem[] {
   ];
 }
 
-// everything the palette lists. the shortcut strings are for people, the
-// keys themselves are bound in shortcuts.ts. hidden tools are left out
+// the shortcut strings are only labels, the keys are bound in shortcuts.ts
 export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
   const c = (id: string, label: string, category: string, action: () => unknown, shortcut?: string): Command => ({
     id,
@@ -75,7 +73,6 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
   });
 
   const commands: Command[] = [
-    // notebook
     c('new-notebook', 'New notebook', 'Notebook', () => actions.newNotebook('paper')),
     c('new-whiteboard', 'New whiteboard', 'Notebook', () => actions.newNotebook('board')),
     c('rename-notebook', 'Rename notebook', 'Notebook', renameNotebook),
@@ -89,14 +86,12 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
     c('export-png', 'Export this page as PNG', 'Notebook', () => actions.exportNotebook('png', 'page')),
     c('export-file', 'Export a .brainotes file', 'Notebook', () => actions.exportNotebook('brainotes')),
 
-    // pages
     c('new-page', 'New page', 'Pages', () => actions.newPage(), 'Ctrl+Enter'),
     c('next-page', 'Next page', 'Pages', () => actions.nextPage(), 'PageDown'),
     c('previous-page', 'Previous page', 'Pages', () => actions.previousPage(), 'PageUp'),
     c('duplicate-page', 'Duplicate this page', 'Pages', () => actions.duplicatePage(get(pageIndex))),
     c('delete-page', 'Delete this page', 'Pages', () => actions.deletePage(get(pageIndex))),
 
-    // edit
     c('undo', 'Undo', 'Edit', () => actions.undo(), 'Ctrl+Z'),
     c('redo', 'Redo', 'Edit', () => actions.redo(), 'Ctrl+Shift+Z'),
     c('select-all', 'Select all', 'Edit', () => actions.selectAll(), 'Ctrl+A'),
@@ -108,7 +103,6 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
     c('deselect', 'Clear the selection', 'Edit', () => actions.clearSelection(), 'Escape'),
     c('insert-image', 'Insert a picture', 'Edit', () => actions.insertImage()),
 
-    // view
     c('zoom-in', 'Zoom in', 'View', () => actions.zoomIn(), 'Ctrl+='),
     c('zoom-out', 'Zoom out', 'View', () => actions.zoomOut(), 'Ctrl+-'),
     c('zoom-reset', 'Fit the page width', 'View', () => actions.zoomReset(), 'Ctrl+0'),
@@ -134,7 +128,6 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
     commands.push(c(`tool-${tool.id}`, `Tool: ${tool.label}`, 'Tools', () => activeTool.set(tool.id), tool.shortcut));
   }
 
-  // the palette closes before it runs an action, so a command that opens a
-  // dialog never fights it for the keyboard
+  // runs once the palette closed, so a dialog it opens does not fight it for the keyboard
   return commands.map((cmd) => ({ ...cmd, action: () => queueMicrotask(cmd.action) }));
 }

@@ -26,8 +26,7 @@ const SNIP_GAP = 12;
 // ms after a notebook opens before its unused pdfs are looked for
 const SWEEP_DELAY = 4000;
 
-// the panel comes up. with both panels closed that is the study workspace,
-// and a file opened to read on the side always goes there
+// with both panels closed, or a file opened to read, the study workspace comes up
 export function showReferencePanel(study = false) {
   const p = get(panels);
   if (get(workspace) !== 'study' && (study || (!p.leftOpen && !p.rightOpen))) workspace.set('study');
@@ -66,8 +65,7 @@ async function ensureNotebook(file: File) {
   await addNotebook(notebook);
 }
 
-// pdfs and pictures open in tabs on the side. a file the notebook has
-// stored already, like the pdf it was made from, is used again
+// a file the notebook stored already, like the pdf it was made from, is used again
 async function openFiles(files: File[]) {
   const usable = files.filter((f) => isPdf(f) || isImage(f));
   if (usable.length === 0) {
@@ -132,8 +130,7 @@ export function showReference(id: string) {
   setActive(id);
 }
 
-// a clip goes back to where it came from: its file opens on the side at
-// the page, and the part it was cut from flashes
+// the file of a clip opens at its page, and the part it was cut from flashes
 export async function showSource(source: ImageSource) {
   const doc = openDoc();
   if (!doc) return;
@@ -160,11 +157,9 @@ async function toPng(picture: ImageBitmap): Promise<Blob> {
   return canvas.convertToBlob({ type: 'image/png' });
 }
 
-// the id of the clip the last snip made
 let lastClip = '';
 
-// the next snip goes under the last clip while that one is in sight, so a
-// few snips in a row do not cover each other
+// while the last clip is in sight the next snip goes under it, not over it
 function underLast(spot: { index: number; x: number; y: number }): Point | undefined {
   const ed = editor();
   const last = ed?.doc.pageAt(spot.index).items.find((item) => item.id === lastClip);
@@ -174,15 +169,13 @@ function underLast(spot: { index: number; x: number; y: number }): Point | undef
   return Math.abs(corner.y - spot.y) < half ? corner : undefined;
 }
 
-// a part of a reference page lands in the notes in the middle of the view,
-// selected, remembering where it came from. no part means the whole page
+// no part means the whole page
 export async function snip(file: string, page: number, part?: Part) {
   const spot = spotAt(null, true);
   if (!spot || !editor()) return;
   try {
     const whole = part ?? { x: 0, y: 0, ...(await pageSize(file, page)) };
-    // a poster sized page would be too big a picture, the stored one is
-    // made smaller to this anyway
+    // a poster sized page would be too big, the stored picture is capped anyway
     const scale = Math.min(capScale(whole.w, whole.h, SNIP_SCALE), MAX_SIDE / Math.max(whole.w, whole.h));
     const blob = await toPng(await renderPart(file, page, scale, part));
     const item = await insertImageBlob(blob, spot.index, spot.x, spot.y, { assetId: file, page, ...whole }, underLast(spot));
@@ -257,8 +250,7 @@ async function sweep(id: string) {
 
 notebookId.subscribe((id) => void loadRefs(id));
 
-// the snip tool cuts from the reference panel, so it comes up with it, in
-// the study workspace where the notes keep their room
+// the snip tool cuts from the side panel, so that comes up in the study workspace
 activeTool.subscribe((tool) => {
   if (tool !== 'snip' || !openDoc()) return;
   if (!get(panels).rightOpen) showReferencePanel(true);

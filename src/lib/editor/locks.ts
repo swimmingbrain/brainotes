@@ -1,6 +1,5 @@
-// a tab holds a web lock on the notebook it has open, so a second tab can
-// not open the same one and the two never write over each other. the lock
-// goes away by itself when the tab closes
+// a web lock per open notebook, so two tabs never write over each other.
+// it goes away by itself when the tab closes
 const held = new Map<string, () => void>();
 
 function lockName(id: string): string {

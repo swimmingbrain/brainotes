@@ -16,9 +16,8 @@ import {
   workspace
 } from '$lib/stores/app';
 
-// every handler swallows the key so the page never scrolls, zooms or clicks
-// a focused button behind it. letters are matched by what is printed on the
-// key, so ctrl+z stays ctrl+z on a german keyboard too
+// handlers swallow the key so nothing behind scrolls, zooms or clicks. letters
+// match the printed key, so ctrl+z stays ctrl+z on a german keyboard
 
 function editable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -48,8 +47,7 @@ function escape(): void {
     actions.clearSelection();
     return;
   }
-  // most browsers leave fullscreen on escape by themselves, the ones that
-  // hand the key on leave present here
+  // most browsers leave fullscreen on escape themselves, this is for the rest
   if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
 }
 
@@ -60,9 +58,8 @@ function bind(fn: () => unknown): KeybindingHandler {
   };
 }
 
-// the arrows move a selection, with shift in bigger steps. without one
-// they only turn pages on a whiteboard or in the board workspace, where
-// nothing else wants them
+// without a selection the arrows only turn pages on a whiteboard or in the
+// board workspace, where nothing else wants them
 function arrow(dx: number, dy: number, page: () => unknown): KeybindingHandler {
   return (e) => {
     if (get(selectionCount) > 0) {
@@ -77,8 +74,6 @@ function arrow(dx: number, dy: number, page: () => unknown): KeybindingHandler {
   };
 }
 
-// holding space is the hand for as long as it is held, then the tool from
-// before comes back
 function installSpaceHand(target: Window): () => void {
   let heldFrom: ToolId | null = null;
 

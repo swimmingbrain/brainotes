@@ -10,8 +10,7 @@ export interface Tool {
   icon: string;
 }
 
-// the order of the rail. the tools you write with sit at the top, the ones
-// you only reach for now and then further down
+// the order of the rail, the tools you write with sit at the top
 export const tools: Tool[] = [
   { id: 'select', label: 'Lasso select', shortcut: 'V', cursor: 'default', icon: 'lasso' },
   { id: 'pen', label: 'Pen', shortcut: 'P', cursor: 'crosshair', icon: 'pen' },
@@ -27,7 +26,6 @@ export const tools: Tool[] = [
 
 export function toolById(id: ToolId): Tool {
   const tool = tools.find((t) => t.id === id);
-  // the id type keeps this unreachable, the fallback is there so callers
-  // never have to deal with undefined
+  // unreachable by the id type, so callers never deal with undefined
   return tool ?? tools[0];
 }

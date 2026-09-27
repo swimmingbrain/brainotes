@@ -22,7 +22,6 @@ export function baseName(name: string): string {
   return name.replace(/\.[^.]+$/, '') || name;
 }
 
-// reads a pdf under a new asset id. a big one shows its progress in a toast
 export async function readFile(file: File): Promise<PdfFile | null> {
   let toast = '';
   let total = 0;
@@ -59,8 +58,7 @@ export function pdfAsset(file: File, pdf: PdfFile, notebookId: string): AssetRec
   };
 }
 
-// a notebook page for one pdf page. the room for notes is lined, a page
-// that is all pdf is blank. a board gets the pdf page in its middle
+// the room for notes is lined, a page that is all pdf is blank
 export function pdfPageMeta(file: string, page: number, size: PageSize, layout: PdfLayout, kind: NotebookKind): PageMeta {
   const p = placePdfPage(size.w, size.h, layout);
   const paper = get(preferences).paper;
@@ -88,8 +86,7 @@ function pagesOf(pdf: PdfFile, layout: PdfLayout, kind: NotebookKind): PageMeta[
   return pdf.pages.map((size, i) => pdfPageMeta(pdf.id, i + 1, size, layout, kind));
 }
 
-// every page of every pdf becomes a page to write on: each pdf its own
-// notebook, or all of them after the last page of the open one
+// each pdf its own notebook, or all of them after the last page of the open one
 export async function writeOn(files: File[], layout: PdfLayout, target: PdfTarget) {
   preferences.update((p) => (p.pdfLayout === layout ? p : { ...p, pdfLayout: layout }));
   for (const file of files) {

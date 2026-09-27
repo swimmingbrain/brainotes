@@ -14,8 +14,7 @@ export const PAGE_SIZES: Record<PageSize, { ratio: number; label: string }> = {
   wide: { ratio: 9 / 16, label: '16:9' }
 };
 
-// a css background that draws the paper pattern at the given spacing in
-// pixels, used for the page tiles until there are real thumbnails
+// for the page tiles until there are real thumbnails, spacing in pixels
 export function paperPattern(style: PaperStyle, color: PaperColor, spacing: number): string {
   const { paper, rule } = PAPER_COLORS[color];
   const s = `${spacing}px ${spacing}px`;
