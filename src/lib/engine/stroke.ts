@@ -23,11 +23,16 @@ export const PENS: Record<PenType, PenLook> = {
 };
 
 const OUTLINE_SMOOTHING = 0.6;
+// tapers take at most these shares of what a line is longer than one pen width,
+// so a short mark is round and not all taper
+const TAPER_START_SHARE = 0.3;
+const TAPER_END_SHARE = 0.4;
 
-// only pen and size, so a stroke looks the same whatever the preferences say later
-export function penOptions(pen: PenType, size: number): StrokeOptions {
+// only pen, size and length, so a stroke looks the same whatever the preferences say later
+export function penOptions(pen: PenType, size: number, length = Infinity): StrokeOptions {
   const look = PENS[pen];
   const s = size * PF_SCALE;
+  const room = Math.max(0, length - s);
   return {
     size: s,
     thinning: look.thinning,
@@ -35,8 +40,8 @@ export function penOptions(pen: PenType, size: number): StrokeOptions {
     streamline: 0,
     simulatePressure: false,
     last: true,
-    start: { cap: true, taper: look.taperStart * s },
-    end: { cap: true, taper: look.taperEnd * s }
+    start: { cap: true, taper: Math.min(look.taperStart * s, room * TAPER_START_SHARE) },
+    end: { cap: true, taper: Math.min(look.taperEnd * s, room * TAPER_END_SHARE) }
   };
 }
 
@@ -136,7 +141,8 @@ export function strokePoints(points: number[][], size: number): StrokePoint[] {
 export function outlineOf(points: number[][], pen: PenType, size: number): number[][] {
   const list = strokePoints(points, size * PF_SCALE);
   if (list.length === 0) return [];
-  return getStrokeOutlinePoints(list, penOptions(pen, size));
+  const length = list[list.length - 1].runningLength;
+  return getStrokeOutlinePoints(list, penOptions(pen, size, length));
 }
 
 // curves through the edge middles round off the corners of the polygon
