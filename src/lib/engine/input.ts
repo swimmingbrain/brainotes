@@ -193,7 +193,7 @@ export class Input {
       if (!this.rawSeen) this.feed(e, active.tool);
       if (active.tool.predict) {
         const predicted = e.getPredictedEvents?.() ?? [];
-        active.tool.predict(predicted.map((p) => this.sample(p)));
+        if (predicted.length > 0) active.tool.predict(predicted.map((p) => this.sample(p)));
       }
       return;
     }

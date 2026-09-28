@@ -27,10 +27,11 @@ const HOLD_MOVE = 3;
 // css pixels, smaller lines are writing, not shapes
 const SNAP_MIN = 28;
 // css pixels: a key this close to the last one adds nothing, the refit may move a
-// point this far, a lift further away is not believed
+// point this far, a lift further away is not believed, a guess goes this far ahead
 const KEY_GAP = 0.2;
 const REFIT_MOVE = 0.35;
 const UP_REACH = 12;
+const TAIL = 4;
 
 // a made up neighbour for the ends, so the curve leaves them at full speed
 function mirror(p: number[], q: number[]): number[] {
@@ -160,9 +161,25 @@ export class PenTool implements Tool {
     if (this.on) this.add(s, false);
   }
 
+  // the guess is cut short, a long one overshoots where the pen stops and jumps back
   predict(list: Sample[]) {
-    if (!this.on) return;
-    this.tail = list.map((s) => this.toPage(s.x, s.y, this.pressure));
+    if (!this.on || !this.tip || list.length === 0) return;
+    const reach = (TAIL / this.view.cam.zoom) * PF_SCALE;
+    const tail: number[][] = [];
+    let from = this.tip;
+    let left = reach;
+    for (const s of list) {
+      const p = this.toPage(s.x, s.y, this.pressure);
+      const d = Math.hypot(p[0] - from[0], p[1] - from[1]);
+      if (d >= left) {
+        if (d > 0) tail.push([from[0] + ((p[0] - from[0]) * left) / d, from[1] + ((p[1] - from[1]) * left) / d, p[2]]);
+        break;
+      }
+      tail.push(p);
+      left -= d;
+      from = p;
+    }
+    this.tail = tail;
     this.request();
   }
 
