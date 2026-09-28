@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { euro, newEuro, smoothingOf } from './smooth';
+import { euro, newEuro, refit, smoothingOf } from './smooth';
 
 const STEP = 1000 / 240;
 
@@ -49,5 +49,59 @@ describe('pen filter', () => {
     expect(smoothingOf(1).min).toBeLessThan(smoothingOf(0.5).min);
     expect(smoothingOf(1).refit).toBeGreaterThan(smoothingOf(0.5).refit);
     expect(wobble(run(20, 0.3, 120, smoothingOf(1)).slice(20))).toBeLessThan(wobble(run(20, 0.3, 120).slice(20)));
+  });
+});
+
+// a line along x with a small wobble on y
+function shaky(count: number, step: number, size: number): number[][] {
+  const pts: number[][] = [];
+  for (let i = 0; i < count; i++) pts.push([i * step, (i % 2 === 0 ? 1 : -1) * size, 0.5]);
+  return pts;
+}
+
+describe('refit after the lift', () => {
+  it('keeps both ends where they are', () => {
+    const pts = shaky(40, 0.5, 0.3);
+    const out = refit(pts, 2, 0.35);
+    expect(out[0]).toEqual(pts[0]);
+    expect(out[out.length - 1]).toEqual(pts[pts.length - 1]);
+  });
+
+  it('takes the wobble out of a line', () => {
+    const pts = shaky(60, 0.5, 0.3);
+    const out = refit(pts, 2, 0.35);
+    expect(wobble(out.slice(8, -8).map((p) => ({ y: p[1] })))).toBeLessThan(0.08);
+  });
+
+  it('moves no point further than allowed', () => {
+    const pts = shaky(60, 0.5, 2);
+    const out = refit(pts, 3, 0.35);
+    for (let i = 0; i < pts.length; i++) {
+      expect(Math.hypot(out[i][0] - pts[i][0], out[i][1] - pts[i][1])).toBeLessThanOrEqual(0.35 + 1e-9);
+    }
+  });
+
+  it('keeps a corner sharp', () => {
+    // down to a point and up again, like the bottom of a v
+    const pts: number[][] = [];
+    for (let i = 0; i <= 20; i++) pts.push([i * 0.5, i * 0.5, 0.5]);
+    for (let i = 1; i <= 20; i++) pts.push([10 + i * 0.5, 10 - i * 0.5, 0.5]);
+    const out = refit(pts, 2, 0.35);
+    expect(out[20][0]).toBe(10);
+    expect(out[20][1]).toBe(10);
+  });
+
+  it('keeps the pressure', () => {
+    const pts = shaky(20, 0.5, 0.3).map((p, i) => [p[0], p[1], i / 20]);
+    const out = refit(pts, 2, 0.35);
+    for (let i = 0; i < pts.length; i++) expect(out[i][2]).toBe(pts[i][2]);
+  });
+
+  it('leaves a line of two points alone', () => {
+    const pts = [
+      [0, 0, 0.5],
+      [3, 1, 0.5]
+    ];
+    expect(refit(pts, 2, 0.35)).toEqual(pts);
   });
 });
