@@ -29,11 +29,18 @@ const OUTLINE_SMOOTHING = 0.6;
 const TAPER_START_SHARE = 0.3;
 const TAPER_END_SHARE = 0.4;
 
+// a piece of a longer line tapers only where the line starts or ends, length is the whole line
+export interface Part {
+  start: boolean;
+  end: boolean;
+  length: number;
+}
+
 // only pen, size and length, so a stroke looks the same whatever the preferences say later
-export function penOptions(pen: PenType, size: number, length = Infinity): StrokeOptions {
+export function penOptions(pen: PenType, size: number, length = Infinity, part?: Part): StrokeOptions {
   const look = PENS[pen];
   const s = size * PF_SCALE;
-  const room = Math.max(0, length - s);
+  const room = Math.max(0, (part ? part.length : length) - s);
   return {
     size: s,
     thinning: look.thinning,
@@ -41,9 +48,15 @@ export function penOptions(pen: PenType, size: number, length = Infinity): Strok
     streamline: 0,
     simulatePressure: false,
     last: true,
-    start: { cap: true, taper: Math.min(look.taperStart * s, room * TAPER_START_SHARE) },
-    end: { cap: true, taper: Math.min(look.taperEnd * s, room * TAPER_END_SHARE) }
+    start: { cap: true, taper: part && !part.start ? 0 : Math.min(look.taperStart * s, room * TAPER_START_SHARE) },
+    end: { cap: true, taper: part && !part.end ? 0 : Math.min(look.taperEnd * s, room * TAPER_END_SHARE) }
   };
+}
+
+// where the tapers of a line this long reach in from its ends, in scaled units
+export function taperReach(pen: PenType, size: number, length: number): { start: number; end: number } {
+  const o = penOptions(pen, size, length);
+  return { start: Number(o.start?.taper ?? 0), end: Number(o.end?.taper ?? 0) };
 }
 
 // a light touch still makes a line that shows
@@ -136,11 +149,17 @@ export function strokePoints(points: number[][], size: number): StrokePoint[] {
 }
 
 // the outline in scaled units, for points that are scaled already. one point is a dot
-export function outlineOf(points: number[][], pen: PenType, size: number): number[][] {
+export function outlineOf(points: number[][], pen: PenType, size: number, part?: Part): number[][] {
   const list = strokePoints(points, size * PF_SCALE);
   if (list.length === 0) return [];
   const length = list[list.length - 1].runningLength;
-  return getStrokeOutlinePoints(list, penOptions(pen, size, length));
+  return getStrokeOutlinePoints(list, penOptions(pen, size, length, part));
+}
+
+export function lengthOf(points: number[][], from = 0, to = points.length - 1): number {
+  let run = 0;
+  for (let i = from + 1; i <= to; i++) run += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+  return run;
 }
 
 // curves through the edge middles round off the corners of the polygon

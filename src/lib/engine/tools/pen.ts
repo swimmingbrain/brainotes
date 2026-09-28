@@ -1,10 +1,10 @@
-import { growBox, itemBox } from '../bounds';
+import { emptyBox, growBox, itemBox } from '../bounds';
 import { newId } from '../doc';
 import { inkColor, isDark } from '../render';
 import { shapePath } from '../shapes';
 import { euro, newEuro, refit, smoothingOf } from '../smooth';
 import { recognize } from '../snap';
-import { curveBetween, mapPressure, outlineOf, PENS, PF_SCALE, strokePath, traceOutline } from '../stroke';
+import { curveBetween, lengthOf, mapPressure, outlineOf, PENS, PF_SCALE, strokePath, taperReach, traceOutline } from '../stroke';
 import type { Box, Item, PenType, Shape, Stroke } from '../types';
 import type { CanvasView } from '../view';
 import type { PointerKind, Sample, Tool } from './tool';
@@ -32,6 +32,9 @@ const KEY_GAP = 0.2;
 const REFIT_MOVE = 0.35;
 const UP_REACH = 12;
 const TAIL = 4;
+// points of a long line kept as one finished piece, and points near the pen that stay live
+const PIECE = 64;
+const KEEP = 24;
 // ms a finished line stays on the live canvas, until the ink canvas surely shows it
 const GHOST = 50;
 
@@ -59,6 +62,11 @@ export class PenTool implements Tool {
   private tip: number[] | null = null;
   private step = 4;
   private tail: number[][] = [];
+  // finished pieces of a long line are kept as one path, a draw only works out the rest
+  private pieces: Path2D | null = null;
+  private piecesEnd = 0;
+  private piecesLength = 0;
+  private piecesBox: Box = emptyBox();
   private pressure = 0.5;
   // a pen that touches down with no pressure gets the first real one for its start
   private pressureKnown = true;
@@ -112,6 +120,10 @@ export class PenTool implements Tool {
     this.pts = [];
     this.tip = null;
     this.tail = [];
+    this.pieces = null;
+    this.piecesEnd = 0;
+    this.piecesLength = 0;
+    this.piecesBox = emptyBox();
     this.pressure = 0.5;
     this.pressureKnown = kind !== 'pen' || s.pressure > 0;
     this.snapped = null;
@@ -392,33 +404,33 @@ export class PenTool implements Tool {
     this.pts.push(keys[n - 1]);
   }
 
-  private drawStroke(ctx: CanvasRenderingContext2D): Box | null {
+  // the tapers must be settled: the start one inside the first piece, the end one in the live rest
+  private freeze() {
     const pts = this.pts;
-    let extra = 0;
-    // the newest key is not in pts yet
-    if (this.keys.length > 1) {
-      pts.push(this.keys[this.keys.length - 1]);
-      extra++;
+    const full = taperReach(this.pen, this.size, Infinity);
+    while (pts.length - this.piecesEnd > PIECE + KEEP) {
+      const from = this.piecesEnd;
+      const to = from + PIECE;
+      const piece = lengthOf(pts, from, to);
+      if (from === 0 && full.start > 0) {
+        const total = piece + lengthOf(pts, to);
+        if (taperReach(this.pen, this.size, total).start < full.start || piece < full.start) break;
+      }
+      if (full.end > 0 && lengthOf(pts, to) < full.end) break;
+      const outline = outlineOf(pts.slice(from, to + 1), this.pen, this.size, {
+        start: from === 0,
+        end: false,
+        length: this.piecesLength + piece + lengthOf(pts, to)
+      });
+      if (!this.pieces) this.pieces = new Path2D();
+      traceOutline(this.pieces, outline);
+      growBox(this.piecesBox, this.boxOf(outline));
+      this.piecesEnd = to;
+      this.piecesLength += piece;
     }
-    if (this.tip) {
-      pts.push(this.tip);
-      extra++;
-    }
-    for (const t of this.tail) {
-      pts.push(t);
-      extra++;
-    }
-    const outline = outlineOf(pts, this.pen, this.size);
-    pts.length -= extra;
-    if (outline.length < 3) return null;
+  }
 
-    this.view.applyPage(ctx, this.page);
-    ctx.globalAlpha = PENS[this.pen].alpha;
-    ctx.fillStyle = this.shown;
-    ctx.beginPath();
-    traceOutline(ctx, outline);
-    ctx.fill();
-
+  private boxOf(outline: number[][]): Box {
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -430,6 +442,29 @@ export class PenTool implements Tool {
       if (p[1] > maxY) maxY = p[1];
     }
     const k = 1 / PF_SCALE;
-    return this.view.toDevice(this.page, { minX: minX * k, minY: minY * k, maxX: maxX * k, maxY: maxY * k });
+    return { minX: minX * k, minY: minY * k, maxX: maxX * k, maxY: maxY * k };
+  }
+
+  private drawStroke(ctx: CanvasRenderingContext2D): Box | null {
+    this.freeze();
+    const rest = this.pts.slice(this.piecesEnd);
+    // the newest key is not in pts yet
+    if (this.keys.length > 1) rest.push(this.keys[this.keys.length - 1]);
+    if (this.tip) rest.push(this.tip);
+    for (const t of this.tail) rest.push(t);
+    const part = this.pieces ? { start: false, end: true, length: this.piecesLength + lengthOf(rest) } : undefined;
+    const outline = outlineOf(rest, this.pen, this.size, part);
+    if (outline.length < 3) return null;
+
+    // one fill for all, so a see through pen is not darker where pieces meet
+    const path = this.pieces ? new Path2D(this.pieces) : new Path2D();
+    traceOutline(path, outline);
+    this.view.applyPage(ctx, this.page);
+    ctx.globalAlpha = PENS[this.pen].alpha;
+    ctx.fillStyle = this.shown;
+    ctx.fill(path);
+    const box = this.boxOf(outline);
+    if (this.pieces) growBox(box, this.piecesBox);
+    return this.view.toDevice(this.page, box);
   }
 }
