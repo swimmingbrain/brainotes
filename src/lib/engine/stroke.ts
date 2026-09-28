@@ -51,12 +51,15 @@ export function followFactor(smoothing: number): number {
   return 0.15 + (1 - streamline) * 0.85;
 }
 
+// a light touch still makes a line that shows
+export const MIN_PRESSURE = 0.2;
+
 // light writing already looks normal, the sensitivity (0.5 is normal) widens
 // or narrows the range around the middle
 export function mapPressure(raw: number, sensitivity: number): number {
   const curved = Math.pow(Math.max(0, Math.min(1, raw)), 0.65);
   const p = 0.5 + (curved - 0.5) * sensitivity * 2;
-  return Math.max(0.05, Math.min(1, p));
+  return Math.max(MIN_PRESSURE, Math.min(1, p));
 }
 
 // catmull-rom points strictly between b and c, about step apart. centripetal,
