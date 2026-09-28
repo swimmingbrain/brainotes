@@ -1,4 +1,4 @@
-import { getStroke, getStrokeOutlinePoints, type StrokeOptions, type StrokePoint } from 'perfect-freehand';
+import { getStrokeOutlinePoints, type StrokeOptions, type StrokePoint } from 'perfect-freehand';
 import { derived } from './cache';
 import type { PenType, Stroke } from './types';
 
@@ -86,38 +86,57 @@ export function scaledPoints(pts: Float32Array): number[][] {
   return out;
 }
 
+// points closer than this share of the pen size only add noise, which the outline
+// shows as bumps along the line and as a knob where a last tiny step turns away
+const MIN_GAP = 0.15;
+
+function strokePoint(p: number[], prev: StrokePoint | undefined): StrokePoint {
+  if (!prev) return { point: [p[0], p[1]], pressure: p[2] ?? 0.5, vector: [0, 0], distance: 0, runningLength: 0 };
+  const dx = prev.point[0] - p[0];
+  const dy = prev.point[1] - p[1];
+  const distance = Math.hypot(dx, dy);
+  return {
+    point: [p[0], p[1]],
+    pressure: p[2] ?? 0.5,
+    vector: [dx / distance, dy / distance],
+    distance,
+    runningLength: prev.runningLength + distance
+  };
+}
+
 // getStrokePoints without its streamline (the pen tool smooths already) and without
-// dropping the points near the start, which left a taper with two outline points
-function strokePoints(points: number[][]): StrokePoint[] {
+// dropping the points near the start, which left a taper with two outline points.
+// the first and the last point always stay, so the line starts and ends at the pen
+export function strokePoints(points: number[][], size: number): StrokePoint[] {
   const out: StrokePoint[] = [];
-  let run = 0;
-  for (const p of points) {
-    const prev = out[out.length - 1];
-    if (!prev) {
-      out.push({ point: [p[0], p[1]], pressure: p[2] ?? 0.5, vector: [0, 0], distance: 0, runningLength: 0 });
-      continue;
+  const gap = size * MIN_GAP;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const p = points[i];
+    let prev = out[out.length - 1];
+    if (prev) {
+      const d = Math.hypot(p[0] - prev.point[0], p[1] - prev.point[1]);
+      if (d === 0) continue;
+      if (d < gap) {
+        if (i < n - 1) continue;
+        // the end takes the place of the point just before it
+        if (out.length > 1) {
+          out.pop();
+          prev = out[out.length - 1];
+        }
+      }
     }
-    const dx = prev.point[0] - p[0];
-    const dy = prev.point[1] - p[1];
-    const distance = Math.hypot(dx, dy);
-    if (distance === 0) continue;
-    run += distance;
-    out.push({
-      point: [p[0], p[1]],
-      pressure: p[2] ?? 0.5,
-      vector: [dx / distance, dy / distance],
-      distance,
-      runningLength: run
-    });
+    out.push(strokePoint(p, prev));
   }
   if (out.length > 1) out[0].vector = out[1].vector;
   return out;
 }
 
-// the outline in scaled units, for points that are scaled already
+// the outline in scaled units, for points that are scaled already. one point is a dot
 export function outlineOf(points: number[][], pen: PenType, size: number): number[][] {
-  if (points.length < 2) return getStroke(points, penOptions(pen, size));
-  return getStrokeOutlinePoints(strokePoints(points), penOptions(pen, size));
+  const list = strokePoints(points, size * PF_SCALE);
+  if (list.length === 0) return [];
+  return getStrokeOutlinePoints(list, penOptions(pen, size));
 }
 
 // curves through the edge middles round off the corners of the polygon
