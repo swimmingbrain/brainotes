@@ -54,7 +54,8 @@ export class PenTool implements Tool {
   private step = 4;
   private tail: number[][] = [];
   private pressure = 0.5;
-  private zeroStart = false;
+  // a pen that touches down with no pressure gets the first real one for its start
+  private pressureKnown = true;
   private keyX = 0;
   private keyY = 0;
   private lastX = 0;
@@ -105,7 +106,7 @@ export class PenTool implements Tool {
     this.tip = null;
     this.tail = [];
     this.pressure = 0.5;
-    this.zeroStart = kind === 'pen' && s.pressure === 0;
+    this.pressureKnown = kind !== 'pen' || s.pressure > 0;
     this.snapped = null;
     this.snapping = set.holdToSnap && set.pen !== 'highlighter';
     this.holdX = s.x;
@@ -295,14 +296,20 @@ export class PenTool implements Tool {
     }
 
     if (this.kind === 'pen') {
-      // a pen that already left the glass reports no pressure
-      if (s.pressure === 0 && !first) return;
-      const p = mapPressure(s.pressure === 0 ? 0.5 : s.pressure, this.sensitivity);
-      this.pressure = first ? p : this.pressure + (p - this.pressure) * 0.5;
-      if (this.zeroStart && !first) {
-        // some pens report 0 on the first sample, it takes the second one's
-        this.keys[0][2] = this.pressure;
-        this.zeroStart = false;
+      // a pen that touches with no pressure keeps its place in the line and the
+      // pressure it had, only the start waits for a real one
+      if (s.pressure > 0) {
+        const p = mapPressure(s.pressure, this.sensitivity);
+        if (!this.pressureKnown) {
+          this.pressureKnown = true;
+          this.pressure = p;
+          for (const k of this.keys) k[2] = p;
+          for (const k of this.pts) k[2] = p;
+        } else {
+          this.pressure = first ? p : this.pressure + (p - this.pressure) * 0.5;
+        }
+      } else if (first) {
+        this.pressure = mapPressure(0.5, this.sensitivity);
       }
     } else if (!first) {
       // no pressure from a mouse or a finger, a fast line gets a bit thinner
