@@ -2,8 +2,9 @@ import { itemBox } from '../bounds';
 import { newId } from '../doc';
 import { inkColor, isDark } from '../render';
 import { shapePath } from '../shapes';
+import { euro, newEuro, refit, smoothingOf } from '../smooth';
 import { recognize } from '../snap';
-import { curveBetween, followFactor, mapPressure, outlineOf, PENS, PF_SCALE, strokePath, traceOutline } from '../stroke';
+import { curveBetween, mapPressure, outlineOf, PENS, PF_SCALE, strokePath, traceOutline } from '../stroke';
 import type { Box, Item, PenType, Shape, Stroke } from '../types';
 import type { CanvasView } from '../view';
 import type { PointerKind, Sample, Tool } from './tool';
@@ -25,6 +26,9 @@ const HOLD = 500;
 const HOLD_MOVE = 3;
 // css pixels, smaller lines are writing, not shapes
 const SNAP_MIN = 28;
+// css pixels: a key this close to the last one adds nothing, the refit may move a point this far
+const KEY_GAP = 0.2;
+const REFIT_MOVE = 0.35;
 
 // a made up neighbour for the ends, so the curve leaves them at full speed
 function mirror(p: number[], q: number[]): number[] {
@@ -40,9 +44,10 @@ export class PenTool implements Tool {
   private color = '';
   private shown = '';
   private size = 2;
-  private follow = 0.66;
   private sensitivity = 0.5;
-  // keys are smoothed, the newest sample stays raw in tip so the line reaches the pen
+  // keys are smoothed while drawing, the newest sample stays raw in tip so the line reaches the pen
+  private filter = newEuro(2.5, 0.1);
+  private refitWidth = 1.6;
   private keys: number[][] = [];
   private pts: number[][] = [];
   private tip: number[] | null = null;
@@ -50,6 +55,8 @@ export class PenTool implements Tool {
   private tail: number[][] = [];
   private pressure = 0.5;
   private zeroStart = false;
+  private keyX = 0;
+  private keyY = 0;
   private lastX = 0;
   private lastY = 0;
   private lastTime = 0;
@@ -87,7 +94,9 @@ export class PenTool implements Tool {
     this.color = set.color;
     this.shown = inkColor(set.color, isDark(meta.paper));
     this.size = set.size;
-    this.follow = followFactor(set.smoothing);
+    const smooth = smoothingOf(set.smoothing);
+    this.filter = newEuro(smooth.min, smooth.beta);
+    this.refitWidth = smooth.refit;
     this.sensitivity = set.pressure;
     // half a pen width apart, the outline drops closer points anyway
     this.step = Math.max(0.75, set.size * 0.6) * PF_SCALE;
@@ -150,7 +159,7 @@ export class PenTool implements Tool {
 
   predict(list: Sample[]) {
     if (!this.on) return;
-    this.tail = list.map((s) => this.toPage(s, this.pressure));
+    this.tail = list.map((s) => this.toPage(s.x, s.y, this.pressure));
     this.request();
   }
 
@@ -181,7 +190,9 @@ export class PenTool implements Tool {
       curveBetween(before, keys[m - 1], keys[m], mirror(keys[m], keys[m - 1]), this.step, this.pts);
       this.pts.push(keys[m]);
     }
-    const all = this.pts;
+    // a last gentle pass over the whole line, too small to see it move
+    const unit = PF_SCALE / this.view.cam.zoom;
+    const all = refit(this.pts, this.refitWidth * unit, REFIT_MOVE * unit);
     const pts = new Float32Array(all.length * 3);
     for (let i = 0; i < all.length; i++) {
       pts[i * 3] = all[i][0] / PF_SCALE;
@@ -258,24 +269,18 @@ export class PenTool implements Tool {
     else this.view.requestLive();
   }
 
-  private toPage(s: Sample, pressure: number): number[] {
+  private toPage(sx: number, sy: number, pressure: number): number[] {
     const cam = this.view.cam;
-    const x = cam.x + s.x / cam.zoom - this.view.pageX(this.page);
-    const y = cam.y + s.y / cam.zoom - this.view.pageY(this.page);
+    const x = cam.x + sx / cam.zoom - this.view.pageX(this.page);
+    const y = cam.y + sy / cam.zoom - this.view.pageY(this.page);
     return [x * PF_SCALE, y * PF_SCALE, pressure];
   }
 
   private add(s: Sample, first: boolean) {
-    const dx = s.x - this.lastX;
-    const dy = s.y - this.lastY;
-    const dist = Math.hypot(dx, dy);
-    // samples closer than half a device pixel add nothing but noise
-    if (!first && dist < 0.5 / this.view.dpr) return;
-
     if (this.snapped) {
       const kind = this.snapped.kind;
       if (kind === 'line' || kind === 'arrow') {
-        const [px, py] = this.toPage(s, 0);
+        const [px, py] = this.toPage(s.x, s.y, 0);
         const x2 = this.snapEndX + px / PF_SCALE - this.snapX;
         const y2 = this.snapEndY + py / PF_SCALE - this.snapY;
         this.snapped = { ...this.snapped, x2, y2 };
@@ -301,6 +306,7 @@ export class PenTool implements Tool {
       }
     } else if (!first) {
       // no pressure from a mouse or a finger, a fast line gets a bit thinner
+      const dist = Math.hypot(s.x - this.lastX, s.y - this.lastY);
       const speed = dist / Math.max(4, s.time - this.lastTime);
       const target = 0.62 - 0.25 * Math.min(1, speed / FAST);
       this.pressure += (target - this.pressure) * 0.25;
@@ -308,19 +314,21 @@ export class PenTool implements Tool {
       this.pressure = 0.62;
     }
 
-    const point = this.toPage(s, this.pressure);
+    const f = this.filter;
+    euro(f, s.x, s.y, s.time);
     if (first) {
+      const point = this.toPage(s.x, s.y, this.pressure);
       this.keys.push(point);
       this.pts.push(point);
+      this.keyX = s.x;
+      this.keyY = s.y;
     } else {
-      // smoothing is for the jitter of a slow hand, a fast move has none and should not lag
-      const tip = this.tip;
-      if (tip) {
-        const prev = this.keys[this.keys.length - 1];
-        const f = this.follow + (1 - this.follow) * Math.min(1, Math.max(0, (dist - 3) / 12));
-        this.addKey([prev[0] + (tip[0] - prev[0]) * f, prev[1] + (tip[1] - prev[1]) * f, tip[2]]);
+      this.tip = this.toPage(s.x, s.y, this.pressure);
+      if (Math.hypot(f.x - this.keyX, f.y - this.keyY) >= KEY_GAP) {
+        this.addKey(this.toPage(f.x, f.y, this.pressure));
+        this.keyX = f.x;
+        this.keyY = f.y;
       }
-      this.tip = point;
     }
     this.tail = [];
     this.lastX = s.x;

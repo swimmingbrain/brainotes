@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { curveBetween, followFactor, mapPressure } from './stroke';
+import { curveBetween, mapPressure } from './stroke';
 
 describe('stroke input', () => {
   it('fills a long gap with points on a curve, a short one not at all', () => {
@@ -43,10 +43,5 @@ describe('stroke input', () => {
     expect(mapPressure(0.9, 0)).toBe(0.5);
     // more sensitivity spreads it out
     expect(mapPressure(0.2, 1)).toBeLessThan(mapPressure(0.2, 0.5));
-  });
-
-  it('smooths more with a higher smoothing preference', () => {
-    expect(followFactor(1)).toBeLessThan(followFactor(0.5));
-    expect(followFactor(0)).toBeLessThan(1);
   });
 });

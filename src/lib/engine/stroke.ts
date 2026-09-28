@@ -46,12 +46,6 @@ export function penOptions(pen: PenType, size: number, length = Infinity): Strok
   };
 }
 
-// smoothing 0 follows the pen, 1 smooths a lot
-export function followFactor(smoothing: number): number {
-  const streamline = 0.15 + smoothing * 0.5;
-  return 0.15 + (1 - streamline) * 0.85;
-}
-
 // a light touch still makes a line that shows
 export const MIN_PRESSURE = 0.2;
 
