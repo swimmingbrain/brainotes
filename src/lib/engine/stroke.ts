@@ -14,8 +14,9 @@ interface PenLook {
   alpha: number;
 }
 
+// the ballpoint stays nearly even like a real one, the fountain pen is the one that swells
 export const PENS: Record<PenType, PenLook> = {
-  ballpoint: { thinning: 0.25, taperStart: 0, taperEnd: 0, alpha: 1 },
+  ballpoint: { thinning: 0.15, taperStart: 0, taperEnd: 0, alpha: 1 },
   fountain: { thinning: 0.6, taperStart: 1.5, taperEnd: 3.5, alpha: 1 },
   marker: { thinning: 0, taperStart: 0, taperEnd: 0, alpha: 1 },
   pencil: { thinning: 0.15, taperStart: 0, taperEnd: 0, alpha: 0.75 },
