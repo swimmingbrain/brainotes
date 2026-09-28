@@ -121,6 +121,8 @@ export class CanvasView {
   private full = true;
   private liveBox: Box | null = null;
   private liveClean = false;
+  // a desynchronized live canvas shows a drawing at once, so input can draw it
+  private fast = false;
   private zoomedAt = 0;
   private zoomTimer: ReturnType<typeof setTimeout> | null = null;
   // a paper notebook keeps fitting its width until someone zooms
@@ -171,6 +173,7 @@ export class CanvasView {
     this.inkCtx = this.ink.getContext('2d')!;
     // the live canvas skips the compositor queue, the pen tip gets ink sooner
     this.liveCtx = this.live.getContext('2d', { desynchronized: true })!;
+    this.fast = this.liveCtx.getContextAttributes?.().desynchronized === true;
     this.hl.style.opacity = String(HIGHLIGHTER_ALPHA);
     this.live.style.touchAction = 'none';
     host.style.isolation = 'isolate';
@@ -247,6 +250,11 @@ export class CanvasView {
   requestLive() {
     this.liveDirty = true;
     this.requestFrame();
+  }
+
+  // input asks for the live canvas right away, the frame loop stays the fallback
+  liveNow() {
+    if (this.fast && this.liveDirty && !this.sizeDirty) this.drawLive();
   }
 
   // a live highlighter stroke is drawn on the highlighter canvas, so it is redone

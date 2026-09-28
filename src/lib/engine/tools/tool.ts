@@ -14,6 +14,8 @@ export interface Sample {
 
 // the input calls these hooks, the view draws the overlay
 export interface Tool {
+  // the live canvas is drawn as soon as input comes, not at the next frame
+  instant?: boolean;
   down(s: Sample, kind: PointerKind): void;
   move(s: Sample): void;
   // where the browser thinks the pointer goes next, only ever a preview

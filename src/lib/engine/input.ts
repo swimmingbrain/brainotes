@@ -163,6 +163,7 @@ export class Input {
     drawing = tool !== this.tools.hand;
     this.view.tool = tool;
     tool.down(this.sample(e), kind);
+    if (tool.instant) this.view.liveNow();
   };
 
   private feed(e: PointerEvent, tool: Tool) {
@@ -172,6 +173,8 @@ export class Input {
     } else {
       tool.move(this.sample(e));
     }
+    // once per input event the live line is drawn at once
+    if (tool.instant) this.view.liveNow();
   }
 
   private onraw = (e: PointerEvent) => {
@@ -194,6 +197,7 @@ export class Input {
       if (active.tool.predict) {
         const predicted = e.getPredictedEvents?.() ?? [];
         if (predicted.length > 0) active.tool.predict(predicted.map((p) => this.sample(p)));
+        if (active.tool.instant) this.view.liveNow();
       }
       return;
     }

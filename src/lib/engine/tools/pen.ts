@@ -1,4 +1,4 @@
-import { itemBox } from '../bounds';
+import { growBox, itemBox } from '../bounds';
 import { newId } from '../doc';
 import { inkColor, isDark } from '../render';
 import { shapePath } from '../shapes';
@@ -32,6 +32,8 @@ const KEY_GAP = 0.2;
 const REFIT_MOVE = 0.35;
 const UP_REACH = 12;
 const TAIL = 4;
+// ms a finished line stays on the live canvas, until the ink canvas surely shows it
+const GHOST = 50;
 
 // a made up neighbour for the ends, so the curve leaves them at full speed
 function mirror(p: number[], q: number[]): number[] {
@@ -39,6 +41,7 @@ function mirror(p: number[], q: number[]): number[] {
 }
 
 export class PenTool implements Tool {
+  readonly instant = true;
   private on = false;
   private page = -1;
   private pageId = '';
@@ -64,10 +67,11 @@ export class PenTool implements Tool {
   private lastX = 0;
   private lastY = 0;
   private lastTime = 0;
-  // a finished stroke stays on the live canvas one more frame, until the ink canvas shows it
+  // a finished stroke stays on the live canvas a little, until the ink canvas shows it
   private ghost: Item | null = null;
   private ghostPage = 0;
   private ghostColor = '';
+  private ghostUntil = 0;
   // draw and hold: after the snap the pen drags the end of a line or arrow
   private snapping = false;
   private holdX = 0;
@@ -199,10 +203,7 @@ export class PenTool implements Tool {
       if (page) {
         this.view.history.run({ type: 'items', pageId: this.pageId, removed: [], added: [{ item: shape, index: page.items.length }] });
       }
-      this.ghost = shape;
-      this.ghostPage = this.page;
-      this.ghostColor = this.shown;
-      this.request();
+      this.keepGhost(shape);
       return;
     }
     // the raw end becomes the last key and the last gaps get their curve
@@ -233,12 +234,16 @@ export class PenTool implements Tool {
         added: [{ item: stroke, index: page.items.length }]
       });
     }
-    if (this.pen !== 'highlighter') {
-      this.ghost = stroke;
-      this.ghostPage = this.page;
-      this.ghostColor = this.shown;
-    }
-    this.request();
+    if (this.pen !== 'highlighter') this.keepGhost(stroke);
+    else this.request();
+  }
+
+  private keepGhost(item: Item) {
+    this.ghost = item;
+    this.ghostPage = this.page;
+    this.ghostColor = this.shown;
+    this.ghostUntil = performance.now() + GHOST;
+    this.view.requestLive();
   }
 
   cancel() {
@@ -249,11 +254,13 @@ export class PenTool implements Tool {
     this.request();
   }
 
+  // the next line may start while the last one is still a ghost, both are drawn
   drawLive(ctx: CanvasRenderingContext2D): Box | null {
-    if (this.ghost) {
-      const ghost = this.ghost;
-      this.ghost = null;
-      if (this.ghostPage >= this.view.doc.pageCount) return null;
+    let box: Box | null = null;
+    const ghost = this.ghost;
+    if (ghost && performance.now() > this.ghostUntil) this.ghost = null;
+    else if (ghost && this.ghostPage < this.view.doc.pageCount) {
+      ctx.save();
       this.view.applyPage(ctx, this.ghostPage);
       if (ghost.type === 'shape') this.drawShape(ctx, ghost, this.ghostColor);
       else if (ghost.type === 'stroke') {
@@ -261,17 +268,24 @@ export class PenTool implements Tool {
         ctx.fillStyle = this.ghostColor;
         ctx.fill(strokePath(ghost));
       }
-      // one more frame to wipe it
+      ctx.restore();
+      box = this.view.toDevice(this.ghostPage, itemBox(ghost));
+      // another frame to wipe it
       this.view.requestLive();
-      return this.view.toDevice(this.ghostPage, itemBox(ghost));
     }
-    if (!this.on || this.pen === 'highlighter') return null;
+    if (!this.on || this.pen === 'highlighter') return box;
+    let line: Box | null;
+    ctx.save();
     if (this.snapped) {
       this.view.applyPage(ctx, this.page);
       this.drawShape(ctx, this.snapped, this.shown);
-      return this.view.toDevice(this.page, itemBox(this.snapped));
+      line = this.view.toDevice(this.page, itemBox(this.snapped));
+    } else {
+      line = this.drawStroke(ctx);
     }
-    return this.drawStroke(ctx);
+    ctx.restore();
+    if (box && line) growBox(box, line);
+    return box ?? line;
   }
 
   private drawShape(ctx: CanvasRenderingContext2D, shape: Shape, color: string) {
