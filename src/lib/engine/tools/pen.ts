@@ -26,9 +26,11 @@ const HOLD = 500;
 const HOLD_MOVE = 3;
 // css pixels, smaller lines are writing, not shapes
 const SNAP_MIN = 28;
-// css pixels: a key this close to the last one adds nothing, the refit may move a point this far
+// css pixels: a key this close to the last one adds nothing, the refit may move a
+// point this far, a lift further away is not believed
 const KEY_GAP = 0.2;
 const REFIT_MOVE = 0.35;
+const UP_REACH = 12;
 
 // a made up neighbour for the ends, so the curve leaves them at full speed
 function mirror(p: number[], q: number[]): number[] {
@@ -164,8 +166,12 @@ export class PenTool implements Tool {
     this.request();
   }
 
-  up() {
+  up(s?: Sample) {
     if (!this.on) return;
+    // the lift often comes a little further on than the last move
+    if (s && !this.snapped && Math.hypot(s.x - this.lastX, s.y - this.lastY) < UP_REACH) {
+      this.add({ ...s, pressure: 0 }, false);
+    }
     this.on = false;
     this.tail = [];
     this.stopHold();

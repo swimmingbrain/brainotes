@@ -18,7 +18,8 @@ export interface Tool {
   move(s: Sample): void;
   // where the browser thinks the pointer goes next, only ever a preview
   predict?(list: Sample[]): void;
-  up(): void;
+  // s is where the pointer was let go, missing when the stroke was cut off
+  up(s?: Sample): void;
   cancel(): void;
   // runs at the start of every frame while the tool is the view's tool
   frame?(): void;

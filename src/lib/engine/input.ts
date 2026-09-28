@@ -223,7 +223,7 @@ export class Input {
     drawing = false;
     // a cancelled pen stroke still keeps its ink, only gestures are dropped
     if (cancel && active.tool === this.tools.hand) active.tool.cancel();
-    else active.tool.up();
+    else active.tool.up(cancel ? undefined : this.sample(e));
   }
 
   private onup = (e: PointerEvent) => this.finish(e, false);
