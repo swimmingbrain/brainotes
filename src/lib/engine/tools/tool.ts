@@ -31,4 +31,6 @@ export interface Tool {
   drawLive?(ctx: CanvasRenderingContext2D): Box | null;
   // the same on the highlighter canvas, under the ink
   drawUnder?(ctx: CanvasRenderingContext2D): Box | null;
+  // color and css px width of the line at the pen tip, for the system ink trail
+  trail?(): { color: string; diameter: number } | null;
 }

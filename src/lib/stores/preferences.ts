@@ -28,6 +28,8 @@ export interface Preferences {
   pressure: number;
   smoothing: number;
   holdToSnap: boolean;
+  // the system draws the newest bit of a pen line ahead of the page
+  inkTrail: boolean;
 }
 
 const STORAGE_KEY = 'brainotes-preferences';
@@ -63,7 +65,8 @@ export function defaultPreferences(): Preferences {
     fingerDraws: false,
     pressure: 0.5,
     smoothing: 0.5,
-    holdToSnap: true
+    holdToSnap: true,
+    inkTrail: true
   };
 }
 

@@ -1,4 +1,5 @@
 import { clampZoom, type Camera } from './camera';
+import { askTrail, dropTrail, trailFrom } from './ink';
 import type { PointerKind, Sample, Tool } from './tools/tool';
 import type { CanvasView } from './view';
 
@@ -29,6 +30,8 @@ export interface InputTools {
 export interface InputHooks {
   kind?: (kind: PointerKind) => void;
   fingerDraws: () => boolean;
+  // the system draws the newest bit of a pen line, see ink.ts
+  inkTrail?: () => boolean;
 }
 
 interface Gesture {
@@ -52,6 +55,8 @@ export class Input {
   private raw: boolean;
   // some pointers never send raw updates, then pointermove has the samples
   private rawSeen = false;
+  // the system ink trail runs ahead of the line, the guessed tail is left out then
+  private trailing = false;
 
   constructor(
     private view: CanvasView,
@@ -82,6 +87,7 @@ export class Input {
     el.removeEventListener('lostpointercapture', this.oncancel);
     el.removeEventListener('pointerleave', this.onleave);
     el.removeEventListener('wheel', this.onwheel);
+    dropTrail(el);
     this.active?.tool.cancel();
     this.active = null;
     drawing = false;
@@ -160,28 +166,38 @@ export class Input {
     if (this.view.tool && this.view.tool !== tool) this.view.tool.hover?.(null);
     this.active = { id: e.pointerId, tool, kind };
     this.rawSeen = false;
+    this.trailing = false;
     drawing = tool !== this.tools.hand;
     this.view.tool = tool;
+    if (kind === 'pen' && this.hooks.inkTrail?.()) askTrail(this.view.live);
     tool.down(this.sample(e), kind);
-    if (tool.instant) this.view.liveNow();
+    this.drawn(e, tool);
   };
 
-  private feed(e: PointerEvent, tool: Tool) {
+  // the last sample given to the tool, the line is drawn up to it
+  private feed(e: PointerEvent, tool: Tool): PointerEvent {
     const list = e.getCoalescedEvents?.();
     if (list && list.length > 0) {
       for (const c of list) tool.move(this.sample(c));
-    } else {
-      tool.move(this.sample(e));
+      return list[list.length - 1];
     }
-    // once per input event the live line is drawn at once
+    tool.move(this.sample(e));
+    return e;
+  }
+
+  // once per input event: the live line is drawn at once and the system trail goes on from its end
+  private drawn(e: PointerEvent, tool: Tool) {
     if (tool.instant) this.view.liveNow();
+    if (e.pointerType !== 'pen' || !tool.trail || !this.hooks.inkTrail?.()) return;
+    const style = tool.trail();
+    if (style) this.trailing = trailFrom(e, style.color, style.diameter);
   }
 
   private onraw = (e: PointerEvent) => {
     const active = this.active;
     if (active && e.pointerId === active.id) {
       this.rawSeen = true;
-      this.feed(e, active.tool);
+      this.drawn(this.feed(e, active.tool), active.tool);
     }
   };
 
@@ -193,11 +209,15 @@ export class Input {
     const active = this.active;
     if (active) {
       if (e.pointerId !== active.id) return;
-      if (!this.rawSeen) this.feed(e, active.tool);
-      if (active.tool.predict) {
+      const last = this.rawSeen ? e : this.feed(e, active.tool);
+      if (active.tool.predict && !this.trailing) {
         const predicted = e.getPredictedEvents?.() ?? [];
         if (predicted.length > 0) active.tool.predict(predicted.map((p) => this.sample(p)));
+      }
+      if (this.rawSeen) {
         if (active.tool.instant) this.view.liveNow();
+      } else {
+        this.drawn(last, active.tool);
       }
       return;
     }

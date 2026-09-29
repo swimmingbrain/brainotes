@@ -266,6 +266,14 @@ export class PenTool implements Tool {
     this.request();
   }
 
+  trail(): { color: string; diameter: number } | null {
+    if (!this.on || this.kind !== 'pen' || this.pen === 'highlighter' || this.snapped) return null;
+    const look = PENS[this.pen];
+    const width = this.size * 2 * (0.5 - look.thinning * (0.5 - this.pressure)) * this.view.cam.zoom;
+    const color = look.alpha < 1 && this.shown.length === 7 ? this.shown + Math.round(look.alpha * 255).toString(16) : this.shown;
+    return { color, diameter: Math.max(0.5, width) };
+  }
+
   // the next line may start while the last one is still a ghost, both are drawn
   drawLive(ctx: CanvasRenderingContext2D): Box | null {
     let box: Box | null = null;

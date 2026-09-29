@@ -342,7 +342,8 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
     },
     {
       kind: (kind) => inputType.set(kind),
-      fingerDraws: () => prefs.fingerDraws
+      fingerDraws: () => prefs.fingerDraws,
+      inkTrail: () => prefs.inkTrail
     }
   );
 
