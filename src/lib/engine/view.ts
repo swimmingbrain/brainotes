@@ -99,6 +99,9 @@ export class CanvasView {
   // work time of the last frame in ms, for measuring
   lastFrame = 0;
 
+  // the paper, highlighter and ink blend in a group of their own, the live canvas
+  // sits above it alone so nothing slows its way to the screen
+  private group: HTMLDivElement;
   readonly bg: HTMLCanvasElement;
   readonly hl: HTMLCanvasElement;
   readonly ink: HTMLCanvasElement;
@@ -164,9 +167,12 @@ export class CanvasView {
     this.host = host;
     this.doc = doc;
     this.history = history;
-    this.bg = makeCanvas(host, 'paper');
-    this.hl = makeCanvas(host, 'highlighter');
-    this.ink = makeCanvas(host, 'ink');
+    this.group = document.createElement('div');
+    this.group.style.cssText = 'position:absolute;inset:0;isolation:isolate';
+    host.appendChild(this.group);
+    this.bg = makeCanvas(this.group, 'paper');
+    this.hl = makeCanvas(this.group, 'highlighter');
+    this.ink = makeCanvas(this.group, 'ink');
     this.live = makeCanvas(host, 'live');
     this.bgCtx = this.bg.getContext('2d', { alpha: false })!;
     this.hlCtx = this.hl.getContext('2d')!;
@@ -176,7 +182,6 @@ export class CanvasView {
     this.fast = this.liveCtx.getContextAttributes?.().desynchronized === true;
     this.hl.style.opacity = String(HIGHLIGHTER_ALPHA);
     this.live.style.touchAction = 'none';
-    host.style.isolation = 'isolate';
 
     this.hlLayer = new TileLayer((box, scale) => this.paint(box, scale, true));
     this.inkLayer = new TileLayer((box, scale) => this.paint(box, scale, false));
@@ -215,6 +220,7 @@ export class CanvasView {
     this.hlLayer.clear();
     this.inkLayer.clear();
     for (const canvas of [this.bg, this.hl, this.ink, this.live]) canvas.remove();
+    this.group.remove();
   }
 
   setDoc(doc: Doc, history: History) {
