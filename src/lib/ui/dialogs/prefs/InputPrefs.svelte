@@ -45,6 +45,10 @@
   <ToggleField value={$preferences.holdToSnap} label="Hold to snap shapes" onchange={(v) => setPreference('holdToSnap', v)} />
 </Field>
 <p class="help">Hold the pen still at the end of a stroke and it turns into a clean line, arrow, rectangle or ellipse.</p>
+<Field label="System ink trail">
+  <ToggleField value={$preferences.inkTrail} label="System ink trail" onchange={(v) => setPreference('inkTrail', v)} />
+</Field>
+<p class="help">Lets the system draw the newest bit of a pen line ahead of the page, so the ink sits right under the pen. Only some browsers on Windows have it. Turn it off if the tip looks wrong.</p>
 
 <style>
   .section {
