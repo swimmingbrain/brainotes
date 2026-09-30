@@ -49,6 +49,7 @@ Open `http://localhost:5173`. `pnpm test` runs the tests, `pnpm check` the type 
 
 - Ink is drawn into cached canvas tiles, only the tiles where something changed are drawn again.
 - A stroke is an outline from perfect-freehand, made from the points and the pen pressure.
+- The line is drawn the moment the pen moves. A one euro filter calms a shaky hand while you write and a light refit runs when the pen lifts.
 - PDFs are drawn by pdf.js in a worker, only the pages you see and at the zoom you see them.
 - Notebooks, pages and files live in IndexedDB and are saved a moment after every change.
 - A `.brainotes` file is a zip with the notebook, one json file per page and the pdfs and pictures.
