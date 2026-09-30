@@ -98,6 +98,8 @@ export class CanvasView {
   tool: Tool | null = null;
   // work time of the last frame in ms, for measuring
   lastFrame = 0;
+  // goes up when another notebook, board or page is put on screen, what lies over it goes
+  scene = 0;
 
   // the paper, highlighter and ink blend in a group of their own, the live canvas
   // sits above it alone so nothing slows its way to the screen
@@ -228,6 +230,7 @@ export class CanvasView {
     this.doc = doc;
     this.history = history;
     this.offDoc = doc.on(this.onChange);
+    this.scene++;
     this.board = 0;
     this.boardId = '';
     this.hidden = null;
@@ -413,6 +416,7 @@ export class CanvasView {
     this.halt();
     if (this.isBoard) {
       if (index === this.board) return;
+      this.scene++;
       const id = this.doc.notebook.pages[this.board]?.id;
       if (id) this.cameras.set(id, { ...this.cam });
       this.board = index;
@@ -424,6 +428,7 @@ export class CanvasView {
       return;
     }
     const r = this.rects[index];
+    this.scene++;
     this.setCamera({ x: this.cam.x, y: r.y - MARGIN / this.cam.zoom, zoom: this.cam.zoom });
   }
 
@@ -701,6 +706,7 @@ export class CanvasView {
       this.bgDirty = this.inkDirty = this.hlDirty = true;
       this.requestFrame();
     } else if (change.type === 'pages') {
+      this.scene++;
       this.relayout();
       this.redrawAll();
       this.setCamera(this.cam);
