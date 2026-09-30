@@ -54,38 +54,33 @@ export function smoothingOf(smoothing: number): { min: number; beta: number; ref
 }
 
 function gap(a: number[], b: number[]): number {
-  return Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
-// how far the line turns at i, looking back and ahead about reach along it
-function turnAt(pts: number[][], i: number, reach: number): number {
+// the cosine of the turn at i, looking back and ahead about reach along the line
+function turnAt(pts: number[][], run: number[], i: number, reach: number): number {
   let a = i;
-  let run = 0;
-  while (a > 0 && run < reach) {
-    run += gap(pts[a - 1], pts[a]);
-    a--;
-  }
+  while (a > 0 && run[i] - run[a] < reach) a--;
   let b = i;
-  run = 0;
-  while (b < pts.length - 1 && run < reach) {
-    run += gap(pts[b], pts[b + 1]);
-    b++;
-  }
-  if (a === i || b === i) return 0;
+  while (b < pts.length - 1 && run[b] - run[i] < reach) b++;
+  if (a === i || b === i) return 1;
   const p = pts[i];
   const ax = p[0] - pts[a][0];
   const ay = p[1] - pts[a][1];
   const bx = pts[b][0] - p[0];
   const by = pts[b][1] - p[1];
-  return Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by));
+  const len = Math.sqrt((ax * ax + ay * ay) * (bx * bx + by * by));
+  return len > 0 ? (ax * bx + ay * by) / len : 1;
 }
 
-// radians, a sharper turn is a corner and stays where it is
-const CORNER = 1.2;
+// a turn sharper than about 70 degrees is a corner and stays where it is
+const CORNER = Math.cos(1.2);
 
-// after the lift a gentle smoothing of the whole line: gaussian along the line
-// with a window that shrinks towards the ends and corners, so they stay put,
-// and no point moves more than max. points are x, y, pressure
+// after the lift a gentle smoothing of the whole line: a bell shaped average along
+// the line with a window that shrinks towards the ends and corners, so they stay
+// put, and no point moves more than max. points are x, y, pressure
 export function refit(pts: number[][], width: number, max: number): number[][] {
   const n = pts.length;
   if (n < 3 || width <= 0) return pts;
@@ -95,18 +90,23 @@ export function refit(pts: number[][], width: number, max: number): number[][] {
   // corners split the line into parts that are smoothed on their own
   const fixed: number[] = [0];
   let last = -1;
+  let lastTurn = 1;
   for (let i = 1; i < n - 1; i++) {
-    if (turnAt(pts, i, width) > CORNER) {
-      // a corner spans a few points, the sharpest of them is kept
-      if (last >= 0 && run[i] - run[last] < width) {
-        if (turnAt(pts, i, width) > turnAt(pts, last, width)) fixed[fixed.length - 1] = i;
-      } else fixed.push(i);
-      last = fixed[fixed.length - 1];
+    const turn = turnAt(pts, run, i, width);
+    if (turn >= CORNER) continue;
+    // a corner spans a few points, the sharpest of them is kept
+    if (last >= 0 && run[i] - run[last] < width) {
+      if (turn >= lastTurn) continue;
+      fixed[fixed.length - 1] = i;
+    } else {
+      fixed.push(i);
     }
+    last = i;
+    lastTurn = turn;
   }
   fixed.push(n - 1);
-  const out = pts.map((p) => p.slice());
-  const sigma = width / 2;
+  const out = pts.slice();
+  const w2 = width * width;
   for (let k = 0; k + 1 < fixed.length; k++) {
     const from = fixed[k];
     const to = fixed[k + 1];
@@ -119,24 +119,21 @@ export function refit(pts: number[][], width: number, max: number): number[][] {
       let j = i;
       while (j > from && run[i] - run[j - 1] <= half) j--;
       for (; j <= to && run[j] - run[i] <= half; j++) {
-        // each point stands for the line around it, so dense parts do not weigh more
-        const before = j > 0 ? run[j] - run[j - 1] : 0;
-        const after = j < n - 1 ? run[j + 1] - run[j] : 0;
         const d = run[j] - run[i];
-        const w = Math.exp(-(d * d) / (2 * sigma * sigma)) * (before + after + 1e-6);
+        // each point stands for the line around it, so dense parts do not weigh more
+        const w = (1 - (d * d) / w2) * (run[j < n - 1 ? j + 1 : j] - run[j > 0 ? j - 1 : j] + 1e-6);
         sx += pts[j][0] * w;
         sy += pts[j][1] * w;
         sw += w;
       }
       let dx = sx / sw - pts[i][0];
       let dy = sy / sw - pts[i][1];
-      const moved = Math.hypot(dx, dy);
+      const moved = Math.sqrt(dx * dx + dy * dy);
       if (moved > max) {
         dx *= max / moved;
         dy *= max / moved;
       }
-      out[i][0] = pts[i][0] + dx;
-      out[i][1] = pts[i][1] + dy;
+      out[i] = [pts[i][0] + dx, pts[i][1] + dy, pts[i][2]];
     }
   }
   return out;
