@@ -15,6 +15,12 @@ describe('mergePreferences', () => {
     expect(merged.paper).toEqual(defaultPreferences().paper);
   });
 
+  it('has the system ink trail on until it is switched off', () => {
+    expect(mergePreferences({}).inkTrail).toBe(true);
+    expect(mergePreferences({ inkTrail: false }).inkTrail).toBe(false);
+    expect(mergePreferences({ inkTrail: 'no' }).inkTrail).toBe(true);
+  });
+
   it('merges the nested tools and paper objects key by key', () => {
     const merged = mergePreferences({ tools: { laser: false }, paper: { style: 'grid' } });
     expect(merged.tools.laser).toBe(false);
