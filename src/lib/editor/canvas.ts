@@ -76,6 +76,9 @@ let text: TextTool | null = null;
 let offDoc: (() => void) | null = null;
 // where the pointer is over the canvas, in window pixels
 let pointer: Point | null = null;
+const here: Point = { x: 0, y: 0 };
+// the kind of the latest pointer, a pen gets a dot at its tip instead of the crosshair
+let pointerType = '';
 
 export interface Editor {
   view: CanvasView;
@@ -283,6 +286,16 @@ function imageTool(v: CanvasView): Tool {
   };
 }
 
+// a dark dot with a light rim, it shows on white, cream and dark paper
+const PEN_DOT = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='2.4' fill='%23111' stroke='%23fff' stroke-width='1.2'/%3E%3C/svg%3E") 4 4, crosshair`;
+const DOT_TOOLS: ToolId[] = ['pen', 'highlighter', 'shape'];
+
+// the mouse keeps the cursor of the tool from the canvas area
+function penCursor(v: CanvasView) {
+  const cursor = pointerType === 'pen' && DOT_TOOLS.includes(tool) ? PEN_DOT : '';
+  if (v.host.style.cursor !== cursor) v.host.style.cursor = cursor;
+}
+
 function eraserSettings() {
   return { mode: options.eraserMode, size: options.eraserSize, markersOnly: options.eraseHighlighterOnly };
 }
@@ -307,6 +320,7 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
     camera: () => text?.place()
   });
   view = v;
+  pointerType = '';
 
   const pen = new PenTool(v, penSettings);
   const eraser = new EraserTool(v, eraserSettings);
@@ -347,7 +361,15 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
     }
   );
 
-  const track = (e: PointerEvent) => (pointer = { x: e.clientX, y: e.clientY });
+  const track = (e: PointerEvent) => {
+    here.x = e.clientX;
+    here.y = e.clientY;
+    pointer = here;
+    if (e.pointerType !== pointerType) {
+      pointerType = e.pointerType;
+      penCursor(v);
+    }
+  };
   const lose = () => (pointer = null);
   v.live.addEventListener('pointermove', track);
   v.live.addEventListener('pointerdown', track);
@@ -361,6 +383,7 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
       words.commit();
       if (t !== 'select') sel.clear();
       v.live.style.cursor = '';
+      penCursor(v);
       input.toolChanged();
       if (t === 'image') actions.insertImage();
     }),
