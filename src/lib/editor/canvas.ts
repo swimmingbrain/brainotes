@@ -326,7 +326,7 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
   const eraser = new EraserTool(v, eraserSettings);
   const hand = new HandTool(v);
   const shape = new ShapeTool(v, shapeSettings);
-  const laser = new LaserTool(v);
+  const laser = new LaserTool(v, () => prefs.smoothing);
   const picker = imageTool(v);
   const words = new TextTool(v, textSettings, textAt);
   const sel = new SelectTool(v, {
