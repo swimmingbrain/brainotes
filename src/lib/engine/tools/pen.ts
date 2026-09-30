@@ -271,7 +271,8 @@ export class PenTool implements Tool {
     const look = PENS[this.pen];
     const width = this.size * 2 * (0.5 - look.thinning * (0.5 - this.pressure)) * this.view.cam.zoom;
     const color = look.alpha < 1 && this.shown.length === 7 ? this.shown + Math.round(look.alpha * 255).toString(16) : this.shown;
-    return { color, diameter: Math.max(0.5, width) };
+    // the system trail takes no width under 1 css px
+    return { color, diameter: Math.max(1, width) };
   }
 
   // the next line may start while the last one is still a ghost, both are drawn
