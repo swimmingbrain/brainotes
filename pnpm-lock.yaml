@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@excalidraw/laser-pointer':
-        specifier: ^1.3.2
-        version: 1.3.2
       '@pdfme/pdf-lib':
         specifier: ^6.2.2
         version: 6.2.2
@@ -233,10 +230,6 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
-
-  '@excalidraw/laser-pointer@1.3.2':
-    resolution: {integrity: sha512-aKhVj3/lLV7TCkZr6q5kn9sBFxzpOQ/yyRwBGm6smsakMdp0o1FVp9HNKOPerEpkKEt34VTURekZLfqa3E1Few==}
-    engines: {browsers: defaults and supports es6-module}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1216,8 +1209,6 @@ snapshots:
 
   '@esbuild/win32-x64@0.25.12':
     optional: true
-
-  '@excalidraw/laser-pointer@1.3.2': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
