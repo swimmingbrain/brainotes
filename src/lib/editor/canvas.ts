@@ -288,11 +288,14 @@ function imageTool(v: CanvasView): Tool {
 
 // a dark dot with a light rim, it shows on white, cream and dark paper
 const PEN_DOT = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='4' cy='4' r='2.4' fill='%23111' stroke='%23fff' stroke-width='1.2'/%3E%3C/svg%3E") 4 4, crosshair`;
+const LASER_DOT = PEN_DOT.replace('%23111', '%23ff2d2d');
 const DOT_TOOLS: ToolId[] = ['pen', 'highlighter', 'shape'];
 
 // the mouse keeps the cursor of the tool from the canvas area
 function penCursor(v: CanvasView) {
-  const cursor = pointerType === 'pen' && DOT_TOOLS.includes(tool) ? PEN_DOT : '';
+  let cursor = '';
+  if (pointerType === 'pen' && tool === 'laser') cursor = LASER_DOT;
+  else if (pointerType === 'pen' && DOT_TOOLS.includes(tool)) cursor = PEN_DOT;
   if (v.host.style.cursor !== cursor) v.host.style.cursor = cursor;
 }
 
