@@ -11,13 +11,18 @@ const PDF_DATA = ['cmaps', 'standard_fonts', 'wasm', 'iccs'];
 function pdfData(): Plugin {
   return {
     name: 'pdf-data',
-    buildStart() {
-      const from = 'node_modules/pdfjs-dist';
-      const version = JSON.parse(readFileSync(`${from}/package.json`, 'utf8')).version;
-      const stamp = 'static/pdfjs/version.txt';
-      if (existsSync(stamp) && readFileSync(stamp, 'utf8') === version) return;
-      for (const dir of PDF_DATA) cpSync(`${from}/${dir}`, `static/pdfjs/${dir}`, { recursive: true });
-      writeFileSync(stamp, version);
+    // before sveltekit lists the static files, or a first build on a fresh
+    // clone leaves them out of the service worker
+    config: {
+      order: 'pre',
+      handler() {
+        const from = 'node_modules/pdfjs-dist';
+        const version = JSON.parse(readFileSync(`${from}/package.json`, 'utf8')).version;
+        const stamp = 'static/pdfjs/version.txt';
+        if (existsSync(stamp) && readFileSync(stamp, 'utf8') === version) return;
+        for (const dir of PDF_DATA) cpSync(`${from}/${dir}`, `static/pdfjs/${dir}`, { recursive: true });
+        writeFileSync(stamp, version);
+      }
     }
   };
 }
