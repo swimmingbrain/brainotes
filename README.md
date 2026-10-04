@@ -9,6 +9,10 @@
   Write with a pen, keep the pdf next to your notes.
 </p>
 
+<p align="center">
+  <a href="https://notes.swimmingbrain.dev"><strong>Try it now &rarr; notes.swimmingbrain.dev</strong></a>
+</p>
+
 braiNOTES is an open source app for writing by hand, like OneNote or GoodNotes, but in a browser tab. It is made for lectures: the slides open next to your notes or become the pages you write on. There is no account and no server, everything stays in your browser.
 
 ## Features
