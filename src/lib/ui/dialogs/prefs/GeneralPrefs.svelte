@@ -48,6 +48,15 @@
 </Field>
 <p class="help">A full page, or the pdf page with lined room for notes below or beside it.</p>
 
+<h3 class="section">About</h3>
+<p class="about">braiNOTES is open source under the MIT license. Your notes stay in this browser.</p>
+<nav class="links" aria-label="About">
+  <a href="https://github.com/swimmingbrain/brainotes" target="_blank" rel="noopener">GitHub</a>
+  <a href="/privacy" target="_blank" rel="noopener">Privacy</a>
+  <a href="/terms" target="_blank" rel="noopener">Terms</a>
+  <a href="/imprint" target="_blank" rel="noopener">Imprint</a>
+</nav>
+
 <style>
   .section {
     margin: 12px 8px 4px;
@@ -70,5 +79,29 @@
     font-size: 11px;
     line-height: 1.5;
     color: var(--text-muted);
+  }
+
+  .about {
+    padding: 2px 8px 4px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  .links {
+    display: flex;
+    gap: 14px;
+    padding: 0 8px 6px;
+  }
+
+  .links a {
+    font-size: 11px;
+    font-family: var(--font-editor);
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+
+  .links a:hover {
+    color: var(--accent);
   }
 </style>
