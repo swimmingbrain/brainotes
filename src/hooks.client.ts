@@ -1,6 +1,9 @@
 import type { HandleClientError } from '@sveltejs/kit';
 
 export const handleError: HandleClientError = ({ error, status, message }) => {
+  // an address that does not exist is no bug, the error page says so
+  if (status === 404) return { message };
+
   const err = error as Error;
   console.error('client error:', err);
 
