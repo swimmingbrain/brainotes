@@ -59,6 +59,13 @@
     {/if}
 
     <p class="welcome-hint">or drop a pdf, an image or a .brainotes file anywhere</p>
+
+    <!-- a new tab, so the app stays as it is -->
+    <nav class="welcome-links" aria-label="Legal">
+      <a href="/privacy" target="_blank" rel="noopener">Privacy</a>
+      <a href="/terms" target="_blank" rel="noopener">Terms</a>
+      <a href="/imprint" target="_blank" rel="noopener">Imprint</a>
+    </nav>
   </div>
 </div>
 
@@ -199,5 +206,23 @@
     font-size: 11px;
     font-family: var(--font-editor);
     color: var(--text-muted);
+  }
+
+  .welcome-links {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 28px;
+  }
+
+  .welcome-links a {
+    font-size: 11px;
+    font-family: var(--font-editor);
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+
+  .welcome-links a:hover {
+    color: var(--accent);
   }
 </style>
