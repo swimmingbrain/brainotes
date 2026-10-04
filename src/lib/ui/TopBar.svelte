@@ -127,6 +127,15 @@
       aria-label="Present">
       <Icon name="fullscreen" size={14} />
     </button>
+    <a
+      class="action-btn icon-only"
+      href="https://github.com/swimmingbrain/brainotes"
+      target="_blank"
+      rel="noopener"
+      title="GitHub"
+      aria-label="GitHub">
+      <Icon name="github" size={14} />
+    </a>
     <Menu items={exportItems}>
       {#snippet trigger({ toggle })}
         <button class="action-btn accent" onclick={toggle} disabled={!$notebookOpen} title="Export the notebook">
