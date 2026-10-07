@@ -95,4 +95,19 @@ describe('mergePreferences', () => {
     expect(mergePreferences({ pens: fewer }).pens).toEqual(fewer);
     expect(mergePreferences({ pens: OLD_PENS, version: 2 }).pens).toEqual(OLD_PENS);
   });
+
+  it('moves the old default paper to dots 12 apart', () => {
+    const old = { style: 'dots', spacing: 24, color: 'white', size: 'a4' };
+    expect(mergePreferences({ paper: old }).paper).toEqual(defaultPreferences().paper);
+    expect(mergePreferences({ paper: { style: 'dots', spacing: 24, color: 'white' } }).paper.spacing).toBe(12);
+  });
+
+  it('keeps a paper changed by hand and one saved after the move', () => {
+    expect(mergePreferences({ paper: { style: 'dots', spacing: 24, color: 'cream', size: 'a4' } }).paper.spacing).toBe(24);
+    expect(mergePreferences({ paper: { style: 'dots', spacing: 24, color: 'white', size: 'letter' } }).paper.spacing).toBe(24);
+    expect(mergePreferences({ paper: { style: 'lines', spacing: 24, color: 'white', size: 'a4' } }).paper.spacing).toBe(24);
+    expect(mergePreferences({ paper: { style: 'dots', spacing: 20, color: 'white', size: 'a4' } }).paper.spacing).toBe(20);
+    const saved = { style: 'dots', spacing: 24, color: 'white', size: 'a4' };
+    expect(mergePreferences({ paper: saved, version: 2 }).paper.spacing).toBe(24);
+  });
 });

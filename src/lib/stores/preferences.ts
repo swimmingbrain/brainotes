@@ -91,6 +91,12 @@ function moveOldDefaults(prefs: Preferences, defaults: Preferences) {
       return pen.type === old.type && pen.color === old.color && pen.size === old.size;
     });
   if (oldPens) prefs.pens = prefs.pens.map((pen, i) => ({ ...pen, size: defaults.pens[i].size }));
+
+  // the old default paper had its dots 24 apart
+  const paper = prefs.paper;
+  if (paper.style === 'dots' && paper.spacing === 24 && paper.color === 'white' && paper.size === 'a4') {
+    paper.spacing = defaults.paper.spacing;
+  }
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
