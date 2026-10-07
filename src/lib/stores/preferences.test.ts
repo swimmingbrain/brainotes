@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { defaultPreferences, mergePreferences } from './preferences';
 
+// the favourite pens as they were saved before version 2
+const OLD_PENS = [
+  { id: 'black', type: 'ballpoint', color: '#1f1f22', size: 2.5 },
+  { id: 'blue', type: 'ballpoint', color: '#1f5fd1', size: 2.5 },
+  { id: 'red', type: 'ballpoint', color: '#d63a3a', size: 2.5 },
+  { id: 'fountain', type: 'fountain', color: '#1f1f22', size: 3.5 },
+  { id: 'yellow', type: 'highlighter', color: '#ffd43b', size: 18 }
+];
+
 describe('mergePreferences', () => {
   it('gives the defaults for nothing stored', () => {
     expect(mergePreferences(null)).toEqual(defaultPreferences());
@@ -70,5 +79,20 @@ describe('mergePreferences', () => {
     expect(defaultPreferences().paper).toEqual({ style: 'dots', spacing: 12, color: 'white', size: 'a4' });
     expect(mergePreferences({ paper: { style: 'lines' } }).paper.spacing).toBe(24);
     expect(mergePreferences({ paper: { style: 'dots', spacing: 30 } }).paper.spacing).toBe(30);
+  });
+
+  it('moves pens saved on the old defaults to the new sizes', () => {
+    const merged = mergePreferences({ pens: OLD_PENS, defaultPen: 'blue' });
+    expect(merged.pens).toEqual(defaultPreferences().pens);
+    expect(merged.defaultPen).toBe('blue');
+    expect(merged.version).toBe(2);
+  });
+
+  it('keeps pens changed by hand and pens saved after the move', () => {
+    const thicker = OLD_PENS.map((pen) => (pen.id === 'red' ? { ...pen, size: 3 } : pen));
+    expect(mergePreferences({ pens: thicker }).pens).toEqual(thicker);
+    const fewer = OLD_PENS.slice(0, 4);
+    expect(mergePreferences({ pens: fewer }).pens).toEqual(fewer);
+    expect(mergePreferences({ pens: OLD_PENS, version: 2 }).pens).toEqual(OLD_PENS);
   });
 });

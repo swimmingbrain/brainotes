@@ -31,6 +31,8 @@ export interface Preferences {
   holdToSnap: boolean;
   // the system draws the newest bit of a pen line ahead of the page
   inkTrail: boolean;
+  // which defaults the saved values come from, old defaults move to new ones once
+  version: number;
 }
 
 const STORAGE_KEY = 'brainotes-preferences';
@@ -67,8 +69,28 @@ export function defaultPreferences(): Preferences {
     pressure: 0.5,
     smoothing: 0.5,
     holdToSnap: true,
-    inkTrail: true
+    inkTrail: true,
+    version: 2
   };
+}
+
+// the pens before version 2, saved preferences that still have exactly these get the new sizes
+const OLD_PENS = [
+  { type: 'ballpoint', color: '#1f1f22', size: 2.5 },
+  { type: 'ballpoint', color: '#1f5fd1', size: 2.5 },
+  { type: 'ballpoint', color: '#d63a3a', size: 2.5 },
+  { type: 'fountain', color: '#1f1f22', size: 3.5 },
+  { type: 'highlighter', color: '#ffd43b', size: 18 }
+];
+
+function moveOldDefaults(prefs: Preferences, defaults: Preferences) {
+  const oldPens =
+    prefs.pens.length === OLD_PENS.length &&
+    prefs.pens.every((pen, i) => {
+      const old = OLD_PENS[i];
+      return pen.type === old.type && pen.color === old.color && pen.size === old.size;
+    });
+  if (oldPens) prefs.pens = prefs.pens.map((pen, i) => ({ ...pen, size: defaults.pens[i].size }));
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -134,6 +156,9 @@ export function mergePreferences(stored: unknown): Preferences {
   if (!merged.pens.some((pen) => pen.id === merged.defaultPen)) {
     merged.defaultPen = merged.pens[0].id;
   }
+
+  if (typeof stored.version !== 'number' || stored.version < defaults.version) moveOldDefaults(merged, defaults);
+  merged.version = defaults.version;
   return merged;
 }
 
