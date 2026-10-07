@@ -197,7 +197,7 @@ function startOptions(): ToolOptions {
   return {
     penType: ink && ink.type !== 'highlighter' ? ink.type : 'ballpoint',
     penColor: inkColor,
-    penSize: ink?.size ?? 2.5,
+    penSize: ink?.size ?? 2,
     highlighterColor: marker?.color ?? '#ffd43b',
     highlighterSize: marker?.size ?? 18,
     eraserMode: 'stroke',

@@ -15,12 +15,12 @@
     if (type === pen.type) return;
     let size = pen.size;
     if (type === 'highlighter' && size < 6) size = 18;
-    if (pen.type === 'highlighter' && type !== 'highlighter' && size > 12) size = 2.5;
+    if (pen.type === 'highlighter' && type !== 'highlighter' && size > 12) size = 2;
     updatePen(pen.id, { type, size });
   }
 
   function addPen() {
-    const pen: PenPreset = { id: newPenId(), type: 'ballpoint', color: '#1f1f22', size: 2.5 };
+    const pen: PenPreset = { id: newPenId(), type: 'ballpoint', color: '#1f1f22', size: 2 };
     preferences.update((p) => ({ ...p, pens: [...p.pens, pen] }));
   }
 

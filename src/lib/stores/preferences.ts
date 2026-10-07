@@ -54,10 +54,10 @@ export function defaultPreferences(): Preferences {
       hand: true
     },
     pens: [
-      { id: 'black', type: 'ballpoint', color: '#1f1f22', size: 2.5 },
-      { id: 'blue', type: 'ballpoint', color: '#1f5fd1', size: 2.5 },
-      { id: 'red', type: 'ballpoint', color: '#d63a3a', size: 2.5 },
-      { id: 'fountain', type: 'fountain', color: '#1f1f22', size: 3.5 },
+      { id: 'black', type: 'ballpoint', color: '#1f1f22', size: 2 },
+      { id: 'blue', type: 'ballpoint', color: '#1f5fd1', size: 2 },
+      { id: 'red', type: 'ballpoint', color: '#d63a3a', size: 2 },
+      { id: 'fountain', type: 'fountain', color: '#1f1f22', size: 2 },
       { id: 'yellow', type: 'highlighter', color: '#ffd43b', size: 18 }
     ],
     defaultPen: 'black',

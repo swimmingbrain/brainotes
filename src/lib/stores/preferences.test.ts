@@ -54,4 +54,15 @@ describe('mergePreferences', () => {
     expect(merged.pens).toEqual(defaultPreferences().pens);
     expect(merged.defaultPen).toBe('black');
   });
+
+  it('starts the pens at size 2 and the highlighter at 18', () => {
+    const sizes = defaultPreferences().pens.map((pen) => [pen.type, pen.size]);
+    expect(sizes).toEqual([
+      ['ballpoint', 2],
+      ['ballpoint', 2],
+      ['ballpoint', 2],
+      ['fountain', 2],
+      ['highlighter', 18]
+    ]);
+  });
 });
