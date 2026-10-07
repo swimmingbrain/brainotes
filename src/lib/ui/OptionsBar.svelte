@@ -52,7 +52,7 @@
       <span class="sep"></span>
       <span class="hint">drag a box over the reference page, the clip lands in your notes</span>
     {:else if $activeTool === 'laser'}
-      <span class="hint">a red line that stays while you draw and fades 2 seconds after you lift, nothing is kept</span>
+      <span class="hint">a red line that stays while you draw and fades 1 second after you lift, nothing is kept</span>
     {:else}
       <span class="hint">drag to move around, or hold space with any tool</span>
     {/if}

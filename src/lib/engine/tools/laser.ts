@@ -9,13 +9,13 @@ import type { Sample, Tool } from './tool';
 const SIZE = 5;
 const GLOW = 10;
 // ms the lines stay after the last lift, then ms they take to fade out together
-export const LASER_HOLD = 2000;
+export const LASER_HOLD = 1000;
 export const LASER_FADE = 500;
 // css pixels between kept points, and how far the refit may move one
 const KEY_GAP = 0.5;
 const REFIT_MOVE = 0.35;
 
-// lines drawn without a 2 second pause between them, they go away together
+// lines drawn without a 1 second pause between them, they go away together
 export interface LaserGroup {
   // world units times PF_SCALE, x, y, pressure
   lines: { pts: number[][]; size: number }[];
@@ -30,7 +30,7 @@ function smoothstep(t: number): number {
   return t * t * (3 - 2 * t);
 }
 
-// a red line that stays while it is drawn and fades two seconds after the last lift.
+// a red line that stays while it is drawn and fades a second after the last lift.
 // it lives in world units so it stays on its place, nothing of it is kept
 export class LaserTool implements Tool {
   readonly instant = true;

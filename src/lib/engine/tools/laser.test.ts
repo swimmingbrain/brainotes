@@ -45,7 +45,7 @@ describe('laser', () => {
     expect(shown()).toEqual([{ lines: 1, alpha: 1 }]);
   });
 
-  it('fades two seconds after the lift and is gone half a second later', () => {
+  it('fades a second after the lift and is gone half a second later', () => {
     const { line, wait, shown } = setup();
     line(50);
     wait(LASER_HOLD - 10);
@@ -61,14 +61,14 @@ describe('laser', () => {
   it('adds up lines drawn with short pauses, they fade together', () => {
     const { line, wait, shown } = setup();
     line(50);
-    wait(1000);
+    wait(600);
     line(80);
-    wait(1000);
+    wait(600);
     line(110);
-    // three seconds after the first lift nothing has faded yet
-    wait(1500);
+    // two and a half seconds after the first lift nothing has faded yet
+    wait(LASER_HOLD - 100);
     expect(shown()).toEqual([{ lines: 3, alpha: 1 }]);
-    wait(500 + LASER_FADE / 2);
+    wait(100 + LASER_FADE / 2);
     expect(shown()).toHaveLength(1);
     expect(shown()[0].lines).toBe(3);
     expect(shown()[0].alpha).toBeLessThan(1);
