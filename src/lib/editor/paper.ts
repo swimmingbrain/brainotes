@@ -14,6 +14,15 @@ export const PAGE_SIZES: Record<PageSize, { ratio: number; label: string }> = {
   wide: { ratio: 9 / 16, label: '16:9' }
 };
 
+// dots sit closer than lines and squares, each style starts with its own step
+export const STYLE_SPACING: Record<PaperStyle, number> = { blank: 24, lines: 24, grid: 24, dots: 12 };
+
+// the step for a new style: one that is still the default of the old style moves
+// to the default of the new one, a step picked by hand stays
+export function spacingFor(paper: { style: PaperStyle; spacing: number }, style: PaperStyle): number {
+  return paper.spacing === STYLE_SPACING[paper.style] ? STYLE_SPACING[style] : paper.spacing;
+}
+
 // for the page tiles until there are real thumbnails, spacing in pixels
 export function paperPattern(style: PaperStyle, color: PaperColor, spacing: number): string {
   const { paper, rule } = PAPER_COLORS[color];

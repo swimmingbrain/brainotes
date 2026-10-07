@@ -3,14 +3,14 @@
   import Menu from '../Menu.svelte';
   import { actions } from '$lib/editor/actions';
   import { PAPER_STYLES } from '$lib/editor/commands';
-  import { PAPER_COLORS } from '$lib/editor/paper';
+  import { PAPER_COLORS, spacingFor } from '$lib/editor/paper';
   import { addToast, paperColor, paperStyle, type MenuItem } from '$lib/stores/app';
   import { preferences, type PaperColor } from '$lib/stores/preferences';
 
   function makeDefault() {
     const style = $paperStyle;
     const color = $paperColor;
-    preferences.update((p) => ({ ...p, paper: { ...p.paper, style, color } }));
+    preferences.update((p) => ({ ...p, paper: { ...p.paper, style, color, spacing: spacingFor(p.paper, style) } }));
     addToast(`New notebooks start on ${PAPER_COLORS[color].label.toLowerCase()} ${style} paper`, 'success');
   }
 

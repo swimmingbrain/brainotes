@@ -4,8 +4,8 @@
   import SelectField from '../../SelectField.svelte';
   import Slider from '../../Slider.svelte';
   import { PAPER_STYLES } from '$lib/editor/commands';
-  import { PAGE_SIZES, PAPER_COLORS, paperPattern } from '$lib/editor/paper';
-  import { preferences, setPaper, type PageSize, type PaperColor } from '$lib/stores/preferences';
+  import { PAGE_SIZES, PAPER_COLORS, paperPattern, spacingFor } from '$lib/editor/paper';
+  import { preferences, setPaper, type PageSize, type PaperColor, type PaperStyle } from '$lib/stores/preferences';
 
   const colors = Object.entries(PAPER_COLORS) as [PaperColor, (typeof PAPER_COLORS)[PaperColor]][];
   const sizes = (Object.entries(PAGE_SIZES) as [PageSize, { label: string }][]).map(([value, size]) => ({
@@ -16,6 +16,10 @@
   const paper = $derived($preferences.paper);
   // the preview shows the paper at half size, like a page seen from a step back
   const preview = $derived(paperPattern(paper.style, paper.color, paper.spacing / 2));
+
+  function setStyle(style: PaperStyle) {
+    preferences.update((p) => ({ ...p, paper: { ...p.paper, style, spacing: spacingFor(p.paper, style) } }));
+  }
 </script>
 
 <h3 class="section">New notebooks</h3>
@@ -27,7 +31,7 @@
         class:active={paper.style === style.id}
         role="radio"
         aria-checked={paper.style === style.id}
-        onclick={() => setPaper('style', style.id)}>
+        onclick={() => setStyle(style.id)}>
         <Icon name={style.id} size={13} />
         {style.label}
       </button>

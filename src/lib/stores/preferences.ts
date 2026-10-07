@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { STYLE_SPACING } from '$lib/editor/paper';
 import type { ToolId } from '$lib/editor/tools';
 
 export type PenType = 'ballpoint' | 'fountain' | 'marker' | 'pencil' | 'highlighter';
@@ -61,7 +62,7 @@ export function defaultPreferences(): Preferences {
       { id: 'yellow', type: 'highlighter', color: '#ffd43b', size: 18 }
     ],
     defaultPen: 'black',
-    paper: { style: 'dots', spacing: 24, color: 'white', size: 'a4' },
+    paper: { style: 'dots', spacing: STYLE_SPACING.dots, color: 'white', size: 'a4' },
     fingerDraws: false,
     pressure: 0.5,
     smoothing: 0.5,
@@ -120,6 +121,10 @@ export function mergePreferences(stored: unknown): Preferences {
   merged.paper.style = oneOf(merged.paper.style, ['blank', 'lines', 'grid', 'dots'], defaults.paper.style);
   merged.paper.color = oneOf(merged.paper.color, ['white', 'cream', 'dark'], defaults.paper.color);
   merged.paper.size = oneOf(merged.paper.size, ['a4', 'letter', 'wide'], defaults.paper.size);
+  // a stored style without a step gets the step of that style
+  if (!isObject(stored.paper) || typeof stored.paper.spacing !== 'number') {
+    merged.paper.spacing = STYLE_SPACING[merged.paper.style];
+  }
   merged.paper.spacing = clamp(merged.paper.spacing, 8, 80);
   merged.pressure = clamp(merged.pressure, 0, 1);
   merged.smoothing = clamp(merged.smoothing, 0, 1);

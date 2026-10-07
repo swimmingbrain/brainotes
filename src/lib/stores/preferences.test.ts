@@ -65,4 +65,10 @@ describe('mergePreferences', () => {
       ['highlighter', 18]
     ]);
   });
+
+  it('starts new notebooks on dots 12 apart, a stored style without a step gets its own', () => {
+    expect(defaultPreferences().paper).toEqual({ style: 'dots', spacing: 12, color: 'white', size: 'a4' });
+    expect(mergePreferences({ paper: { style: 'lines' } }).paper.spacing).toBe(24);
+    expect(mergePreferences({ paper: { style: 'dots', spacing: 30 } }).paper.spacing).toBe(30);
+  });
 });

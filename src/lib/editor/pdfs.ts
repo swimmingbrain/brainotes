@@ -2,6 +2,7 @@ import { get } from 'svelte/store';
 import { actions } from './actions';
 import { addPages, currentPage, openDoc } from './canvas';
 import { addNotebook } from './library';
+import { spacingFor } from './paper';
 import { newId } from '$lib/engine/doc';
 import type { Notebook, NotebookKind, PageMeta } from '$lib/engine/types';
 import { placePdfPage, type PdfLayout } from '$lib/pdf/layout';
@@ -70,7 +71,7 @@ export function pdfPageMeta(file: string, page: number, size: PageSize, layout: 
     w: p.w,
     h: p.h,
     // white under a pdf page, so the default black ink stays black on it
-    paper: { style, spacing: paper.spacing, color: 'white' },
+    paper: { style, spacing: spacingFor(paper, style), color: 'white' },
     pdf: {
       assetId: file,
       page,

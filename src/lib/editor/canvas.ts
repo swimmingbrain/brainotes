@@ -1,5 +1,6 @@
 import { get } from 'svelte/store';
 import { actions, plugActions, type Point } from './actions';
+import { spacingFor } from './paper';
 import type { ToolId } from './tools';
 import { copyItem, copyPage, Doc, newId, newPageData, newPageMeta, type DocChange, type PageData } from '$lib/engine/doc';
 import { History, type Op } from '$lib/engine/history';
@@ -454,6 +455,7 @@ function setPagePaper(index: number, change: { style?: PaperStyle; color?: Paper
   const meta = doc?.notebook.pages[index];
   if (!history || !meta) return;
   const after = { ...meta.paper, ...change };
+  if (change.style) after.spacing = spacingFor(meta.paper, change.style);
   if (after.style === meta.paper.style && after.color === meta.paper.color) return;
   history.run({ type: 'paper', pageId: meta.id, before: { ...meta.paper }, after });
 }
