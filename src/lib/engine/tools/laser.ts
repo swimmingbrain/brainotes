@@ -120,6 +120,7 @@ export class LaserTool implements Tool {
     group.lines.push({ pts, size: this.size });
     // a group drawn already gets the new line added to its paths
     if (group.glow && group.core) this.trace(group, pts, this.size);
+    if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(this.fadeOut, LASER_HOLD);
     this.view.requestLive();
   }
@@ -130,7 +131,9 @@ export class LaserTool implements Tool {
 
   private fadeOut = () => {
     this.timer = null;
-    if (this.open) this.open.fadeAt = performance.now();
+    // every group still on full starts to fade, so none can stay behind
+    const now = performance.now();
+    for (const group of this.groups) if (group.fadeAt === 0) group.fadeAt = now;
     this.open = null;
     this.view.requestLive();
   };
@@ -173,13 +176,15 @@ export class LaserTool implements Tool {
     const box = emptyBox();
     let fading = false;
     for (const { group, alpha } of list) {
+      // a fade asks for frames until the group is gone, also when the first frame
+      // comes so soon after the timer that the clock did not move and alpha is still 1
+      if (group.fadeAt > 0) fading = true;
       if (!group.glow || !group.core) {
         group.glow = new Path2D();
         group.core = new Path2D();
         for (const line of group.lines) this.trace(group, line.pts, line.size);
       }
       if (group.lines.length === 0) continue;
-      if (alpha < 1) fading = true;
       this.paint(ctx, group.glow, group.core, alpha);
       growBox(box, group.box);
     }
