@@ -174,15 +174,18 @@ export class Input {
     this.drawn(e, tool);
   };
 
-  // the last sample given to the tool, the line is drawn up to it
-  private feed(e: PointerEvent, tool: Tool): PointerEvent {
+  // the last sample given to the tool, the line is drawn up to it. a pen that left
+  // the glass can still send a few hover samples (no buttons) before its up, those are
+  // not drawn, null when the event had nothing else
+  private feed(e: PointerEvent, tool: Tool): PointerEvent | null {
     const list = e.getCoalescedEvents?.();
-    if (list && list.length > 0) {
-      for (const c of list) tool.move(this.sample(c));
-      return list[list.length - 1];
+    let last: PointerEvent | null = null;
+    for (const c of list && list.length > 0 ? list : [e]) {
+      if (c.buttons === 0) continue;
+      tool.move(this.sample(c));
+      last = c;
     }
-    tool.move(this.sample(e));
-    return e;
+    return last;
   }
 
   // once per input event: the live line is drawn at once and the system trail goes on from its end
@@ -197,7 +200,8 @@ export class Input {
     const active = this.active;
     if (active && e.pointerId === active.id) {
       this.rawSeen = true;
-      this.drawn(this.feed(e, active.tool), active.tool);
+      const last = this.feed(e, active.tool);
+      if (last) this.drawn(last, active.tool);
     }
   };
 
@@ -210,6 +214,7 @@ export class Input {
     if (active) {
       if (e.pointerId !== active.id) return;
       const last = this.rawSeen ? e : this.feed(e, active.tool);
+      if (!last || last.buttons === 0) return;
       if (active.tool.predict && !this.trailing) {
         const predicted = e.getPredictedEvents?.() ?? [];
         if (predicted.length > 0) active.tool.predict(predicted.map((p) => this.sample(p)));
