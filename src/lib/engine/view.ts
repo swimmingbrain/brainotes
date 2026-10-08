@@ -214,6 +214,8 @@ export class CanvasView {
     this.observer = new ResizeObserver(() => this.measure());
     this.observer.observe(host);
     window.addEventListener('resize', this.measure);
+    // browser bars and the keyboard of a phone change the visual viewport first
+    window.visualViewport?.addEventListener('resize', this.measure);
     this.watchDpr();
     this.measure();
     this.relayout();
@@ -230,6 +232,7 @@ export class CanvasView {
     want('canvas', []);
     this.observer.disconnect();
     window.removeEventListener('resize', this.measure);
+    window.visualViewport?.removeEventListener('resize', this.measure);
     this.dprQuery?.removeEventListener('change', this.onDpr);
     this.hlLayer.clear();
     this.inkLayer.clear();
