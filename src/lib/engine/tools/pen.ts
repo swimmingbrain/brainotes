@@ -26,8 +26,8 @@ const HOLD = 500;
 const HOLD_MOVE = 3;
 // css pixels, smaller lines are writing, not shapes
 const SNAP_MIN = 28;
-// css pixels: a key this close to the last one adds nothing, the refit may move a
-// point this far, a lift further away is not believed, a guess goes this far ahead
+// css pixels: with smoothing a key this close to the last one adds nothing, the refit
+// may move a point this far, a lift further away is not believed, a guess goes this far ahead
 const KEY_GAP = 0.2;
 const REFIT_MOVE = 0.35;
 const UP_REACH = 12;
@@ -57,6 +57,8 @@ export class PenTool implements Tool {
   // keys are smoothed while drawing, the newest sample stays raw in tip so the line reaches the pen
   private filter = newEuro(2.5, 0.1);
   private refitWidth = 1.6;
+  // smoothing 0: every sample is a key as it came, nothing is filtered or dropped
+  private raw = false;
   private keys: number[][] = [];
   private pts: number[][] = [];
   private tip: number[] | null = null;
@@ -113,6 +115,7 @@ export class PenTool implements Tool {
     const smooth = smoothingOf(set.smoothing);
     this.filter = newEuro(smooth.min, smooth.beta);
     this.refitWidth = smooth.refit;
+    this.raw = smooth.min === Infinity;
     this.sensitivity = set.pressure;
     // half a pen width apart, the outline drops closer points anyway
     this.step = Math.max(0.75, set.size * 0.6) * PF_SCALE;
@@ -220,7 +223,8 @@ export class PenTool implements Tool {
     }
     // the raw end becomes the last key and the last gaps get their curve
     const keys = this.keys;
-    if (this.tip) this.addKey(this.tip);
+    const end = keys[keys.length - 1];
+    if (this.tip && (this.tip[0] !== end[0] || this.tip[1] !== end[1])) this.addKey(this.tip);
     const m = keys.length - 1;
     if (m >= 1) {
       const before = m >= 2 ? keys[m - 2] : mirror(keys[m - 1], keys[m]);
@@ -381,6 +385,8 @@ export class PenTool implements Tool {
 
     const f = this.filter;
     euro(f, s.x, s.y, s.time);
+    const kx = this.raw ? s.x : f.x;
+    const ky = this.raw ? s.y : f.y;
     if (first) {
       const point = this.toPage(s.x, s.y, this.pressure);
       this.keys.push(point);
@@ -389,10 +395,11 @@ export class PenTool implements Tool {
       this.keyY = s.y;
     } else {
       this.tip = this.toPage(s.x, s.y, this.pressure);
-      if (Math.hypot(f.x - this.keyX, f.y - this.keyY) >= KEY_GAP) {
-        this.addKey(this.toPage(f.x, f.y, this.pressure));
-        this.keyX = f.x;
-        this.keyY = f.y;
+      const gap = Math.hypot(kx - this.keyX, ky - this.keyY);
+      if (this.raw ? gap > 0 : gap >= KEY_GAP) {
+        this.addKey(this.raw ? this.tip : this.toPage(kx, ky, this.pressure));
+        this.keyX = kx;
+        this.keyY = ky;
       }
     }
     this.tail = [];

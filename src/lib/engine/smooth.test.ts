@@ -45,6 +45,23 @@ describe('pen filter', () => {
     }
   });
 
+  it('is off at 0 and lets go smoothly on the way there', () => {
+    const off = smoothingOf(0);
+    expect(off.min).toBe(Infinity);
+    expect(off.refit).toBe(0);
+    // the middle stays as it was
+    expect(smoothingOf(0.5).min).toBeCloseTo(2.5);
+    expect(smoothingOf(0.5).refit).toBeCloseTo(1.6);
+    // no jump back to a stiff filter just above 0
+    expect(smoothingOf(0.05).min).toBeGreaterThan(smoothingOf(0.25).min);
+    expect(smoothingOf(0.25).min).toBeGreaterThan(smoothingOf(0.5).min);
+    const out = run(50, 0.3, 40, off);
+    for (const p of out) {
+      expect(p.x).toBe(p.px);
+      expect(p.y).toBe(p.py);
+    }
+  });
+
   it('smooths more with a higher preference', () => {
     expect(smoothingOf(1).min).toBeLessThan(smoothingOf(0.5).min);
     expect(smoothingOf(1).refit).toBeGreaterThan(smoothingOf(0.5).refit);

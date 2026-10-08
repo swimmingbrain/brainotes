@@ -41,16 +41,25 @@ export function euro(f: Euro, x: number, y: number, time: number) {
   f.speed = f.count === 1 ? speed : f.speed + (speed - f.speed) * alpha(SPEED_CUTOFF, dt);
   f.count++;
   const a = alpha(f.min + f.beta * f.speed, dt);
+  // with the filter off the point is the sample itself, not one rounding away
+  if (a >= 1) {
+    f.x = x;
+    f.y = y;
+    return;
+  }
   f.x += (x - f.x) * a;
   f.y += (y - f.y) * a;
 }
 
 // the smoothing preference (0 to 1) as the filter at rest, its speed factor and
-// the refit width in css px. the middle is tuned for handwriting with a pen
+// the refit width in css px. the middle is tuned for handwriting with a pen, below
+// it the filter lets go faster and faster and at 0 it is off, min is Infinity then
 export function smoothingOf(smoothing: number): { min: number; beta: number; refit: number } {
   const s = Math.max(0, Math.min(1, smoothing));
-  if (s === 0) return { min: 1000, beta: 0, refit: 0 };
-  return { min: 2.5 * Math.pow(4, 1 - 2 * s), beta: 0.1 * Math.pow(2, 1 - 2 * s), refit: 3.2 * s };
+  const beta = 0.1 * Math.pow(2, 1 - 2 * s);
+  if (s === 0) return { min: Infinity, beta, refit: 0 };
+  const min = s >= 0.5 ? 2.5 * Math.pow(4, 1 - 2 * s) : 2.5 / (4 * s * s);
+  return { min, beta, refit: 3.2 * s };
 }
 
 function gap(a: number[], b: number[]): number {

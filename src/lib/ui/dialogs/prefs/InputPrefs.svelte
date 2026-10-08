@@ -40,7 +40,7 @@
     label="Smoothing"
     onchange={(v) => setPreference('smoothing', v / 100)} />
 </Field>
-<p class="help">Evens out a shaky hand while you write and once more when you lift the pen. The line always reaches the pen, a lot of it rounds small corners.</p>
+<p class="help">Evens out a shaky hand while you write and once more when you lift the pen. The line always reaches the pen, a lot of it rounds small corners. Zero draws exactly what the pen sends.</p>
 <Field label="Hold to snap">
   <ToggleField value={$preferences.holdToSnap} label="Hold to snap shapes" onchange={(v) => setPreference('holdToSnap', v)} />
 </Field>

@@ -110,6 +110,29 @@ describe('pen tool', () => {
     expect(pts[pts.length - 1][0]).toBeCloseTo(79);
   });
 
+  it('keeps every sample where it was with no smoothing', () => {
+    const { pen, stroke } = setup({ smoothing: 0 });
+    // a slow shaky hand, the samples close together
+    const list: number[][] = [];
+    for (let i = 0; i < 80; i++) list.push([50 + i * 0.4, 50 + (i % 2 ? 0.35 : -0.35) + (i % 7) * 0.05, 0.4]);
+    write(pen, list);
+    const pts = stroke();
+    expect(pts).toHaveLength(list.length);
+    for (let i = 0; i < list.length; i++) {
+      expect(pts[i][0]).toBeCloseTo(list[i][0], 4);
+      expect(pts[i][1]).toBeCloseTo(list[i][1], 4);
+    }
+  });
+
+  it('smooths the same shaky hand at the middle setting', () => {
+    const { pen, stroke } = setup({ smoothing: 0.5 });
+    const list: number[][] = [];
+    for (let i = 0; i < 80; i++) list.push([50 + i * 0.4, 50 + (i % 2 ? 0.35 : -0.35), 0.4]);
+    write(pen, list);
+    const mid = stroke().slice(10, -10);
+    expect(Math.max(...mid.map((p) => Math.abs(p[1] - 50)))).toBeLessThan(0.2);
+  });
+
   it('keeps a tap of one or a few samples as a round dot', () => {
     for (const count of [1, 2, 3]) {
       const { pen, stroke } = setup();
