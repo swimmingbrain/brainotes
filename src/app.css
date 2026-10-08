@@ -46,6 +46,8 @@
 html, body {
   height: 100%;
   overflow: hidden;
+  /* no pull to refresh and no bounce on phones */
+  overscroll-behavior: none;
   font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-primary);

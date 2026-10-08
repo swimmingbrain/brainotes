@@ -125,6 +125,10 @@
     flex-direction: column;
     background: var(--bg-deep);
     overflow: hidden;
+    /* the page never pans or zooms on a phone, the panels still scroll */
+    touch-action: none;
+    /* the notch and the rounded corners of a phone keep their space */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
 
   .main-area {
