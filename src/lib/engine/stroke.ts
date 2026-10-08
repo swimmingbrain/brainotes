@@ -23,7 +23,9 @@ export const PENS: Record<PenType, PenLook> = {
   highlighter: { thinning: 0, taperStart: 0, taperEnd: 0, alpha: 1 }
 };
 
-const OUTLINE_SMOOTHING = 0.6;
+// edge points closer than this share of the pen size are left out, enough for a clean
+// edge. more rounds off the small turns of fast writing
+const OUTLINE_SMOOTHING = 0.25;
 // tapers take at most these shares of what a line is longer than one pen width,
 // so a short mark is round and not all taper
 const TAPER_START_SHARE = 0.3;

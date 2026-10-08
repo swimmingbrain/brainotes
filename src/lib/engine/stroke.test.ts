@@ -132,6 +132,22 @@ describe('stroke outline', () => {
     expect(mapPressure(0, 0.5)).toBe(MIN_PRESSURE);
   });
 
+  it('gives the edge of a small loop a point at least every 0.65 pen widths', () => {
+    // two turns around a circle of radius 3, the edge outside it has a radius of 4
+    const pts: number[][] = [];
+    for (let a = 0; a <= Math.PI * 4; a += 0.1) pts.push([3 * Math.cos(a) * PF_SCALE, 3 * Math.sin(a) * PF_SCALE, 0.5]);
+    const outline = outlineOf(pts, 'ballpoint', 2).map((p) => [p[0] / PF_SCALE, p[1] / PF_SCALE]);
+    let gap = 0;
+    for (let i = 1; i < outline.length; i++) {
+      const a = outline[i - 1];
+      const b = outline[i];
+      // along the outer edge only
+      if (Math.hypot(a[0], a[1]) > 3.8 && Math.hypot(b[0], b[1]) > 3.8) gap = Math.max(gap, Math.hypot(b[0] - a[0], b[1] - a[1]));
+    }
+    expect(gap).toBeGreaterThan(0);
+    expect(gap).toBeLessThan(1.3);
+  });
+
   it('keeps a short fountain pen mark from being all taper', () => {
     const outline = outlineOf(line(0, 4, 0.25), 'fountain', 3.5);
     expect(halfWidthAt(outline, 2)).toBeGreaterThan(3.5 * 0.25);
