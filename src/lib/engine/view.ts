@@ -17,7 +17,7 @@ import {
 import { imagesOf, type Doc, type DocChange, type PageData } from './doc';
 import type { History } from './history';
 import { onBitmap } from './images';
-import { ANDROID } from './device';
+import { ANDROID, PHONE, PHONE_DPR } from './device';
 import { penIsDown } from './input';
 import {
   darkUnder,
@@ -91,7 +91,9 @@ export class CanvasView {
   doc: Doc;
   history: History;
   cam: Camera = { x: 0, y: 0, zoom: 1 };
+  // device pixels per css pixel of the paper and ink, and of the live canvas
   dpr = 1;
+  liveDpr = 1;
   width = 0;
   height = 0;
   // where the canvas sits in the window, kept so pointer handlers never read layout
@@ -579,19 +581,25 @@ export class CanvasView {
 
   private applySize() {
     this.sizeDirty = false;
-    const dpr = window.devicePixelRatio || 1;
+    const real = window.devicePixelRatio || 1;
+    const dpr = PHONE ? Math.min(real, PHONE_DPR) : real;
     // another screen makes old tiles useless, draw anew in one go, not tile by tile
     if (dpr !== this.dpr) this.full = true;
     this.dpr = dpr;
-    const w = Math.max(1, Math.round(this.width * this.dpr));
-    const h = Math.max(1, Math.round(this.height * this.dpr));
-    for (const canvas of [this.screen, this.bg, this.hl, this.ink, this.live]) {
+    this.liveDpr = real;
+    const w = Math.max(1, Math.round(this.width * dpr));
+    const h = Math.max(1, Math.round(this.height * dpr));
+    for (const canvas of [this.screen, this.bg, this.hl, this.ink]) {
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
     }
+    const lw = Math.max(1, Math.round(this.width * real));
+    const lh = Math.max(1, Math.round(this.height * real));
+    if (this.live.width !== lw) this.live.width = lw;
+    if (this.live.height !== lh) this.live.height = lh;
     // the overlay starts out empty, also when the size in pixels stayed
     this.liveCtx.setTransform(1, 0, 0, 1, 0, 0);
-    this.liveCtx.clearRect(0, 0, w, h);
+    this.liveCtx.clearRect(0, 0, lw, lh);
     this.liveBox = null;
     this.liveClean = true;
     this.bgDirty = this.inkDirty = this.hlDirty = this.liveDirty = true;
@@ -1023,9 +1031,16 @@ export class CanvasView {
     this.liveClean = true;
     this.liveBox = null;
     if (!this.tool?.drawLive) return;
+    // the tools draw in device pixels of the view, here those of the live canvas
+    const dpr = this.dpr;
+    this.dpr = this.liveDpr;
     ctx.save();
-    this.liveBox = this.tool.drawLive(ctx);
-    ctx.restore();
+    try {
+      this.liveBox = this.tool.drawLive(ctx);
+    } finally {
+      ctx.restore();
+      this.dpr = dpr;
+    }
     if (this.liveBox) this.liveClean = false;
   }
 
