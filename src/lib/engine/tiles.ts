@@ -1,4 +1,5 @@
 import type { Camera } from './camera';
+import { PHONE } from './device';
 import type { Box } from './types';
 
 // world squares rendered at one exact scale, so a frame is a few drawImage calls
@@ -7,6 +8,9 @@ const MIN_CANVASES = 64;
 const MAX_TILES = 4096;
 const POOL = 16;
 const SPARE = 4;
+// a phone browser gives canvases much less memory: about 48 MB of tiles for both
+// layers together, the spares counted in, at 1 MB a tile
+const PHONE_CANVASES = Math.floor((48 * 1024 * 1024) / 2 / (TILE * TILE * 4)) - SPARE;
 // items per step of a tile that is drawn over several frames
 const CHUNK = 48;
 
@@ -170,14 +174,15 @@ export class TileLayer {
     }
 
     if (missing.length > 0) this.drawOld(ctx, cam, target);
-    else this.old = null;
+    else this.dropOld();
     this.shown.x = cam.x;
     this.shown.y = cam.y;
     this.shownScale = target;
 
+    const limit = this.limit(range);
     let more = missing.length > 0;
-    if (!more && prefetch) more = this.prefetch(deadline);
-    this.evict(range);
+    if (!more && prefetch) more = this.prefetch(deadline, limit);
+    this.evict(limit);
     return more;
   }
 
@@ -244,7 +249,15 @@ export class TileLayer {
     this.dropPending();
     this.releaseAll(this.tiles);
     this.tiles = new Map();
+    this.dropOld();
+  }
+
+  // the stretched copy is a whole screen of pixels, a phone lets it go when done
+  private dropOld() {
     this.old = null;
+    if (!PHONE) return;
+    this.oldCanvas = null;
+    this.oldCtx = null;
   }
 
   // the tile once it is complete, null while it still needs more frames
@@ -376,7 +389,7 @@ export class TileLayer {
   }
 
   // one ring of tiles around the view, so a small scroll finds them ready
-  private prefetch(deadline: number): boolean {
+  private prefetch(deadline: number, limit: number): boolean {
     const r = this.range;
     const ring = this.ring;
     ring.x0 = r.x0 - 1;
@@ -387,6 +400,8 @@ export class TileLayer {
       for (let tx = ring.x0; tx <= ring.x1; tx++) {
         if (tx >= r.x0 && tx <= r.x1 && ty >= r.y0 && ty <= r.y1) continue;
         if (this.tiles.has(tileKey(tx, ty))) continue;
+        // a full cache would throw them out again right away
+        if (PHONE && this.canvases >= limit) return this.pending.size > 0;
         if (performance.now() >= deadline) return true;
         this.work(tx, ty, deadline);
       }
@@ -411,7 +426,7 @@ export class TileLayer {
 
   private release(tile: Tile) {
     if (!tile.canvas) return;
-    if (this.pool.length < POOL) this.pool.push(tile.canvas);
+    if (this.pool.length < (PHONE ? SPARE : POOL)) this.pool.push(tile.canvas);
     tile.canvas = null;
     tile.ctx = null;
     this.canvases--;
@@ -421,10 +436,15 @@ export class TileLayer {
     for (const tile of map.values()) this.release(tile);
   }
 
-  // least recently used tiles go first, never the ones on screen
-  private evict(range: TileRange) {
+  // how many tiles may keep a canvas
+  private limit(range: TileRange): number {
+    if (PHONE) return PHONE_CANVASES;
     const visible = (range.x1 - range.x0 + 1) * (range.y1 - range.y0 + 1);
-    const cap = Math.max(MIN_CANVASES, visible * 2 + 16);
+    return Math.max(MIN_CANVASES, visible * 2 + 16);
+  }
+
+  // least recently used tiles go first, never the ones on screen
+  private evict(cap: number) {
     if (this.canvases <= cap && this.tiles.size <= MAX_TILES) return;
     const list = [...this.tiles.values()].filter((t) => t.used !== this.stamp).sort((a, b) => a.used - b.used);
     for (const tile of list) {
