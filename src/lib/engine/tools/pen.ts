@@ -38,10 +38,10 @@ const CURVE_STEP = 0.75;
 // samples and css pixels: this little at no pressure at the very end is the pen leaving the glass
 const LIFT_SAMPLES = 4;
 const LIFT_RUN = 6;
-// ms and pen widths: a tap this soon after a lift and this close to where the line
-// ended is the nib bouncing back onto the glass, not a dot
+// ms and css pixels: a tap this soon after a lift and this close to where the nib
+// left the glass is the nib bouncing back, not a dot
 const BOUNCE_TIME = 80;
-const BOUNCE_REACH = 2;
+const BOUNCE_REACH = 6;
 // points of a long line kept as one finished piece, and points near the pen that stay live
 const PIECE = 64;
 const KEEP = 24;
@@ -157,7 +157,7 @@ export class PenTool implements Tool {
     this.lift = null;
     this.downTime = s.time;
     this.bounce =
-      kind === 'pen' && s.time - this.liftTime < BOUNCE_TIME && Math.hypot(s.x - this.liftX, s.y - this.liftY) < BOUNCE_REACH * set.size * this.view.cam.zoom;
+      kind === 'pen' && s.time - this.liftTime < BOUNCE_TIME && Math.hypot(s.x - this.liftX, s.y - this.liftY) < BOUNCE_REACH;
     this.snapped = null;
     this.snapping = set.holdToSnap && set.pen !== 'highlighter';
     this.holdX = s.x;
@@ -287,10 +287,8 @@ export class PenTool implements Tool {
     }
     if (this.pen !== 'highlighter') this.keepGhost(stroke);
     else this.request();
-    const last = all[all.length - 1];
-    const cam = this.view.cam;
-    this.liftX = (last[0] / PF_SCALE + this.view.pageX(this.page) - cam.x) * cam.zoom;
-    this.liftY = (last[1] / PF_SCALE + this.view.pageY(this.page) - cam.y) * cam.zoom;
+    this.liftX = this.lastX;
+    this.liftY = this.lastY;
     this.liftTime = time;
   }
 
