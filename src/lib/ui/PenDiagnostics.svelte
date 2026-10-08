@@ -43,7 +43,10 @@
         `desync       ${s.desynchronized}`,
         `ink trail    ${trail}`,
         `live draw    ${s.draws > 0 ? (s.drawMs / s.draws).toFixed(2) : '-'} ms per event`,
-        `display      ${hz || '-'} Hz`
+        `display      ${hz || '-'} Hz`,
+        `pixels       ${s.dpr ? `${s.dpr}, live ${s.liveDpr}` : '-'}`,
+        `gpu resets   ${s.restores}`,
+        `error        ${s.error ? s.error.slice(0, 60) : '-'}`
       ].join('\n');
       if (next !== text) text = next;
     }, 250);
@@ -59,10 +62,14 @@
 <div class="pen-diagnostics" aria-hidden="true">{text}</div>
 
 <style>
+  /* above the canvases, also when they show nothing but black */
   .pen-diagnostics {
     position: absolute;
+    z-index: 5;
     left: 8px;
     bottom: 8px;
+    max-width: calc(100% - 16px);
+    overflow: hidden;
     padding: 5px 8px;
     background: var(--bg-surface);
     border: 1px solid var(--border);

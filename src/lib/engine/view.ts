@@ -315,6 +315,7 @@ export class CanvasView {
   }
 
   private restored = () => {
+    penStats.restores++;
     // the tiles were on the gpu too, they are made anew
     this.hlLayer.forget();
     this.inkLayer.forget();
@@ -618,6 +619,8 @@ export class CanvasView {
     if (dpr !== this.dpr) this.full = true;
     this.dpr = dpr;
     this.liveDpr = real;
+    penStats.dpr = dpr;
+    penStats.liveDpr = real;
     const w = Math.max(1, Math.round(this.width * dpr));
     const h = Math.max(1, Math.round(this.height * dpr));
     for (const canvas of [this.screen, this.bg, this.hl, this.ink]) {
@@ -795,6 +798,7 @@ export class CanvasView {
     try {
       this.draw();
     } catch (err) {
+      penStats.error = err instanceof Error ? err.message : String(err);
       if (this.broken) return;
       this.broken = true;
       console.error(err);

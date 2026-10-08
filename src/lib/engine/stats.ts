@@ -9,6 +9,12 @@ export const penStats = {
   // the low latency canvas and the system ink trail
   desynchronized: false,
   trailReady: false,
+  // device pixels per css pixel of the paper and of the live canvas, gpu resets
+  // the canvas came back from, and the last error that stopped a frame
+  dpr: 0,
+  liveDpr: 0,
+  restores: 0,
+  error: '',
   // the stroke going on or the last one: event times in ms, events with samples,
   // samples, pointermoves and their guessed points, pressure, live draw time
   first: 0,

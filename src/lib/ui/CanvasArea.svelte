@@ -4,6 +4,7 @@
   import ScrollIndicator from './ScrollIndicator.svelte';
   import { actions } from '$lib/editor/actions';
   import { mountCanvas } from '$lib/editor/canvas';
+  import { penStats } from '$lib/engine/stats';
   import { installClipboard } from '$lib/editor/clipboard';
   import { PAPER_STYLES } from '$lib/editor/commands';
   import { PAPER_COLORS } from '$lib/editor/paper';
@@ -26,6 +27,7 @@
       console.error(err);
       layers.replaceChildren();
       failed = err instanceof Error ? err.message : String(err);
+      penStats.error = failed;
       addToast(`The writing area could not start: ${failed}`, 'error', 0);
     }
     const removeClipboard = installClipboard();
