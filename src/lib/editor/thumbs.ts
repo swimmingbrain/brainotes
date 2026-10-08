@@ -66,12 +66,14 @@ export class Thumbs {
     this.byId.set(id, thumb);
     this.byCanvas.set(canvas, thumb);
     this.observer.observe(canvas);
+    canvas.addEventListener('contextrestored', this.onRestored);
   }
 
   remove(canvas: HTMLCanvasElement) {
     const thumb = this.byCanvas.get(canvas);
     if (!thumb) return;
     this.observer?.unobserve(canvas);
+    canvas.removeEventListener('contextrestored', this.onRestored);
     this.byCanvas.delete(canvas);
     if (this.byId.get(thumb.id) === thumb) this.byId.delete(thumb.id);
   }
@@ -128,6 +130,16 @@ export class Thumbs {
     thumb.job = null;
     // ink that just arrived from storage shows at once, an edit waits a moment
     this.schedule(change.type === 'loaded' ? 0 : REFRESH);
+  };
+
+  // a gpu reset leaves the thumbnail empty, it is drawn again
+  private onRestored = (e: Event) => {
+    const thumb = this.byCanvas.get(e.target as Element);
+    if (!thumb) return;
+    thumb.stale = true;
+    thumb.job = null;
+    this.sink = null;
+    this.schedule(0);
   };
 
   private onBitmap = (assetId: string) => {
