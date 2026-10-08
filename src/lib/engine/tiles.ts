@@ -252,6 +252,15 @@ export class TileLayer {
     this.dropOld();
   }
 
+  // after a gpu reset no canvas of the layer can be trusted, not even the spares
+  forget() {
+    this.clear();
+    this.pool = [];
+    this.oldCanvas = null;
+    this.oldCtx = null;
+    this.sink = null;
+  }
+
   // the stretched copy is a whole screen of pixels, a phone lets it go when done
   private dropOld() {
     this.old = null;

@@ -207,6 +207,11 @@ export class CanvasView {
     this.fast = this.liveCtx.getContextAttributes?.().desynchronized === true;
     penStats.desynchronized = this.fast;
     this.live.style.touchAction = 'none';
+    // a gpu reset (often on a phone) leaves every canvas empty, a black sheet where
+    // the paper was. once the browser gives them back all is drawn again
+    for (const canvas of [this.screen, this.bg, this.hl, this.ink, this.live]) {
+      canvas.addEventListener('contextrestored', this.restored);
+    }
 
     this.hlLayer = new TileLayer((box, scale) => this.paint(box, scale, true));
     this.inkLayer = new TileLayer((box, scale) => this.paint(box, scale, false));
@@ -247,6 +252,9 @@ export class CanvasView {
     this.dprQuery?.removeEventListener('change', this.onDpr);
     this.hlLayer.clear();
     this.inkLayer.clear();
+    for (const canvas of [this.screen, this.bg, this.hl, this.ink, this.live]) {
+      canvas.removeEventListener('contextrestored', this.restored);
+    }
     this.screen.remove();
     this.live.remove();
   }
@@ -305,6 +313,15 @@ export class CanvasView {
     this.hlDirty = true;
     this.requestFrame();
   }
+
+  private restored = () => {
+    // the tiles were on the gpu too, they are made anew
+    this.hlLayer.forget();
+    this.inkLayer.forget();
+    this.liveBox = null;
+    this.liveClean = false;
+    this.redrawAll();
+  };
 
   redrawAll() {
     this.warm = false;
