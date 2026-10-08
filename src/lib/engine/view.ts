@@ -76,9 +76,11 @@ const FRICTION = 260;
 // px per ms, slower than this a fling has ended
 const FLING_STOP = 0.02;
 
-function makeCanvas(host: HTMLElement, name: string): HTMLCanvasElement {
+// without a host the canvas stays off the page
+function makeCanvas(name: string, host?: HTMLElement): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.className = `layer-${name}`;
+  if (!host) return canvas;
   canvas.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;display:block';
   host.appendChild(canvas);
   return canvas;
@@ -103,13 +105,15 @@ export class CanvasView {
   // goes up when another notebook, board or page is put on screen, what lies over it goes
   scene = 0;
 
-  // the paper, highlighter and ink blend in a group of their own, the live canvas
-  // sits above it alone so nothing slows its way to the screen
-  private group: HTMLDivElement;
+  // the paper, highlighter and ink are drawn off the page and put together on the
+  // screen canvas, the live canvas sits above it alone so nothing slows its way to
+  // the screen. css blending of stacked canvases came out black on some phones
+  readonly screen: HTMLCanvasElement;
   readonly bg: HTMLCanvasElement;
   readonly hl: HTMLCanvasElement;
   readonly ink: HTMLCanvasElement;
   readonly live: HTMLCanvasElement;
+  private screenCtx: CanvasRenderingContext2D;
   private bgCtx: CanvasRenderingContext2D;
   private hlCtx: CanvasRenderingContext2D;
   private inkCtx: CanvasRenderingContext2D;
@@ -124,6 +128,10 @@ export class CanvasView {
   private hlDirty = true;
   private liveDirty = false;
   private sizeDirty = true;
+  // one of the three layers changed, the screen canvas is put together again
+  private shownDirty = true;
+  // the highlighter is multiplied onto light paper and laid on normally on dark
+  private blend: GlobalCompositeOperation = 'multiply';
   // render everything on screen in this frame, no budget
   private full = true;
   private liveBox: Box | null = null;
@@ -171,13 +179,12 @@ export class CanvasView {
     this.host = host;
     this.doc = doc;
     this.history = history;
-    this.group = document.createElement('div');
-    this.group.style.cssText = 'position:absolute;inset:0;isolation:isolate';
-    host.appendChild(this.group);
-    this.bg = makeCanvas(this.group, 'paper');
-    this.hl = makeCanvas(this.group, 'highlighter');
-    this.ink = makeCanvas(this.group, 'ink');
-    this.live = makeCanvas(host, 'live');
+    this.screen = makeCanvas('screen', host);
+    this.live = makeCanvas('live', host);
+    this.bg = makeCanvas('paper');
+    this.hl = makeCanvas('highlighter');
+    this.ink = makeCanvas('ink');
+    this.screenCtx = this.screen.getContext('2d', { alpha: false })!;
     this.bgCtx = this.bg.getContext('2d', { alpha: false })!;
     this.hlCtx = this.hl.getContext('2d')!;
     this.inkCtx = this.ink.getContext('2d')!;
@@ -186,7 +193,6 @@ export class CanvasView {
     this.liveCtx = this.live.getContext('2d', ANDROID ? {} : { desynchronized: true })!;
     this.fast = this.liveCtx.getContextAttributes?.().desynchronized === true;
     penStats.desynchronized = this.fast;
-    this.hl.style.opacity = String(HIGHLIGHTER_ALPHA);
     this.live.style.touchAction = 'none';
 
     this.hlLayer = new TileLayer((box, scale) => this.paint(box, scale, true));
@@ -225,8 +231,8 @@ export class CanvasView {
     this.dprQuery?.removeEventListener('change', this.onDpr);
     this.hlLayer.clear();
     this.inkLayer.clear();
-    for (const canvas of [this.bg, this.hl, this.ink, this.live]) canvas.remove();
-    this.group.remove();
+    this.screen.remove();
+    this.live.remove();
   }
 
   setDoc(doc: Doc, history: History) {
@@ -579,7 +585,7 @@ export class CanvasView {
     this.dpr = dpr;
     const w = Math.max(1, Math.round(this.width * this.dpr));
     const h = Math.max(1, Math.round(this.height * this.dpr));
-    for (const canvas of [this.bg, this.hl, this.ink, this.live]) {
+    for (const canvas of [this.screen, this.bg, this.hl, this.ink, this.live]) {
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
     }
@@ -606,8 +612,11 @@ export class CanvasView {
   private updateBlend() {
     const index = this.currentPage;
     const page = index >= 0 && index < this.doc.pageCount ? this.doc.notebook.pages[index] : null;
-    const blend = page && darkUnder(page) ? 'normal' : 'multiply';
-    if (this.hl.style.mixBlendMode !== blend) this.hl.style.mixBlendMode = blend;
+    const blend = page && darkUnder(page) ? 'source-over' : 'multiply';
+    if (blend === this.blend) return;
+    this.blend = blend;
+    this.shownDirty = true;
+    this.requestFrame();
   }
 
   // a tile's drawing as a job the tile layer can spread over frames
@@ -766,6 +775,7 @@ export class CanvasView {
     if (this.bgDirty) {
       this.drawBackground();
       this.bgDirty = false;
+      this.shownDirty = true;
     }
 
     const deadline = this.full ? Infinity : start + (penIsDown() ? BUDGET_PEN_DOWN : BUDGET);
@@ -777,6 +787,7 @@ export class CanvasView {
     }
     if (this.inkDirty) {
       this.inkDirty = this.inkLayer.compose(this.inkCtx, this.cam, this.dpr, this.width, this.height, deadline, prefetch);
+      this.shownDirty = true;
     }
     if (this.hlDirty) {
       this.hlDirty = this.hlLayer.compose(this.hlCtx, this.cam, this.dpr, this.width, this.height, deadline, prefetch);
@@ -785,7 +796,9 @@ export class CanvasView {
         tool.drawUnder(this.hlCtx);
         this.hlCtx.restore();
       }
+      this.shownDirty = true;
     }
+    if (this.shownDirty) this.present();
     if (this.liveDirty) this.drawLive();
     this.full = false;
 
@@ -977,6 +990,22 @@ export class CanvasView {
       drawImageItem(ctx, image, dark);
     }
     ctx.restore();
+  }
+
+  // the three layers as one picture, the highlighter at half strength like a marker
+  private present() {
+    this.shownDirty = false;
+    const ctx = this.screenCtx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(this.bg, 0, 0);
+    ctx.globalAlpha = HIGHLIGHTER_ALPHA;
+    ctx.globalCompositeOperation = this.blend;
+    ctx.drawImage(this.hl, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(this.ink, 0, 0);
   }
 
   private drawLive() {
