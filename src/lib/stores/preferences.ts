@@ -31,6 +31,8 @@ export interface Preferences {
   holdToSnap: boolean;
   // the system draws the newest bit of a pen line ahead of the page
   inkTrail: boolean;
+  // a small box on the canvas with what the pen and the browser report
+  penDiagnostics: boolean;
   // which defaults the saved values come from, old defaults move to new ones once
   version: number;
 }
@@ -70,6 +72,7 @@ export function defaultPreferences(): Preferences {
     smoothing: 0.5,
     holdToSnap: true,
     inkTrail: true,
+    penDiagnostics: false,
     version: 2
   };
 }

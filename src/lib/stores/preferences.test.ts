@@ -30,6 +30,11 @@ describe('mergePreferences', () => {
     expect(mergePreferences({ inkTrail: 'no' }).inkTrail).toBe(true);
   });
 
+  it('has the pen diagnostics off until they are switched on', () => {
+    expect(mergePreferences({}).penDiagnostics).toBe(false);
+    expect(mergePreferences({ penDiagnostics: true }).penDiagnostics).toBe(true);
+  });
+
   it('merges the nested tools and paper objects key by key', () => {
     const merged = mergePreferences({ tools: { laser: false }, paper: { style: 'grid' } });
     expect(merged.tools.laser).toBe(false);

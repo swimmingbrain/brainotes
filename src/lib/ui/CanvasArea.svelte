@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import PenDiagnostics from './PenDiagnostics.svelte';
   import ScrollIndicator from './ScrollIndicator.svelte';
   import { actions } from '$lib/editor/actions';
   import { mountCanvas } from '$lib/editor/canvas';
@@ -8,7 +9,7 @@
   import { PAPER_COLORS } from '$lib/editor/paper';
   import { toolById } from '$lib/editor/tools';
   import { activeTool, contextMenu, history, inputType, paperColor, paperStyle, selectionCount, type MenuItem } from '$lib/stores/app';
-  import type { PaperColor } from '$lib/stores/preferences';
+  import { preferences, type PaperColor } from '$lib/stores/preferences';
 
   const cursor = $derived(toolById($activeTool).cursor);
 
@@ -78,6 +79,9 @@
   <!-- the engine puts its canvases in here -->
   <div class="layers" bind:this={layers}></div>
   <ScrollIndicator bind:this={indicator} />
+  {#if $preferences.penDiagnostics}
+    <PenDiagnostics />
+  {/if}
 </div>
 
 <style>

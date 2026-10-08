@@ -49,6 +49,10 @@
   <ToggleField value={$preferences.inkTrail} label="System ink trail" onchange={(v) => setPreference('inkTrail', v)} />
 </Field>
 <p class="help">Lets the system draw the newest bit of a pen line ahead of the page, so the ink sits right under the pen. Only some browsers on Windows have it. Turn it off if the tip looks wrong.</p>
+<Field label="Pen diagnostics">
+  <ToggleField value={$preferences.penDiagnostics} label="Pen diagnostics" onchange={(v) => setPreference('penDiagnostics', v)} />
+</Field>
+<p class="help">Shows a small box in the corner of the page with what the pen and the browser report while you write: events and samples per second, pressure, and whether the fast drawing paths are on. Handy when the pen feels slow.</p>
 
 <style>
   .section {
