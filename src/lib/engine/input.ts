@@ -75,6 +75,8 @@ export class Input {
     el.addEventListener('lostpointercapture', this.oncancel);
     el.addEventListener('pointerleave', this.onleave);
     el.addEventListener('wheel', this.onwheel, { passive: false });
+    // the presenter comes some time after it is asked for, so before the first stroke
+    if (hooks.inkTrail?.()) askTrail(el);
   }
 
   destroy() {
