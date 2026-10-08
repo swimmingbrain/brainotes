@@ -27,10 +27,10 @@ const HOLD_MOVE = 3;
 // css pixels, smaller lines are writing, not shapes
 const SNAP_MIN = 28;
 // css pixels: with smoothing a key this close to the last one adds nothing, the refit
-// may move a point this far, a guess goes this far ahead
+// may move a point this far, a guess goes this far ahead, about a frame of fast writing
 const KEY_GAP = 0.2;
 const REFIT_MOVE = 0.35;
-const TAIL = 4;
+const TAIL = 9;
 // css pixels: a gap between two samples longer than this gets a curve, fast small loops
 // come with only a few samples a turn. it is filled about every CURVE_STEP
 const SPARSE = 1;
@@ -470,7 +470,8 @@ export class PenTool implements Tool {
         this.keyY = ky;
       }
     }
-    this.tail = [];
+    // the guess stays until the next one comes, as far as the pen has not passed it
+    if (this.tail.length > 0) this.trimTail(first ? 0 : s.x - this.lastX, first ? 0 : s.y - this.lastY);
     const step = Math.hypot(s.x - this.lastX, s.y - this.lastY);
     if (!first && step >= 0.25) {
       this.dirX = (s.x - this.lastX) / step;
@@ -480,6 +481,19 @@ export class PenTool implements Tool {
     this.lastY = s.y;
     this.lastTime = s.time;
     this.request();
+  }
+
+  // what is left of the guess ahead of the new tip, going dx, dy. a pen that stopped
+  // or turned back loses all of it
+  private trimTail(dx: number, dy: number) {
+    const tip = this.tip;
+    let i = 0;
+    if (tip && (dx !== 0 || dy !== 0)) {
+      while (i < this.tail.length && (this.tail[i][0] - tip[0]) * dx + (this.tail[i][1] - tip[1]) * dy <= 0) i++;
+    } else {
+      i = this.tail.length;
+    }
+    if (i > 0) this.tail = this.tail.slice(i);
   }
 
   // with the newest key known, the gap before the one ahead of it gets its curve

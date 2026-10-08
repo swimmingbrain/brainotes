@@ -200,6 +200,30 @@ describe('pen tool', () => {
     expect(stroke()).toHaveLength(list.length);
   });
 
+  it('guesses at most 9 px ahead, keeps the guess while the pen goes on and never keeps it', () => {
+    const { pen, stroke } = setup();
+    const tail = () => (pen as unknown as { tail: number[][] }).tail.map((p) => [p[0] / PF_SCALE, p[1] / PF_SCALE]);
+    const list = right(10, 2);
+    list.forEach(([x, y, pressure], i) => {
+      const s: Sample = { x, y, pressure, time: i * STEP };
+      if (i === 0) pen.down(s, 'pen');
+      else pen.move(s);
+    });
+    // the browser guesses 20 px straight on from 68, 50
+    pen.predict([0, 1, 2, 3].map((i) => ({ x: 73 + i * 5, y: 50, pressure: 0.4, time: (10 + i) * STEP })));
+    expect(Math.max(...tail().map((p) => p[0]))).toBeCloseTo(77);
+    // the pen goes on 3 px, what is still ahead stays
+    pen.move({ x: 71, y: 50, pressure: 0.4, time: 11 * STEP });
+    expect(tail().length).toBeGreaterThan(0);
+    expect(Math.min(...tail().map((p) => p[0]))).toBeGreaterThan(71);
+    // it turns back, the guess goes
+    pen.move({ x: 70, y: 51, pressure: 0.4, time: 12 * STEP });
+    expect(tail()).toHaveLength(0);
+    pen.predict([{ x: 75, y: 51, pressure: 0.4, time: 13 * STEP }]);
+    pen.up();
+    expect(Math.max(...stroke().map((p) => p[0]))).toBeLessThan(71.01);
+  });
+
   it('keeps a tap of one or a few samples as a round dot', () => {
     for (const count of [1, 2, 3]) {
       const { pen, stroke } = setup();
