@@ -49,14 +49,14 @@ function setup(settings: Partial<PenSettings> = {}) {
   return { pen, stroke };
 }
 
-// samples x, y, pressure at 240 a second, then the lift
-function write(pen: PenTool, list: number[][], lift?: number[]) {
+// samples x, y, pressure at 240 a second from start ms, then the lift
+function write(pen: PenTool, list: number[][], lift?: number[], start = 0) {
   list.forEach(([x, y, pressure], i) => {
-    const s: Sample = { x, y, pressure, time: i * STEP };
+    const s: Sample = { x, y, pressure, time: start + i * STEP };
     if (i === 0) pen.down(s, 'pen');
     else pen.move(s);
   });
-  pen.up(lift ? { x: lift[0], y: lift[1], pressure: 0, time: list.length * STEP } : undefined);
+  pen.up(lift ? { x: lift[0], y: lift[1], pressure: 0, time: start + list.length * STEP } : undefined);
 }
 
 // a pen going right from 50, 50 by step px a sample
@@ -95,19 +95,39 @@ describe('pen tool', () => {
     expect(Math.min(...pts.map((p) => p[2]))).toBeGreaterThan(0.2);
   });
 
-  it('ends where the pen was lifted', () => {
+  it('ends where the pen was lifted, a little further on', () => {
     const { pen, stroke } = setup();
-    write(pen, right(30, 1), [81.5, 50.5]);
+    write(pen, right(30, 1), [80.8, 50.3]);
     const pts = stroke();
-    expect(pts[pts.length - 1][0]).toBeCloseTo(81.5);
-    expect(pts[pts.length - 1][1]).toBeCloseTo(50.5);
+    expect(pts[pts.length - 1][0]).toBeCloseTo(80.8);
+    expect(pts[pts.length - 1][1]).toBeCloseTo(50.3);
   });
 
-  it('does not believe a lift far away from the line', () => {
+  it('does not believe a lift more than a pen width away, or turned back or aside', () => {
+    for (const lift of [
+      [200, 300],
+      [82, 52],
+      [77.6, 50.4],
+      [79.3, 51.8]
+    ]) {
+      const { pen, stroke } = setup();
+      write(pen, right(30, 1), lift);
+      const pts = stroke();
+      expect(pts[pts.length - 1][0]).toBeCloseTo(79);
+      expect(pts[pts.length - 1][1]).toBeCloseTo(50);
+    }
+  });
+
+  it('takes back the few samples at no pressure while the pen leaves the glass', () => {
     const { pen, stroke } = setup();
-    write(pen, right(30, 1), [200, 300]);
+    const list = right(30, 1);
+    // the pressure is gone, the tip drifts up and away before the up comes
+    list.push([80.2, 49.2, 0], [81.4, 48, 0], [82.2, 47.1, 0]);
+    write(pen, list, [83, 46]);
     const pts = stroke();
     expect(pts[pts.length - 1][0]).toBeCloseTo(79);
+    expect(pts[pts.length - 1][1]).toBeCloseTo(50);
+    expect(Math.min(...pts.map((p) => p[1]))).toBeCloseTo(50);
   });
 
   it('keeps every sample where it was with no smoothing', () => {

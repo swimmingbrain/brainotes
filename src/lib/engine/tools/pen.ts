@@ -27,11 +27,13 @@ const HOLD_MOVE = 3;
 // css pixels, smaller lines are writing, not shapes
 const SNAP_MIN = 28;
 // css pixels: with smoothing a key this close to the last one adds nothing, the refit
-// may move a point this far, a lift further away is not believed, a guess goes this far ahead
+// may move a point this far, a guess goes this far ahead
 const KEY_GAP = 0.2;
 const REFIT_MOVE = 0.35;
-const UP_REACH = 12;
 const TAIL = 4;
+// samples and css pixels: this little at no pressure at the very end is the pen leaving the glass
+const LIFT_SAMPLES = 4;
+const LIFT_RUN = 6;
 // points of a long line kept as one finished piece, and points near the pen that stay live
 const PIECE = 64;
 const KEEP = 24;
@@ -77,6 +79,11 @@ export class PenTool implements Tool {
   private lastX = 0;
   private lastY = 0;
   private lastTime = 0;
+  // where the pen was going, a unit vector in css px
+  private dirX = 0;
+  private dirY = 0;
+  // the line as it was before the samples at no pressure at the end, see dropLift
+  private lift: { keys: number; pts: number; tip: number[] | null; count: number; run: number } | null = null;
   // a finished stroke stays on the live canvas a little, until the ink canvas shows it
   private ghost: Item | null = null;
   private ghostPage = 0;
@@ -129,6 +136,9 @@ export class PenTool implements Tool {
     this.piecesBox = emptyBox();
     this.pressure = 0.5;
     this.pressureKnown = kind !== 'pen' || s.pressure > 0;
+    this.dirX = 0;
+    this.dirY = 0;
+    this.lift = null;
     this.snapped = null;
     this.snapping = set.holdToSnap && set.pen !== 'highlighter';
     this.holdX = s.x;
@@ -204,10 +214,9 @@ export class PenTool implements Tool {
 
   up(s?: Sample) {
     if (!this.on) return;
-    // the lift often comes a little further on than the last move
-    if (s && !this.snapped && Math.hypot(s.x - this.lastX, s.y - this.lastY) < UP_REACH) {
-      this.add({ ...s, pressure: 0 }, false);
-    }
+    const lifted = this.dropLift();
+    // the lift is often reported a little further on than the last move
+    if (s && !this.snapped && !lifted && this.liftCounts(s)) this.add({ ...s, pressure: 0 }, false);
     this.on = false;
     this.tail = [];
     this.stopHold();
@@ -252,6 +261,28 @@ export class PenTool implements Tool {
     }
     if (this.pen !== 'highlighter') this.keepGhost(stroke);
     else this.request();
+  }
+
+  // the samples at no pressure after the last real one were the pen leaving the glass,
+  // a few of them that went only a little way are taken back. more is light writing
+  private dropLift(): boolean {
+    const lift = this.lift;
+    this.lift = null;
+    if (!lift || lift.count > LIFT_SAMPLES || lift.run > LIFT_RUN) return false;
+    this.keys.length = lift.keys;
+    this.pts.length = lift.pts;
+    this.tip = lift.tip;
+    return true;
+  }
+
+  // a lift within a pen width of the last sample and going the same way, further away
+  // or turned back it is where the pen already hovers and would add a hook
+  private liftCounts(s: Sample): boolean {
+    const dx = s.x - this.lastX;
+    const dy = s.y - this.lastY;
+    const d = Math.hypot(dx, dy);
+    if (d === 0 || d > this.size * this.view.cam.zoom) return false;
+    return dx * this.dirX + dy * this.dirY > d * 0.5;
   }
 
   private keepGhost(item: Item) {
@@ -361,6 +392,7 @@ export class PenTool implements Tool {
       // a pen that touches with no pressure keeps its place in the line and the
       // pressure it had, only the start waits for a real one
       if (s.pressure > 0) {
+        this.lift = null;
         const p = mapPressure(s.pressure, this.sensitivity);
         if (!this.pressureKnown) {
           this.pressureKnown = true;
@@ -372,6 +404,11 @@ export class PenTool implements Tool {
         }
       } else if (first) {
         this.pressure = mapPressure(0.5, this.sensitivity);
+      } else if (this.pressureKnown) {
+        // maybe the pen is leaving the glass, the line so far is kept aside
+        if (!this.lift) this.lift = { keys: this.keys.length, pts: this.pts.length, tip: this.tip, count: 0, run: 0 };
+        this.lift.count++;
+        this.lift.run += Math.hypot(s.x - this.lastX, s.y - this.lastY);
       }
     } else if (!first) {
       // no pressure from a mouse or a finger, a fast line gets a bit thinner
@@ -403,6 +440,11 @@ export class PenTool implements Tool {
       }
     }
     this.tail = [];
+    const step = Math.hypot(s.x - this.lastX, s.y - this.lastY);
+    if (!first && step >= 0.25) {
+      this.dirX = (s.x - this.lastX) / step;
+      this.dirY = (s.y - this.lastY) / step;
+    }
     this.lastX = s.x;
     this.lastY = s.y;
     this.lastTime = s.time;
