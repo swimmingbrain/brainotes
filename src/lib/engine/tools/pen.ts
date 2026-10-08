@@ -34,6 +34,10 @@ const TAIL = 4;
 // samples and css pixels: this little at no pressure at the very end is the pen leaving the glass
 const LIFT_SAMPLES = 4;
 const LIFT_RUN = 6;
+// ms and pen widths: a tap this soon after a lift and this close to where the line
+// ended is the nib bouncing back onto the glass, not a dot
+const BOUNCE_TIME = 80;
+const BOUNCE_REACH = 2;
 // points of a long line kept as one finished piece, and points near the pen that stay live
 const PIECE = 64;
 const KEEP = 24;
@@ -84,6 +88,12 @@ export class PenTool implements Tool {
   private dirY = 0;
   // the line as it was before the samples at no pressure at the end, see dropLift
   private lift: { keys: number; pts: number; tip: number[] | null; count: number; run: number } | null = null;
+  // the end of the last line on screen and when it was lifted, for a bounce of the nib
+  private liftX = 0;
+  private liftY = 0;
+  private liftTime = -Infinity;
+  private downTime = 0;
+  private bounce = false;
   // a finished stroke stays on the live canvas a little, until the ink canvas shows it
   private ghost: Item | null = null;
   private ghostPage = 0;
@@ -139,6 +149,9 @@ export class PenTool implements Tool {
     this.dirX = 0;
     this.dirY = 0;
     this.lift = null;
+    this.downTime = s.time;
+    this.bounce =
+      kind === 'pen' && s.time - this.liftTime < BOUNCE_TIME && Math.hypot(s.x - this.liftX, s.y - this.liftY) < BOUNCE_REACH * set.size * this.view.cam.zoom;
     this.snapped = null;
     this.snapping = set.holdToSnap && set.pen !== 'highlighter';
     this.holdX = s.x;
@@ -220,6 +233,13 @@ export class PenTool implements Tool {
     this.on = false;
     this.tail = [];
     this.stopHold();
+    const time = s?.time ?? this.lastTime;
+    if (this.bounce && time - this.downTime < BOUNCE_TIME && lengthOf(this.pts) <= this.size * PF_SCALE && !this.snapped) {
+      // the nib came back for a moment, nothing is kept
+      this.liftTime = time;
+      this.request();
+      return;
+    }
     const shape = this.snapped;
     if (shape) {
       this.snapped = null;
@@ -261,6 +281,11 @@ export class PenTool implements Tool {
     }
     if (this.pen !== 'highlighter') this.keepGhost(stroke);
     else this.request();
+    const last = all[all.length - 1];
+    const cam = this.view.cam;
+    this.liftX = (last[0] / PF_SCALE + this.view.pageX(this.page) - cam.x) * cam.zoom;
+    this.liftY = (last[1] / PF_SCALE + this.view.pageY(this.page) - cam.y) * cam.zoom;
+    this.liftTime = time;
   }
 
   // the samples at no pressure after the last real one were the pen leaving the glass,

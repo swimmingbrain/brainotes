@@ -130,6 +130,26 @@ describe('pen tool', () => {
     expect(Math.min(...pts.map((p) => p[1]))).toBeCloseTo(50);
   });
 
+  it('leaves no dot when the nib bounces back right after a lift', () => {
+    const { pen, stroke } = setup();
+    write(pen, right(30, 1));
+    const kept = stroke();
+    // 15 ms after the lift the nib touches again for one sample next to the end
+    write(pen, [[80.5, 49.2, 0.1]], [80.6, 49.1], 30 * STEP + 15);
+    expect(stroke()).toEqual(kept);
+  });
+
+  it('keeps a dot made a moment after a lift, or away from the end', () => {
+    const { pen, stroke } = setup();
+    write(pen, right(30, 1));
+    write(pen, [[80.5, 49.2, 0.3]], [80.5, 49.2], 30 * STEP + 200);
+    expect(stroke()).toHaveLength(1);
+    write(pen, right(30, 1), undefined, 1000);
+    write(pen, [[79, 40, 0.3]], [79, 40], 1000 + 30 * STEP + 15);
+    expect(stroke()[0][0]).toBe(79);
+    expect(stroke()[0][1]).toBe(40);
+  });
+
   it('keeps every sample where it was with no smoothing', () => {
     const { pen, stroke } = setup({ smoothing: 0 });
     // a slow shaky hand, the samples close together
