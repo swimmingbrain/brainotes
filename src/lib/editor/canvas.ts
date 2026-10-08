@@ -26,6 +26,7 @@ import type { PageLoader } from '$lib/storage/loader';
 import type { Saver } from '$lib/storage/saver';
 import {
   activeTool,
+  addToast,
   history as historyState,
   inputType,
   itemCount,
@@ -321,7 +322,8 @@ export function mountCanvas(host: HTMLElement, onscroll: (start: number, size: n
     },
     scroll: onscroll,
     near: (first, last) => session?.loader.near(first, last),
-    camera: () => text?.place()
+    camera: () => text?.place(),
+    failed: (err) => addToast(`Drawing the page failed: ${err instanceof Error ? err.message : String(err)}`, 'error', 0)
   });
   view = v;
   pointerType = '';

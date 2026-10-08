@@ -63,6 +63,8 @@ export interface ViewHooks {
   near?: (first: number, last: number) => void;
   // the camera moved, for things laid over the canvas
   camera?: () => void;
+  // drawing a frame threw, told once
+  failed?: (err: unknown) => void;
 }
 
 // pages around the view that get loaded before they come in sight
@@ -84,6 +86,13 @@ function makeCanvas(name: string, host?: HTMLElement): HTMLCanvasElement {
   canvas.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;display:block';
   host.appendChild(canvas);
   return canvas;
+}
+
+// a browser out of canvas memory gives no context, an error says more than a black area
+function context2d(canvas: HTMLCanvasElement, options: CanvasRenderingContext2DSettings = {}): CanvasRenderingContext2D {
+  const ctx = canvas.getContext('2d', options);
+  if (!ctx) throw new Error(`the browser gave no 2d context for the ${canvas.className.slice(6)} canvas`);
+  return ctx;
 }
 
 export class CanvasView {
@@ -169,6 +178,8 @@ export class CanvasView {
   private offShot: () => void;
   // pdf pages wait for the zoom to rest before they are drawn sharp
   private pdfWait = false;
+  // a frame threw once, the next ones only try again
+  private broken = false;
   private observer: ResizeObserver;
   private dprQuery: MediaQueryList | null = null;
 
@@ -186,13 +197,13 @@ export class CanvasView {
     this.bg = makeCanvas('paper');
     this.hl = makeCanvas('highlighter');
     this.ink = makeCanvas('ink');
-    this.screenCtx = this.screen.getContext('2d', { alpha: false })!;
-    this.bgCtx = this.bg.getContext('2d', { alpha: false })!;
-    this.hlCtx = this.hl.getContext('2d')!;
-    this.inkCtx = this.ink.getContext('2d')!;
+    this.screenCtx = context2d(this.screen, { alpha: false });
+    this.bgCtx = context2d(this.bg, { alpha: false });
+    this.hlCtx = context2d(this.hl);
+    this.inkCtx = context2d(this.ink);
     // the live canvas skips the compositor queue, the pen tip gets ink sooner. not on
     // android, a see through low latency canvas can end up as a black sheet over the page
-    this.liveCtx = this.live.getContext('2d', ANDROID ? {} : { desynchronized: true })!;
+    this.liveCtx = context2d(this.live, ANDROID ? {} : { desynchronized: true });
     this.fast = this.liveCtx.getContextAttributes?.().desynchronized === true;
     penStats.desynchronized = this.fast;
     this.live.style.touchAction = 'none';
@@ -764,6 +775,17 @@ export class CanvasView {
 
   private frame = () => {
     this.raf = 0;
+    try {
+      this.draw();
+    } catch (err) {
+      if (this.broken) return;
+      this.broken = true;
+      console.error(err);
+      this.hooks.failed?.(err);
+    }
+  };
+
+  private draw() {
     const start = performance.now();
     if (this.moving) this.move(start);
     const tool = this.tool;
@@ -817,7 +839,7 @@ export class CanvasView {
     this.lastFrame = performance.now() - start;
     if (this.inkDirty || this.hlDirty || this.liveDirty || this.inkLayer.busy || this.hlLayer.busy) this.requestFrame();
     else if (!this.warm) this.warmLater();
-  };
+  }
 
   // stroke outlines near the view are built when idle, so a zoom out finds them ready
   private warmLater() {

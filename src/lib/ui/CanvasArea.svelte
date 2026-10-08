@@ -8,16 +8,26 @@
   import { PAPER_STYLES } from '$lib/editor/commands';
   import { PAPER_COLORS } from '$lib/editor/paper';
   import { toolById } from '$lib/editor/tools';
-  import { activeTool, contextMenu, history, inputType, paperColor, paperStyle, selectionCount, type MenuItem } from '$lib/stores/app';
+  import { activeTool, addToast, contextMenu, history, inputType, paperColor, paperStyle, selectionCount, type MenuItem } from '$lib/stores/app';
   import { preferences, type PaperColor } from '$lib/stores/preferences';
 
   const cursor = $derived(toolById($activeTool).cursor);
 
   let layers: HTMLDivElement;
   let indicator: ScrollIndicator;
+  // why the writing area could not start, shown instead of a black area
+  let failed = $state('');
 
   onMount(() => {
-    const unmount = mountCanvas(layers, (start, size) => indicator.show(start, size));
+    let unmount = () => {};
+    try {
+      unmount = mountCanvas(layers, (start, size) => indicator.show(start, size));
+    } catch (err) {
+      console.error(err);
+      layers.replaceChildren();
+      failed = err instanceof Error ? err.message : String(err);
+      addToast(`The writing area could not start: ${failed}`, 'error', 0);
+    }
     const removeClipboard = installClipboard();
     return () => {
       removeClipboard();
@@ -78,6 +88,9 @@
 <div class="canvas-area" style="cursor: {cursor}" role="presentation" {oncontextmenu}>
   <!-- the engine puts its canvases in here -->
   <div class="layers" bind:this={layers}></div>
+  {#if failed}
+    <div class="failed">The writing area could not start: {failed}</div>
+  {/if}
   <ScrollIndicator bind:this={indicator} />
   {#if $preferences.penDiagnostics}
     <PenDiagnostics />
@@ -101,5 +114,15 @@
   .layers {
     position: absolute;
     inset: 0;
+  }
+
+  .failed {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    top: 40%;
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-align: center;
   }
 </style>
