@@ -17,6 +17,7 @@ import {
 import { imagesOf, type Doc, type DocChange, type PageData } from './doc';
 import type { History } from './history';
 import { onBitmap } from './images';
+import { ANDROID } from './device';
 import { penIsDown } from './input';
 import {
   darkUnder,
@@ -180,8 +181,9 @@ export class CanvasView {
     this.bgCtx = this.bg.getContext('2d', { alpha: false })!;
     this.hlCtx = this.hl.getContext('2d')!;
     this.inkCtx = this.ink.getContext('2d')!;
-    // the live canvas skips the compositor queue, the pen tip gets ink sooner
-    this.liveCtx = this.live.getContext('2d', { desynchronized: true })!;
+    // the live canvas skips the compositor queue, the pen tip gets ink sooner. not on
+    // android, a see through low latency canvas can end up as a black sheet over the page
+    this.liveCtx = this.live.getContext('2d', ANDROID ? {} : { desynchronized: true })!;
     this.fast = this.liveCtx.getContextAttributes?.().desynchronized === true;
     penStats.desynchronized = this.fast;
     this.hl.style.opacity = String(HIGHLIGHTER_ALPHA);
