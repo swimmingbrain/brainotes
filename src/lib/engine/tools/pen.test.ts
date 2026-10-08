@@ -152,15 +152,17 @@ describe('pen tool', () => {
 
   it('keeps every sample where it was with no smoothing', () => {
     const { pen, stroke } = setup({ smoothing: 0 });
-    // a slow shaky hand, the samples close together
+    // a shaky hand, the samples close together, then a few far apart
     const list: number[][] = [];
-    for (let i = 0; i < 80; i++) list.push([50 + i * 0.4, 50 + (i % 2 ? 0.35 : -0.35) + (i % 7) * 0.05, 0.4]);
+    for (let i = 0; i < 80; i++) list.push([50 + i * 0.4, 50 + (i % 2 ? 0.25 : -0.25) + (i % 7) * 0.05, 0.4]);
+    for (let i = 1; i < 6; i++) list.push([82 + i * 3, 50 + (i % 2) * 2, 0.4]);
     write(pen, list);
     const pts = stroke();
-    expect(pts).toHaveLength(list.length);
-    for (let i = 0; i < list.length; i++) {
-      expect(pts[i][0]).toBeCloseTo(list[i][0], 4);
-      expect(pts[i][1]).toBeCloseTo(list[i][1], 4);
+    // every sample is in the line where it was, in its order
+    let at = 0;
+    for (const s of list) {
+      while (at < pts.length && (Math.abs(pts[at][0] - s[0]) > 1e-4 || Math.abs(pts[at][1] - s[1]) > 1e-4)) at++;
+      expect(at).toBeLessThan(pts.length);
     }
   });
 
@@ -171,6 +173,31 @@ describe('pen tool', () => {
     write(pen, list);
     const mid = stroke().slice(10, -10);
     expect(Math.max(...mid.map((p) => Math.abs(p[1] - 50)))).toBeLessThan(0.2);
+  });
+
+  it('rounds a fast small loop from four samples a turn', () => {
+    const { pen, stroke } = setup({ smoothing: 0 });
+    // three turns around 60, 50 with a radius of 2 px, 4 samples each
+    const list: number[][] = [];
+    for (let i = 0; i <= 12; i++) list.push([60 + 2 * Math.cos((i * Math.PI) / 2), 50 + 2 * Math.sin((i * Math.PI) / 2), 0.4]);
+    write(pen, list);
+    const pts = stroke();
+    // a few points a gap, close to the circle and well outside the straight cut
+    // across it (1.41 away from the middle), the middle turn the closest
+    expect(pts.length).toBeGreaterThan(list.length * 3);
+    pts.forEach((p, i) => {
+      const r = Math.hypot(p[0] - 60, p[1] - 50);
+      expect(r).toBeGreaterThan(i > pts.length / 3 && i < (pts.length * 2) / 3 ? 1.7 : 1.55);
+      expect(r).toBeLessThan(2.2);
+    });
+  });
+
+  it('leaves close samples of a slow line as they are', () => {
+    const { pen, stroke } = setup({ smoothing: 0 });
+    const list: number[][] = [];
+    for (let i = 0; i < 40; i++) list.push([50 + i * 0.6, 50 + Math.sin(i) * 0.4, 0.4]);
+    write(pen, list);
+    expect(stroke()).toHaveLength(list.length);
   });
 
   it('keeps a tap of one or a few samples as a round dot', () => {

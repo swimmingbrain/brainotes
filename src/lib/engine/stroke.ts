@@ -70,10 +70,12 @@ export function mapPressure(raw: number, sensitivity: number): number {
   return Math.max(MIN_PRESSURE, Math.min(1, p));
 }
 
-// catmull-rom points strictly between b and c, about step apart. centripetal,
-// as that never loops or overshoots on a zigzag
-export function curveBetween(a: number[], b: number[], c: number[], d: number[], step: number, out: number[][]) {
+// catmull-rom points strictly between b and c, about step apart, and only for a gap
+// longer than min: samples that close follow the pen well enough, a curve through them
+// would only bend their wobble. centripetal, as that never loops or overshoots on a zigzag
+export function curveBetween(a: number[], b: number[], c: number[], d: number[], step: number, out: number[][], min = 0) {
   const dist = Math.hypot(c[0] - b[0], c[1] - b[1]);
+  if (dist <= min) return;
   const n = Math.ceil(dist / step);
   if (n < 2) return;
   const t1 = Math.max(1e-4, Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])));

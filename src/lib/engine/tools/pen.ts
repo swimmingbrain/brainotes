@@ -31,6 +31,10 @@ const SNAP_MIN = 28;
 const KEY_GAP = 0.2;
 const REFIT_MOVE = 0.35;
 const TAIL = 4;
+// css pixels: a gap between two samples longer than this gets a curve, fast small loops
+// come with only a few samples a turn. it is filled about every CURVE_STEP
+const SPARSE = 1;
+const CURVE_STEP = 0.75;
 // samples and css pixels: this little at no pressure at the very end is the pen leaving the glass
 const LIFT_SAMPLES = 4;
 const LIFT_RUN = 6;
@@ -69,6 +73,7 @@ export class PenTool implements Tool {
   private pts: number[][] = [];
   private tip: number[] | null = null;
   private step = 4;
+  private sparse = 8;
   private tail: number[][] = [];
   // finished pieces of a long line are kept as one path, a draw only works out the rest
   private pieces: Path2D | null = null;
@@ -134,8 +139,9 @@ export class PenTool implements Tool {
     this.refitWidth = smooth.refit;
     this.raw = smooth.min === Infinity;
     this.sensitivity = set.pressure;
-    // half a pen width apart, the outline drops closer points anyway
-    this.step = Math.max(0.75, set.size * 0.6) * PF_SCALE;
+    const unit = PF_SCALE / this.view.cam.zoom;
+    this.step = CURVE_STEP * unit;
+    this.sparse = SPARSE * unit;
     this.keys = [];
     this.pts = [];
     this.tip = null;
@@ -257,7 +263,7 @@ export class PenTool implements Tool {
     const m = keys.length - 1;
     if (m >= 1) {
       const before = m >= 2 ? keys[m - 2] : mirror(keys[m - 1], keys[m]);
-      curveBetween(before, keys[m - 1], keys[m], mirror(keys[m], keys[m - 1]), this.step, this.pts);
+      curveBetween(before, keys[m - 1], keys[m], mirror(keys[m], keys[m - 1]), this.step, this.pts, this.sparse);
       this.pts.push(keys[m]);
     }
     // a last gentle pass over the whole line, too small to see it move
@@ -483,7 +489,7 @@ export class PenTool implements Tool {
     const n = keys.length - 1;
     if (n < 2) return;
     const before = n >= 3 ? keys[n - 3] : mirror(keys[n - 2], keys[n - 1]);
-    curveBetween(before, keys[n - 2], keys[n - 1], key, this.step, this.pts);
+    curveBetween(before, keys[n - 2], keys[n - 1], key, this.step, this.pts, this.sparse);
     this.pts.push(keys[n - 1]);
   }
 
@@ -528,12 +534,29 @@ export class PenTool implements Tool {
     return { minX: minX * k, minY: minY * k, maxX: maxX * k, maxY: maxY * k };
   }
 
+  // the newest key and the raw tip are not in pts yet, their gaps get a curve as well,
+  // with the next sample guessed as straight on
+  private liveEnd(out: number[][]) {
+    const keys = this.keys;
+    const n = keys.length - 1;
+    const key = keys[n];
+    const tip = this.tip && (this.tip[0] !== key[0] || this.tip[1] !== key[1]) ? this.tip : null;
+    if (n >= 1) {
+      const before = n >= 2 ? keys[n - 2] : mirror(keys[n - 1], key);
+      curveBetween(before, keys[n - 1], key, tip ?? mirror(key, keys[n - 1]), this.step, out, this.sparse);
+      out.push(key);
+    }
+    if (tip) {
+      const before = n >= 1 ? keys[n - 1] : mirror(key, tip);
+      curveBetween(before, key, tip, mirror(tip, key), this.step, out, this.sparse);
+      out.push(tip);
+    }
+  }
+
   private drawStroke(ctx: CanvasRenderingContext2D): Box | null {
     this.freeze();
     const rest = this.pts.slice(this.piecesEnd);
-    // the newest key is not in pts yet
-    if (this.keys.length > 1) rest.push(this.keys[this.keys.length - 1]);
-    if (this.tip) rest.push(this.tip);
+    this.liveEnd(rest);
     for (const t of this.tail) rest.push(t);
     const part = this.pieces ? { start: false, end: true, length: this.piecesLength + lengthOf(rest) } : undefined;
     const outline = outlineOf(rest, this.pen, this.size, part);

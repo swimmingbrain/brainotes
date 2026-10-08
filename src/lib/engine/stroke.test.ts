@@ -16,6 +16,18 @@ describe('stroke input', () => {
     expect(none).toHaveLength(0);
   });
 
+  it('fills only a gap longer than min, a longer one with more points', () => {
+    const fill = (len: number) => {
+      const out: number[][] = [];
+      curveBetween([-len, 0, 0.5], [0, 0, 0.5], [len, 0, 0.5], [len * 2, 0, 0.5], 0.75, out, 1);
+      return out.length;
+    };
+    expect(fill(0.9)).toBe(0);
+    expect(fill(1.5)).toBe(1);
+    expect(fill(3)).toBe(3);
+    expect(fill(6)).toBeGreaterThan(fill(3));
+  });
+
   it('bends the filled points the way the neighbours go, without overshoot', () => {
     // four samples of a circle of radius 10, the gap between the middle two
     // should bulge outwards and stay close to the circle
