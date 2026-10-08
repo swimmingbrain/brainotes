@@ -33,7 +33,7 @@ const REFIT_MOVE = 0.35;
 const TAIL = 9;
 // css pixels: a gap between two samples longer than this gets a curve, fast small loops
 // come with only a few samples a turn. it is filled about every CURVE_STEP
-const SPARSE = 1;
+const SPARSE = 1.5;
 const CURVE_STEP = 0.75;
 // samples and css pixels: this little at no pressure at the very end is the pen leaving the glass
 const LIFT_SAMPLES = 4;
