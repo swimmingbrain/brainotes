@@ -30,6 +30,7 @@ import {
   PDF_EDGE,
   PDF_WAITING
 } from './render';
+import { penStats } from './stats';
 import { hasLine, hasPath, strokeLine, strokePath, THIN } from './stroke';
 import { TileLayer, type TileJob } from './tiles';
 import type { Tool } from './tools/tool';
@@ -182,6 +183,7 @@ export class CanvasView {
     // the live canvas skips the compositor queue, the pen tip gets ink sooner
     this.liveCtx = this.live.getContext('2d', { desynchronized: true })!;
     this.fast = this.liveCtx.getContextAttributes?.().desynchronized === true;
+    penStats.desynchronized = this.fast;
     this.hl.style.opacity = String(HIGHLIGHTER_ALPHA);
     this.live.style.touchAction = 'none';
 
@@ -263,7 +265,15 @@ export class CanvasView {
 
   // input asks for the live canvas right away, the frame loop stays the fallback
   liveNow() {
-    if (this.fast && this.liveDirty && !this.sizeDirty) this.drawLive();
+    if (!this.fast || !this.liveDirty || this.sizeDirty) return;
+    if (!penStats.on) {
+      this.drawLive();
+      return;
+    }
+    const start = performance.now();
+    this.drawLive();
+    penStats.drawMs += performance.now() - start;
+    penStats.draws++;
   }
 
   // a live highlighter stroke is drawn on the highlighter canvas, so it is redone

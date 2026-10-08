@@ -1,5 +1,6 @@
 import { clampZoom, type Camera } from './camera';
 import { askTrail, dropTrail, trailFrom } from './ink';
+import { penStats, statsDown, statsSample } from './stats';
 import type { PointerKind, Sample, Tool } from './tools/tool';
 import type { CanvasView } from './view';
 
@@ -66,6 +67,7 @@ export class Input {
     const el = view.live;
     // pointerrawupdate comes as soon as the pen moves, not once per frame
     this.raw = 'onpointerrawupdate' in window;
+    penStats.rawThere = this.raw;
     el.addEventListener('pointerdown', this.ondown);
     if (this.raw) el.addEventListener('pointerrawupdate', this.onraw as EventListener);
     el.addEventListener('pointermove', this.onmove);
@@ -172,6 +174,7 @@ export class Input {
     drawing = tool !== this.tools.hand;
     this.view.tool = tool;
     if (kind === 'pen' && this.hooks.inkTrail?.()) askTrail(this.view.live);
+    if (penStats.on) statsDown(e.pointerType, e.timeStamp, e.pressure);
     tool.down(this.sample(e), kind);
     this.drawn(e, tool);
   };
@@ -186,7 +189,9 @@ export class Input {
       if (c.buttons === 0) continue;
       tool.move(this.sample(c));
       last = c;
+      if (penStats.on) statsSample(c.timeStamp, c.pressure);
     }
+    if (penStats.on && last) penStats.events++;
     return last;
   }
 
@@ -202,6 +207,7 @@ export class Input {
     const active = this.active;
     if (active && e.pointerId === active.id) {
       this.rawSeen = true;
+      penStats.rawUsed = true;
       const last = this.feed(e, active.tool);
       if (last) this.drawn(last, active.tool);
     }
@@ -220,6 +226,10 @@ export class Input {
       if (active.tool.predict && !this.trailing) {
         const predicted = e.getPredictedEvents?.() ?? [];
         if (predicted.length > 0) active.tool.predict(predicted.map((p) => this.sample(p)));
+        if (penStats.on) {
+          penStats.moves++;
+          penStats.predicted += predicted.length;
+        }
       }
       if (this.rawSeen) {
         if (active.tool.instant) this.view.liveNow();

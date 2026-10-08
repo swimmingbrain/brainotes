@@ -1,3 +1,5 @@
+import { penStats } from './stats';
+
 // the system ink trail (navigator.ink, chromium browsers): windows draws the newest
 // bit of the line ahead of the page, which is how native note apps feel so quick
 
@@ -22,12 +24,15 @@ export function askTrail(canvas: Element) {
   if (asked === canvas) return;
   asked = canvas;
   presenter = null;
+  penStats.trailReady = false;
   const ink = (navigator as Navigator & { ink?: Ink }).ink;
   if (typeof ink?.requestPresenter !== 'function') return;
   try {
     ink.requestPresenter({ presentationArea: canvas }).then(
       (p) => {
-        if (asked === canvas) presenter = p;
+        if (asked !== canvas) return;
+        presenter = p;
+        penStats.trailReady = true;
       },
       () => {}
     );
@@ -40,6 +45,7 @@ export function dropTrail(canvas: Element) {
   if (asked !== canvas) return;
   asked = null;
   presenter = null;
+  penStats.trailReady = false;
 }
 
 // e is the trusted pen event the line on the page was drawn up to
