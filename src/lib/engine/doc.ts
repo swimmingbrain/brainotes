@@ -28,6 +28,8 @@ export type DocChange =
   | { type: 'pages' }
   | { type: 'paper'; pageId: string }
   | { type: 'name' }
+  // the texbrain project it is linked to
+  | { type: 'tex' }
   // the files open in the reference panel
   | { type: 'refs' }
   // the items of a page came in from storage, nothing was changed
@@ -301,6 +303,13 @@ export class Doc {
   rename(name: string) {
     this.notebook.name = name;
     this.emit({ type: 'name' });
+  }
+
+  // null takes the link away again
+  link(tex: string | null) {
+    if (tex) this.notebook.tex = tex;
+    else delete this.notebook.tex;
+    this.emit({ type: 'tex' });
   }
 
   setRefs(refs: string[]) {

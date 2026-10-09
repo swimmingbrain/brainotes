@@ -36,6 +36,8 @@ export interface Notebook {
   updatedAt: number;
   pages: PageMeta[];
   refs: string[];
+  // the texbrain project these notes are written up in
+  tex?: string;
 }
 
 // pts holds x, y, pressure for every point, in page units
