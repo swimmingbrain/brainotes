@@ -256,8 +256,15 @@ export interface Frame {
   h: number;
 }
 
-// step(count) draws a few more items, true when done. on a board frame is the part
-export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
+// step(count) draws a few more items, true when done. on a board frame is the part.
+// everywhere puts the paper pattern up to the edges, a page starts it one step in
+export function pageJob(
+  ctx: Ctx,
+  page: { meta: PageMeta; items: Item[] },
+  scale: number,
+  frame?: Frame,
+  everywhere = frame !== undefined
+) {
   const paper = page.meta.paper;
   const part = frame ?? { x: 0, y: 0, w: page.meta.w, h: page.meta.h };
   const dark = isDark(paper);
@@ -282,7 +289,7 @@ export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale
         ctx.globalAlpha = 1;
         ctx.fillStyle = PAPER_COLORS[paper.color].paper;
         ctx.fillRect(0, 0, width, height);
-        drawPattern(ctx, paper, ox, oy, scale, 0, 0, width, height, frame !== undefined);
+        drawPattern(ctx, paper, ox, oy, scale, 0, 0, width, height, everywhere);
         // the pdf page and the pictures lie on the paper, under all the ink
         ctx.beginPath();
         ctx.rect(0, 0, width, height);
@@ -322,6 +329,12 @@ export function pageJob(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale
 }
 
 // for the png export, call ensureShot first so the pdf page is sharp
-export function renderPage(ctx: Ctx, page: { meta: PageMeta; items: Item[] }, scale: number, frame?: Frame) {
-  pageJob(ctx, page, scale, frame).step(Infinity);
+export function renderPage(
+  ctx: Ctx,
+  page: { meta: PageMeta; items: Item[] },
+  scale: number,
+  frame?: Frame,
+  everywhere = frame !== undefined
+) {
+  pageJob(ctx, page, scale, frame, everywhere).step(Infinity);
 }
