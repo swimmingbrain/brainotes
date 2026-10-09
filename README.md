@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <img src="docs/screenshot.png" alt="braiNOTES in Study mode, handwritten notes with a diagram snipped from the slides, and the lecture pdf open on the side" width="800" />
+</p>
+
+<p align="center">
   <a href="https://notes.swimmingbrain.dev"><strong>Try it now &rarr; notes.swimmingbrain.dev</strong></a>
 </p>
 
