@@ -2,6 +2,7 @@ import { plugActions, type ExportPages } from './actions';
 import { currentPage, loadPage, openDoc } from './canvas';
 import type { Doc } from '$lib/engine/doc';
 import type { Item, Notebook, PageMeta } from '$lib/engine/types';
+import type { ExportHooks } from '$lib/export/pdf';
 import { fileName, saveFile, type FileKind } from '$lib/export/save';
 import { getAsset, listAssets } from '$lib/storage/db';
 import { addToast, dismissToast, updateToast } from '$lib/stores/app';
@@ -13,7 +14,7 @@ function stoppedError(): DOMException {
   return new DOMException('the export was stopped', 'AbortError');
 }
 
-async function pageOf(doc: Doc, id: string): Promise<{ meta: PageMeta; items: Item[] }> {
+export async function pageOf(doc: Doc, id: string): Promise<{ meta: PageMeta; items: Item[] }> {
   if (openDoc() !== doc) throw stoppedError();
   const page = await loadPage(id);
   if (!page || openDoc() !== doc) throw stoppedError();
@@ -55,28 +56,39 @@ function run(kind: FileKind, name: string, label: string, work: (stopped: () => 
     });
 }
 
+// pages are followed by id, they may move while the export runs
+async function pdfOf(doc: Doc, ids: string[], hooks: ExportHooks = {}): Promise<Blob> {
+  const notebook = { ...doc.notebook };
+  const [{ exportPdf }] = await Promise.all([import('$lib/export/pdf'), document.fonts?.ready]);
+  return exportPdf(
+    notebook,
+    ids.map((_, i) => i),
+    { page: (i) => pageOf(doc, ids[i]), asset: assetBlob },
+    hooks
+  );
+}
+
+// the pages of the open notebook as a pdf, without a save dialog
+export function notebookPdf(indices: number[]): Promise<Blob> {
+  const doc = openDoc();
+  if (!doc) return Promise.reject(new Error('no notebook is open'));
+  return pdfOf(doc, indices.map((i) => doc.notebook.pages[i].id));
+}
+
 function exportPdf(pages: ExportPages) {
   const doc = openDoc();
   if (!doc || doc.pageCount === 0) return;
-  // pages are followed by id, they may move while the export runs
   const ids = pages === 'all' ? doc.notebook.pages.map((p) => p.id) : [doc.notebook.pages[currentPage()].id];
-  const notebook = { ...doc.notebook };
-  const name = pages === 'all' ? notebook.name : `${notebook.name} p${currentPage() + 1}`;
+  const name = pages === 'all' ? doc.notebook.name : `${doc.notebook.name} p${currentPage() + 1}`;
   const word = doc.kind === 'board' ? 'board' : 'page';
-  run('pdf', name, 'PDF', async (stopped, toast) => {
-    const [{ exportPdf }] = await Promise.all([import('$lib/export/pdf'), document.fonts?.ready]);
-    return exportPdf(
-      notebook,
-      ids.map((_, i) => i),
-      { page: (i) => pageOf(doc, ids[i]), asset: assetBlob },
-      {
-        stopped,
-        progress: (done, total) => {
-          if (total > 1) updateToast(toast, `Exporting PDF: ${done} of ${total} ${word}s`);
-        }
+  run('pdf', name, 'PDF', (stopped, toast) =>
+    pdfOf(doc, ids, {
+      stopped,
+      progress: (done, total) => {
+        if (total > 1) updateToast(toast, `Exporting PDF: ${done} of ${total} ${word}s`);
       }
-    );
-  });
+    })
+  );
 }
 
 function exportPng() {
