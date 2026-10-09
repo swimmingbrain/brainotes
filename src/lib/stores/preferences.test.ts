@@ -35,6 +35,17 @@ describe('mergePreferences', () => {
     expect(mergePreferences({ penDiagnostics: true }).penDiagnostics).toBe(true);
   });
 
+  it('has the bridge off on port 7332 until it is switched on', () => {
+    expect(mergePreferences({}).bridge).toBe(false);
+    expect(mergePreferences({}).bridgePort).toBe(7332);
+    const merged = mergePreferences({ bridge: true, bridgePort: 7400 });
+    expect(merged.bridge).toBe(true);
+    expect(merged.bridgePort).toBe(7400);
+    expect(mergePreferences({ bridgePort: 70000 }).bridgePort).toBe(7332);
+    expect(mergePreferences({ bridgePort: 7400.5 }).bridgePort).toBe(7332);
+    expect(mergePreferences({ bridgePort: '7400' }).bridgePort).toBe(7332);
+  });
+
   it('merges the nested tools and paper objects key by key', () => {
     const merged = mergePreferences({ tools: { laser: false }, paper: { style: 'grid' } });
     expect(merged.tools.laser).toBe(false);
