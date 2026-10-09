@@ -64,7 +64,8 @@
   onMount(() => {
     const removeShortcuts = installShortcuts();
     const removeFullscreen = watchFullscreen();
-    const stopLibrary = startLibrary();
+    // ?notebook=<id> opens that notebook, the link texbrain has for its notes
+    const stopLibrary = startLibrary(new URL(location.href).searchParams.get('notebook') || null);
     return () => {
       stopLibrary();
       removeFullscreen();

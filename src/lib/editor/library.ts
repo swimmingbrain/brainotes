@@ -228,8 +228,9 @@ export function addNotebook(notebook: Notebook, items: Record<string, Item[]> = 
   });
 }
 
-// the very first launch gets a notebook to write in right away
-export function startLibrary(): () => void {
+// the very first launch gets a notebook to write in right away. first is
+// opened instead of the last one, a link with ?notebook= asks for that
+export function startLibrary(first: string | null = null): () => void {
   void navigator.storage?.persist?.().catch(() => {});
 
   // a tab on its way out may not finish the write, local storage gets it too
@@ -251,7 +252,9 @@ export function startLibrary(): () => void {
       const all = newestFirst((await listNotebooks()).map(summary));
       library.set(all);
       const last = lastOpened();
-      if (all.length === 0 && last === null) {
+      if (first) {
+        await openStored(first);
+      } else if (all.length === 0 && last === null) {
         const notebook = await create('paper', 'My notes');
         await lockNotebook(notebook.id);
         start(notebook, true);
