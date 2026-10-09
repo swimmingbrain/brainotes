@@ -147,28 +147,43 @@ async function nameOf(id: string): Promise<string> {
   return name ? `"${name}"` : 'That notebook';
 }
 
-// quiet leaves out the toast for a notebook that is gone
-async function openStored(id: string, quiet = false) {
-  if (session?.doc.notebook.id === id) return;
+// quiet leaves out the toast for a notebook that is gone. gives back why it
+// did not open, empty when it did
+async function openStored(id: string, quiet = false): Promise<string> {
+  if (session?.doc.notebook.id === id) return '';
   if (!(await lockNotebook(id))) {
-    addToast(`${await nameOf(id)} is open in another tab`, 'warning', 5000);
-    return;
+    const problem = `${await nameOf(id)} is open in another tab`;
+    addToast(problem, 'warning', 5000);
+    return problem;
   }
   // the stored copy is older than what the last tab kept, it waits for that
   if (!(await recover(id))) {
     unlockNotebook(id);
-    addToast(`${await nameOf(id)} has changes the browser storage did not take yet, try again in a moment`, 'error', 8000);
-    return;
+    const problem = `${await nameOf(id)} has changes the browser storage did not take yet, try again in a moment`;
+    addToast(problem, 'error', 8000);
+    return problem;
   }
   const notebook = await getNotebook(id);
   if (!notebook) {
     unlockNotebook(id);
-    if (!quiet) addToast('That notebook is not there any more', 'warning');
+    const problem = 'That notebook is not there any more';
+    if (!quiet) addToast(problem, 'warning');
     await refresh();
-    return;
+    return problem;
   }
   await stop();
   start(notebook, false);
+  return '';
+}
+
+// for code that waits until the notebook is open, it throws with the reason when it did not
+export async function openNotebookById(id: string): Promise<void> {
+  let problem = '';
+  await run(async () => {
+    problem = await openStored(id);
+  });
+  if (problem) throw new Error(problem);
+  if (session?.doc.notebook.id !== id) throw new Error('The notebook could not be read from the browser storage');
 }
 
 // a page without items is not written, so a 500 page pdf goes in as one record and its file
@@ -187,6 +202,20 @@ async function create(kind: NotebookKind, name: string): Promise<Notebook> {
   await store(notebook);
   library.update((list) => [summary(notebook), ...list]);
   return notebook;
+}
+
+// stored, opened and waited for. the name gets a number when it is taken already
+export async function createNotebook(kind: NotebookKind, name: string): Promise<string> {
+  let id = '';
+  await run(async () => {
+    const notebook = await create(kind, uniqueName(name));
+    await lockNotebook(notebook.id);
+    await stop();
+    start(notebook, true);
+    id = notebook.id;
+  });
+  if (!id) throw new Error('The new notebook could not be stored in the browser');
+  return id;
 }
 
 // a notebook made somewhere else, from a pdf or a file
@@ -250,15 +279,13 @@ export function startLibrary(): () => void {
 
 plugActions({
   newNotebook: (kind) => {
-    void run(async () => {
-      const notebook = await create(kind, uniqueName(kind === 'board' ? 'Whiteboard' : 'Notebook'));
-      await lockNotebook(notebook.id);
-      await stop();
-      start(notebook, true);
-    });
+    // a storage error has had its toast already
+    void createNotebook(kind, kind === 'board' ? 'Whiteboard' : 'Notebook').catch(() => {});
   },
   openNotebook: (id) => {
-    void run(() => openStored(id));
+    void run(async () => {
+      await openStored(id);
+    });
   },
   closeNotebook: () => {
     void run(async () => {
