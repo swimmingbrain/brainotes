@@ -131,6 +131,20 @@ describe('the .brainotes file', () => {
     expect(Object.keys(a.pages).every((id) => a.notebook.pages.some((p) => p.id === id))).toBe(true);
   });
 
+  it('keeps the linked texbrain project and drops one that is not a name', async () => {
+    const file = sample();
+    file.notebook.tex = 'analysis-script';
+    const back = await readNotebookFile(await writeNotebookFile(file));
+    expect(back.notebook.tex).toBe('analysis-script');
+    expect(withFreshIds(back).notebook.tex).toBe('analysis-script');
+    expect((await readNotebookFile(await writeNotebookFile(sample()))).notebook.tex).toBeUndefined();
+
+    const manifest = strToU8(JSON.stringify({ format: 'brainotes', version: 1, assets: [] }));
+    const odd = { ...sample().notebook, tex: { name: 'x' } };
+    const zip = zipSync({ 'manifest.json': manifest, 'notebook.json': strToU8(JSON.stringify(odd)) });
+    expect((await readNotebookFile(new Blob([zip]))).notebook.tex).toBeUndefined();
+  });
+
   it('turns down files that are not notebooks', async () => {
     await expect(readNotebookFile(new Blob(['%PDF-1.7 not a zip']))).rejects.toBeInstanceOf(FileFormatError);
     const other = zipSync({ 'manifest.json': strToU8(JSON.stringify({ format: 'something', version: 1 })) });
