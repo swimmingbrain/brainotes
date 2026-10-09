@@ -33,6 +33,9 @@ export interface Preferences {
   inkTrail: boolean;
   // a small box on the canvas with what the pen and the browser report
   penDiagnostics: boolean;
+  // a socket to the brainbridge server on this machine, off unless asked for
+  bridge: boolean;
+  bridgePort: number;
   // which defaults the saved values come from, old defaults move to new ones once
   version: number;
 }
@@ -73,6 +76,8 @@ export function defaultPreferences(): Preferences {
     holdToSnap: true,
     inkTrail: true,
     penDiagnostics: false,
+    bridge: false,
+    bridgePort: 7332,
     version: 2
   };
 }
@@ -159,6 +164,9 @@ export function mergePreferences(stored: unknown): Preferences {
   merged.paper.spacing = clamp(merged.paper.spacing, 8, 80);
   merged.pressure = clamp(merged.pressure, 0, 1);
   merged.smoothing = clamp(merged.smoothing, 0, 1);
+  if (!Number.isInteger(merged.bridgePort) || merged.bridgePort < 1 || merged.bridgePort > 65535) {
+    merged.bridgePort = defaults.bridgePort;
+  }
 
   const pens = Array.isArray(stored.pens) ? stored.pens.filter(validPen) : [];
   merged.pens = pens.length > 0 ? pens : defaults.pens;
