@@ -167,6 +167,8 @@ export async function readNotebookFile(blob: Blob, pause: Pause = noPause): Prom
   const notebook = json(head['notebook.json']);
   if (!isNotebook(notebook)) throw new FileFormatError('the notebook in it is broken');
   notebook.refs = Array.isArray(notebook.refs) ? notebook.refs : [];
+  // a link that is not a name would show up as one in the top bar
+  if (typeof notebook.tex !== 'string' || !notebook.tex) delete notebook.tex;
 
   // pages a few at a time, a big notebook must not hold the tab up
   const pages: Record<string, Item[]> = {};
