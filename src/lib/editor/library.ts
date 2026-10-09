@@ -48,7 +48,8 @@ function summary(notebook: Notebook): NotebookSummary {
     name: notebook.name,
     kind: notebook.kind,
     pageCount: notebook.pages.length,
-    modifiedAt: notebook.updatedAt
+    modifiedAt: notebook.updatedAt,
+    tex: notebook.tex ?? ''
   };
 }
 

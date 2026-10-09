@@ -245,6 +245,8 @@ export interface NotebookSummary {
   kind: NotebookKind;
   pageCount: number;
   modifiedAt: number;
+  // the linked texbrain project, empty when there is none
+  tex: string;
 }
 
 export interface PageInfo {
@@ -259,6 +261,7 @@ export const notebookOpen = writable(false);
 export const notebookId = writable('');
 export const notebookName = writable('');
 export const notebookKind = writable<NotebookKind>('paper');
+export const notebookTex = writable('');
 export const pageList = writable<PageInfo[]>([]);
 export const paperStyle = writable<PaperStyle>(get(preferences).paper.style);
 export const paperColor = writable<PaperColor>(get(preferences).paper.color);

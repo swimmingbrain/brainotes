@@ -33,6 +33,7 @@ import {
   notebookId,
   notebookKind,
   notebookName,
+  notebookTex,
   pageCount,
   pageIndex,
   pageList,
@@ -154,6 +155,8 @@ function onDocChange(change: DocChange) {
     syncCount();
   } else if (change.type === 'name') {
     notebookName.set(doc?.notebook.name ?? '');
+  } else if (change.type === 'tex') {
+    notebookTex.set(doc?.notebook.tex ?? '');
   } else if (change.type === 'pages') {
     syncPages();
     syncPage();
@@ -186,9 +189,11 @@ export function showNotebook(next: Session | null) {
     notebookId.set(doc.notebook.id);
     notebookKind.set(doc.kind);
     notebookName.set(doc.notebook.name);
+    notebookTex.set(doc.notebook.tex ?? '');
     view?.setDoc(doc, history);
   } else {
     notebookId.set('');
+    notebookTex.set('');
   }
   syncHistory();
   syncPages();
