@@ -140,7 +140,7 @@ async function idByName(name: string): Promise<string> {
   return found.id;
 }
 
-function describe(doc: Doc | null) {
+export function describe(doc = openDoc()) {
   if (!doc) return null;
   const { id, name, kind, tex } = doc.notebook;
   return { id, name, kind, pages: doc.pageCount, tex: tex ?? null };

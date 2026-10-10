@@ -3,10 +3,10 @@
 // only ever points at the loopback address
 
 import { derived, get, writable } from 'svelte/store';
-import { addToast, starting } from '$lib/stores/app';
+import { addToast, notebookId, notebookName, notebookTex, starting } from '$lib/stores/app';
 import { preferences } from '$lib/stores/preferences';
 import { version } from '$lib/version';
-import { runCommand } from './commands';
+import { describe, runCommand } from './commands';
 import { PROTOCOL_VERSION, type CallMessage, type ServerMessage, type TabMessage } from './protocol';
 import { bridge } from './state';
 
@@ -18,6 +18,7 @@ let retry: ReturnType<typeof setTimeout> | null = null;
 // set when another tab took the connection, so this one stops trying
 let replaced = false;
 let announced = false;
+let documentQueued = false;
 // ?bridge in the address switches it on for this tab only, with this port.
 // null means the tab follows the preference
 const tabPort = writable<number | null>(null);
@@ -28,6 +29,21 @@ function validPort(n: number): boolean {
 
 function send(message: TabMessage): void {
   if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+}
+
+// something the server did not ask about, only while it listens
+export function bridgeEvent(name: string, data: unknown): void {
+  if (get(bridge).state === 'connected') send({ type: 'event', name, data });
+}
+
+// a switch of notebook changes id, name and link one after the other, one event says it all
+function sendDocument(): void {
+  if (documentQueued) return;
+  documentQueued = true;
+  queueMicrotask(() => {
+    documentQueued = false;
+    bridgeEvent('document', { notebook: describe() });
+  });
 }
 
 // a call that comes in while the tab still opens the last notebook waits for it
@@ -69,6 +85,7 @@ function onMessage(event: MessageEvent): void {
       bridge.update((b) => ({ ...b, state: 'connected', port }));
       if (!announced) addToast('Bridge connected', 'success');
       announced = true;
+      sendDocument();
       break;
     case 'call':
       void handleCall(message);
@@ -155,6 +172,7 @@ export function installBridge(): () => void {
     tabPort.set(flag !== '' && validPort(asked) ? asked : get(preferences).bridgePort);
   }
   const wish = derived([preferences, tabPort], ([p, tab]) => ({ on: tab !== null || p.bridge, port: tab ?? p.bridgePort }));
+  const unwatch = derived([notebookId, notebookName, notebookTex], (open) => open).subscribe(sendDocument);
   const unsubscribe = wish.subscribe((next) => {
     bridge.update((b) => ({ ...b, on: next.on, port: next.port }));
     if (next.on) {
@@ -169,6 +187,7 @@ export function installBridge(): () => void {
     }
   });
   return () => {
+    unwatch();
     unsubscribe();
     wanted = false;
     disconnect();
