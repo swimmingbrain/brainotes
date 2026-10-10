@@ -7,9 +7,10 @@ import { actions } from '$lib/editor/actions';
 import { currentPage, editor, loadPage, openDoc, type Editor } from '$lib/editor/canvas';
 import { pageOf } from '$lib/editor/exports';
 import { createNotebook, openNotebookById } from '$lib/editor/library';
+import { pointsBox } from '$lib/engine/bounds';
 import type { Doc } from '$lib/engine/doc';
 import type { Frame } from '$lib/engine/render';
-import type { PageMeta } from '$lib/engine/types';
+import type { Box, PageMeta } from '$lib/engine/types';
 import { listNotebooks } from '$lib/storage/db';
 import { activeTool, library, zoomPercent } from '$lib/stores/app';
 import { version } from '$lib/version';
@@ -23,6 +24,8 @@ const CANVAS_WAIT = 5000;
 // a page picture stays small enough for the server to hand on
 const PNG_SIDE = 3000;
 
+const r1 = (n: number): number => Math.round(n * 10) / 10;
+const r2 = (n: number): number => Math.round(n * 100) / 100;
 const r3 = (n: number): number => Math.round(n * 1000) / 1000;
 
 function sleep(ms: number): Promise<void> {
@@ -87,6 +90,10 @@ function regionOf(value: unknown, meta: PageMeta | null): Frame {
   }
   if (right - x < 1 || bottom - y < 1) throw new Error('region has to lie on the page and be at least 1 unit wide and high');
   return { x, y, w: right - x, h: bottom - y };
+}
+
+function frameOf(box: Box) {
+  return { x: r1(box.minX), y: r1(box.minY), w: r1(box.maxX - box.minX), h: r1(box.maxY - box.minY) };
 }
 
 // the canvas mounts a moment after the notebook opened, edits go through it
@@ -190,6 +197,35 @@ const commands: Record<string, Command> = {
     const [{ renderPng }] = await Promise.all([import('$lib/export/png'), document.fonts?.ready]);
     const png = await renderPng(data, board, { scale: wanted, region: part, maxSide: PNG_SIDE });
     return { png: base64(new Uint8Array(await png.blob.arrayBuffer())), w: png.w, h: png.h, scale: r3(png.scale) };
+  },
+
+  // what is on a page as data. the box of a stroke is its ink, half the pen around the points
+  async page_strokes({ page }) {
+    const doc = requireDoc();
+    const index = pageIndex(doc, page);
+    const { meta, items } = await pageOf(doc, doc.notebook.pages[index].id);
+    const strokes = [];
+    const texts = [];
+    const shapes = [];
+    const images = [];
+    for (const item of items) {
+      if (item.type === 'stroke') {
+        const points: number[][] = [];
+        const pts = item.pts;
+        for (let i = 0; i < pts.length; i += 3) points.push([r1(pts[i]), r1(pts[i + 1]), r2(pts[i + 2])]);
+        const box = frameOf(pointsBox(pts, item.size / 2));
+        strokes.push({ id: item.id, pen: item.pen, color: item.color, size: r2(item.size), box, points });
+      } else if (item.type === 'text') {
+        const { id, text, color } = item;
+        texts.push({ id, x: r1(item.x), y: r1(item.y), w: r1(item.w), text, size: r2(item.size), color });
+      } else if (item.type === 'shape') {
+        const { id, kind, color } = item;
+        shapes.push({ id, kind, x1: r1(item.x1), y1: r1(item.y1), x2: r1(item.x2), y2: r1(item.y2), color, size: r2(item.size) });
+      } else {
+        images.push({ id: item.id, x: r1(item.x), y: r1(item.y), w: r1(item.w), h: r1(item.h) });
+      }
+    }
+    return { w: meta.w, h: meta.h, strokes, texts, shapes, images };
   }
 };
 
