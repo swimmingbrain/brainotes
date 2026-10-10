@@ -3,7 +3,8 @@
 // like any other and shows up on the page as it happens
 
 import { get } from 'svelte/store';
-import { currentPage, editor, openDoc, type Editor } from '$lib/editor/canvas';
+import { actions } from '$lib/editor/actions';
+import { currentPage, editor, loadPage, openDoc, type Editor } from '$lib/editor/canvas';
 import { createNotebook, openNotebookById } from '$lib/editor/library';
 import type { Doc } from '$lib/engine/doc';
 import { listNotebooks } from '$lib/storage/db';
@@ -21,6 +22,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function num(value: unknown, name: string): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (value === null || value === '' || !Number.isFinite(n)) throw new Error(`${name} must be a number`);
+  return n;
+}
+
 function str(value: unknown, name: string): string {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} must be a non-empty string`);
   return value;
@@ -34,6 +41,16 @@ function requireDoc(): Doc {
   const doc = openDoc();
   if (!doc) throw new Error('No notebook is open. Call open or create, or open one in the tab.');
   return doc;
+}
+
+// pages count from 0 like the list of pages, no page means the one on screen
+function pageIndex(doc: Doc, value: unknown): number {
+  if (value === undefined || value === null) return currentPage();
+  const page = num(value, 'page');
+  if (!Number.isInteger(page) || page < 0 || page >= doc.pageCount) {
+    throw new Error(`There is no page ${page}, they go from 0 to ${doc.pageCount - 1}; see pages`);
+  }
+  return page;
 }
 
 // the canvas mounts a moment after the notebook opened, edits go through it
@@ -105,6 +122,25 @@ const commands: Record<string, Command> = {
     await createNotebook(type, optStr(name)?.trim() ?? (type === 'board' ? 'Whiteboard' : 'Notebook'));
     await requireEditor();
     return status();
+  },
+
+  // a page that is not in memory yet is read from the browser storage for its count
+  async pages() {
+    const doc = requireDoc();
+    const out = [];
+    for (let index = 0; index < doc.pageCount; index++) {
+      const meta = doc.notebook.pages[index];
+      const page = await loadPage(meta.id);
+      out.push({ index, id: meta.id, w: meta.w, h: meta.h, items: page?.items.length ?? 0, pdf: meta.pdf !== undefined });
+    }
+    return out;
+  },
+
+  async goto({ page }) {
+    const ed = await requireEditor();
+    const index = pageIndex(ed.doc, num(page, 'page'));
+    actions.goToPage(index);
+    return { page: index };
   }
 };
 
