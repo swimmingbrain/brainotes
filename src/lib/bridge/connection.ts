@@ -2,6 +2,7 @@
 // machine, calls in, results out. nothing here leaves the machine, the socket
 // only ever points at the loopback address
 
+import { derived, get, writable } from 'svelte/store';
 import { addToast, starting } from '$lib/stores/app';
 import { preferences } from '$lib/stores/preferences';
 import { version } from '$lib/version';
@@ -17,6 +18,13 @@ let retry: ReturnType<typeof setTimeout> | null = null;
 // set when another tab took the connection, so this one stops trying
 let replaced = false;
 let announced = false;
+// ?bridge in the address switches it on for this tab only, with this port.
+// null means the tab follows the preference
+const tabPort = writable<number | null>(null);
+
+function validPort(n: number): boolean {
+  return Number.isInteger(n) && n > 0 && n < 65536;
+}
 
 function send(message: TabMessage): void {
   if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
@@ -138,14 +146,21 @@ function disconnect(): void {
 }
 
 // wires the bridge to the preference: on means keep a connection up, off
-// means drop it
+// means drop it. opening the app with ?bridge (or ?bridge=PORT) switches it
+// on for this tab without touching the preference, links from texbrain do that
 export function installBridge(): () => void {
-  const unsubscribe = preferences.subscribe((p) => {
-    bridge.update((b) => ({ ...b, on: p.bridge, port: p.bridgePort }));
-    if (p.bridge) {
-      if (!wanted || p.bridgePort !== port) {
+  const flag = new URL(location.href).searchParams.get('bridge');
+  if (flag !== null) {
+    const asked = Number(flag);
+    tabPort.set(flag !== '' && validPort(asked) ? asked : get(preferences).bridgePort);
+  }
+  const wish = derived([preferences, tabPort], ([p, tab]) => ({ on: tab !== null || p.bridge, port: tab ?? p.bridgePort }));
+  const unsubscribe = wish.subscribe((next) => {
+    bridge.update((b) => ({ ...b, on: next.on, port: next.port }));
+    if (next.on) {
+      if (!wanted || next.port !== port) {
         wanted = true;
-        port = p.bridgePort;
+        port = next.port;
         connect();
       }
     } else if (wanted) {
@@ -167,5 +182,13 @@ export function connectBridge(): void {
 }
 
 export function disconnectBridge(): void {
+  tabPort.set(null);
   preferences.update((p) => ({ ...p, bridge: false }));
+}
+
+// a tab switched on by its address keeps following its own port
+export function setBridgePort(next: number): void {
+  if (!validPort(next)) return;
+  if (get(tabPort) !== null) tabPort.set(next);
+  preferences.update((p) => ({ ...p, bridgePort: next }));
 }
