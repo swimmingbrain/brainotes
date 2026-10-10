@@ -20,6 +20,7 @@
   import '$lib/editor/exports';
   import { installShortcuts } from '$lib/editor/shortcuts';
   import { startLibrary } from '$lib/editor/library';
+  import { installBridge } from '$lib/bridge/connection';
   import { watchFullscreen } from '$lib/editor/present';
   import { MIN_LEFT, MIN_RIGHT, notebookName, notebookOpen, panels, starting, updatePanels } from '$lib/stores/app';
   import { preferences } from '$lib/stores/preferences';
@@ -66,7 +67,9 @@
     const removeFullscreen = watchFullscreen();
     // ?notebook=<id> opens that notebook, the link texbrain has for its notes
     const stopLibrary = startLibrary(new URL(location.href).searchParams.get('notebook') || null);
+    const removeBridge = installBridge();
     return () => {
+      removeBridge();
       stopLibrary();
       removeFullscreen();
       removeShortcuts();
