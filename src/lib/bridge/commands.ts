@@ -3,14 +3,58 @@
 // like any other and shows up on the page as it happens
 
 import { get } from 'svelte/store';
-import { currentPage, openDoc } from '$lib/editor/canvas';
+import { currentPage, editor, openDoc, type Editor } from '$lib/editor/canvas';
+import { createNotebook, openNotebookById } from '$lib/editor/library';
 import type { Doc } from '$lib/engine/doc';
+import { listNotebooks } from '$lib/storage/db';
 import { activeTool, library, zoomPercent } from '$lib/stores/app';
 import { version } from '$lib/version';
 
 export type CommandArgs = Record<string, unknown>;
 
 type Command = (args: CommandArgs) => Promise<unknown> | unknown;
+
+// ms the canvas gets to show up after a notebook opened
+const CANVAS_WAIT = 5000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function str(value: unknown, name: string): string {
+  if (typeof value !== 'string' || !value.trim()) throw new Error(`${name} must be a non-empty string`);
+  return value;
+}
+
+function optStr(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function requireDoc(): Doc {
+  const doc = openDoc();
+  if (!doc) throw new Error('No notebook is open. Call open or create, or open one in the tab.');
+  return doc;
+}
+
+// the canvas mounts a moment after the notebook opened, edits go through it
+async function requireEditor(): Promise<Editor> {
+  requireDoc();
+  const until = Date.now() + CANVAS_WAIT;
+  for (;;) {
+    const ed = editor();
+    if (ed) return ed;
+    if (Date.now() > until) throw new Error('The notebook is open but its pages did not show up in the tab');
+    await sleep(50);
+  }
+}
+
+// the same name in another case counts too, the exact one wins
+async function idByName(name: string): Promise<string> {
+  const all = (await listNotebooks()).sort((a, b) => b.updatedAt - a.updatedAt);
+  const found = all.find((n) => n.name === name) ?? all.find((n) => n.name.toLowerCase() === name.trim().toLowerCase());
+  if (!found) throw new Error(`No notebook called "${name}"; see notebooks`);
+  return found.id;
+}
 
 function describe(doc: Doc | null) {
   if (!doc) return null;
@@ -46,6 +90,21 @@ const commands: Record<string, Command> = {
         tex: (open ? open.notebook.tex : row.tex) || null
       };
     });
+  },
+
+  async open({ id, name }) {
+    const wanted = optStr(id) ?? (await idByName(str(name, 'id or name')));
+    await openNotebookById(wanted);
+    await requireEditor();
+    return status();
+  },
+
+  async create({ name, kind }) {
+    const type = kind ?? 'paper';
+    if (type !== 'paper' && type !== 'board') throw new Error("kind must be 'paper' or 'board'");
+    await createNotebook(type, optStr(name)?.trim() ?? (type === 'board' ? 'Whiteboard' : 'Notebook'));
+    await requireEditor();
+    return status();
   }
 };
 
