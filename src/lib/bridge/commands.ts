@@ -5,8 +5,11 @@
 import { get } from 'svelte/store';
 import { actions } from '$lib/editor/actions';
 import { currentPage, editor, loadPage, openDoc, type Editor } from '$lib/editor/canvas';
+import { pageOf } from '$lib/editor/exports';
 import { createNotebook, openNotebookById } from '$lib/editor/library';
 import type { Doc } from '$lib/engine/doc';
+import type { Frame } from '$lib/engine/render';
+import type { PageMeta } from '$lib/engine/types';
 import { listNotebooks } from '$lib/storage/db';
 import { activeTool, library, zoomPercent } from '$lib/stores/app';
 import { version } from '$lib/version';
@@ -17,6 +20,10 @@ type Command = (args: CommandArgs) => Promise<unknown> | unknown;
 
 // ms the canvas gets to show up after a notebook opened
 const CANVAS_WAIT = 5000;
+// a page picture stays small enough for the server to hand on
+const PNG_SIDE = 3000;
+
+const r3 = (n: number): number => Math.round(n * 1000) / 1000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -26,6 +33,10 @@ function num(value: unknown, name: string): number {
   const n = typeof value === 'number' ? value : Number(value);
   if (value === null || value === '' || !Number.isFinite(n)) throw new Error(`${name} must be a number`);
   return n;
+}
+
+function optNum(value: unknown, name: string): number | undefined {
+  return value === undefined || value === null ? undefined : num(value, name);
 }
 
 function str(value: unknown, name: string): string {
@@ -51,6 +62,31 @@ function pageIndex(doc: Doc, value: unknown): number {
     throw new Error(`There is no page ${page}, they go from 0 to ${doc.pageCount - 1}; see pages`);
   }
   return page;
+}
+
+// btoa wants a string, a big page in one go would blow the call stack
+function base64(bytes: Uint8Array): string {
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(text);
+}
+
+// a part of the page in page units, cut to the page on paper. a board has no edges
+function regionOf(value: unknown, meta: PageMeta | null): Frame {
+  if (!value || typeof value !== 'object') throw new Error('region must be { x, y, w, h } in page units');
+  const r = value as Record<string, unknown>;
+  let x = num(r.x, 'region.x');
+  let y = num(r.y, 'region.y');
+  let right = x + num(r.w, 'region.w');
+  let bottom = y + num(r.h, 'region.h');
+  if (meta) {
+    x = Math.max(0, x);
+    y = Math.max(0, y);
+    right = Math.min(meta.w, right);
+    bottom = Math.min(meta.h, bottom);
+  }
+  if (right - x < 1 || bottom - y < 1) throw new Error('region has to lie on the page and be at least 1 unit wide and high');
+  return { x, y, w: right - x, h: bottom - y };
 }
 
 // the canvas mounts a moment after the notebook opened, edits go through it
@@ -141,6 +177,19 @@ const commands: Record<string, Command> = {
     const index = pageIndex(ed.doc, num(page, 'page'));
     actions.goToPage(index);
     return { page: index };
+  },
+
+  // paper, pdf page, pictures, highlighter and ink, like the png export
+  async page_image({ page, scale, region }) {
+    const doc = requireDoc();
+    const index = pageIndex(doc, page);
+    const wanted = Math.min(4, Math.max(0.5, optNum(scale, 'scale') ?? 2));
+    const data = await pageOf(doc, doc.notebook.pages[index].id);
+    const board = doc.kind === 'board';
+    const part = region === undefined || region === null ? undefined : regionOf(region, board ? null : data.meta);
+    const [{ renderPng }] = await Promise.all([import('$lib/export/png'), document.fonts?.ready]);
+    const png = await renderPng(data, board, { scale: wanted, region: part, maxSide: PNG_SIDE });
+    return { png: base64(new Uint8Array(await png.blob.arrayBuffer())), w: png.w, h: png.h, scale: r3(png.scale) };
   }
 };
 
