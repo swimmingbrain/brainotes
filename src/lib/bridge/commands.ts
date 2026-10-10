@@ -6,13 +6,15 @@ import { get } from 'svelte/store';
 import { actions } from '$lib/editor/actions';
 import { currentPage, editor, loadPage, openDoc, type Editor } from '$lib/editor/canvas';
 import { pageOf } from '$lib/editor/exports';
+import { imageItemFor, storeImage } from '$lib/editor/images';
 import { createNotebook, openNotebookById } from '$lib/editor/library';
 import { pointsBox } from '$lib/engine/bounds';
-import type { Doc } from '$lib/engine/doc';
+import { newId, type Doc } from '$lib/engine/doc';
 import type { Frame } from '$lib/engine/render';
-import type { Box, PageMeta } from '$lib/engine/types';
+import { layoutText, measurer, textWidth } from '$lib/engine/text';
+import type { Box, ImageItem, Item, PageMeta, TextItem } from '$lib/engine/types';
 import { listNotebooks } from '$lib/storage/db';
-import { activeTool, library, zoomPercent } from '$lib/stores/app';
+import { activeTool, library, toolOptions, zoomPercent } from '$lib/stores/app';
 import { version } from '$lib/version';
 
 export type CommandArgs = Record<string, unknown>;
@@ -92,6 +94,18 @@ function regionOf(value: unknown, meta: PageMeta | null): Frame {
   return { x, y, w: right - x, h: bottom - y };
 }
 
+function bytesOf(data: string): Uint8Array<ArrayBuffer> {
+  let text: string;
+  try {
+    text = atob(data.replace(/^data:[^,]*,/, ''));
+  } catch {
+    throw new Error('png must be base64');
+  }
+  const bytes = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+  return bytes;
+}
+
 function frameOf(box: Box) {
   return { x: r1(box.minX), y: r1(box.minY), w: r1(box.maxX - box.minX), h: r1(box.maxY - box.minY) };
 }
@@ -106,6 +120,16 @@ async function requireEditor(): Promise<Editor> {
     if (Date.now() > until) throw new Error('The notebook is open but its pages did not show up in the tab');
     await sleep(50);
   }
+}
+
+// one undo step, and the page comes into sight when it is not
+async function insert(ed: Editor, index: number, items: Item[]): Promise<void> {
+  const page = await loadPage(ed.doc.notebook.pages[index].id);
+  if (!page?.ready) throw new Error(`Page ${index} could not be read from the browser storage`);
+  if (editor()?.doc !== ed.doc) throw new Error('Another notebook was opened in the meantime');
+  const added = items.map((item, i) => ({ item, index: page.items.length + i }));
+  ed.view.history.run({ type: 'items', pageId: page.meta.id, removed: [], added });
+  if (!ed.view.pageShown(index)) ed.view.goToPage(index);
 }
 
 // the same name in another case counts too, the exact one wins
@@ -226,6 +250,55 @@ const commands: Record<string, Command> = {
       }
     }
     return { w: meta.w, h: meta.h, strokes, texts, shapes, images };
+  },
+
+  // wraps like a pasted text, at the right edge of the paper
+  async add_text({ page, x, y, text, size, color }) {
+    const ed = await requireEditor();
+    const index = pageIndex(ed.doc, page);
+    const left = num(x, 'x');
+    const top = num(y, 'y');
+    const words = str(text, 'text');
+    const options = get(toolOptions);
+    const fontSize = Math.min(400, Math.max(4, optNum(size, 'size') ?? options.textSize));
+    const meta = ed.doc.notebook.pages[index];
+    const max = ed.view.isBoard ? Infinity : Math.max(40, meta.w - left - 8);
+    const measure = measurer(fontSize);
+    const w = textWidth(layoutText(words, max, measure), max, measure);
+    const item: TextItem = {
+      id: newId(),
+      type: 'text',
+      x: left,
+      y: top,
+      w,
+      text: words,
+      size: fontSize,
+      color: optStr(color) ?? options.textColor
+    };
+    await insert(ed, index, [item]);
+    return { id: item.id };
+  },
+
+  // stored as an asset like a pasted picture. without w it gets the size a paste would
+  async add_image({ page, x, y, w, png }) {
+    const ed = await requireEditor();
+    const index = pageIndex(ed.doc, page);
+    const left = num(x, 'x');
+    const top = num(y, 'y');
+    const width = optNum(w, 'w');
+    if (width !== undefined && width <= 0) throw new Error('w must be more than 0');
+    const blob = new Blob([bytesOf(str(png, 'png'))], { type: 'image/png' });
+    const asset = await storeImage(blob, 'image', ed.doc.notebook.id);
+    if (!asset) throw new Error('png is not a picture this browser can read');
+    let item: ImageItem | null;
+    if (width === undefined) {
+      item = imageItemFor(asset, index, 0, 0, undefined, { x: left, y: top });
+    } else {
+      item = { id: newId(), type: 'image', assetId: asset.assetId, x: left, y: top, w: width, h: (width * asset.h) / asset.w };
+    }
+    if (!item) throw new Error('Another notebook was opened in the meantime');
+    await insert(ed, index, [item]);
+    return { id: item.id };
   }
 };
 
