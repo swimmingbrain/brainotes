@@ -4,8 +4,8 @@
 
 import { get } from 'svelte/store';
 import { actions } from '$lib/editor/actions';
-import { currentPage, editor, loadPage, openDoc, type Editor } from '$lib/editor/canvas';
-import { pageOf } from '$lib/editor/exports';
+import { addPages, currentPage, editor, loadPage, openDoc, type Editor } from '$lib/editor/canvas';
+import { notebookPdf, pageOf } from '$lib/editor/exports';
 import { imageItemFor, storeImage } from '$lib/editor/images';
 import { createNotebook, openNotebookById } from '$lib/editor/library';
 import { pointsBox } from '$lib/engine/bounds';
@@ -299,6 +299,35 @@ const commands: Record<string, Command> = {
     if (!item) throw new Error('Another notebook was opened in the meantime');
     await insert(ed, index, [item]);
     return { id: item.id };
+  },
+
+  // blank like the page before it, after the page on screen unless after says which
+  async new_page({ after }) {
+    const ed = await requireEditor();
+    const at = pageIndex(ed.doc, after);
+    const like = ed.doc.notebook.pages[at];
+    addPages(at + 1, [{ id: newId(), w: like.w, h: like.h, paper: { ...like.paper } }]);
+    return { index: at + 1 };
+  },
+
+  // the texbrain project the notebook is written up in, saved with it like the name
+  link({ tex }) {
+    const doc = requireDoc();
+    if (tex !== undefined && tex !== null && typeof tex !== 'string') throw new Error('tex must be a project name or null');
+    const name = typeof tex === 'string' ? tex.trim() : '';
+    doc.link(name || null);
+    return { tex: name || null };
+  },
+
+  async export_pdf({ pages }) {
+    const doc = requireDoc();
+    let indices = doc.notebook.pages.map((_, i) => i);
+    if (pages !== undefined && pages !== null) {
+      if (!Array.isArray(pages) || pages.length === 0) throw new Error('pages must be a list of page numbers');
+      indices = pages.map((page) => pageIndex(doc, num(page, 'pages')));
+    }
+    const pdf = await notebookPdf(indices);
+    return { pdf: base64(new Uint8Array(await pdf.arrayBuffer())) };
   }
 };
 
