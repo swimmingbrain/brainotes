@@ -5,6 +5,7 @@
   import { actions } from '$lib/editor/actions';
   import { renameNotebook } from '$lib/editor/commands';
   import { presenting, togglePresent } from '$lib/editor/present';
+  import { openInTex } from '$lib/bridge/tex';
   import {
     commandPaletteOpen,
     dialog,
@@ -12,6 +13,7 @@
     notebookKind,
     notebookName,
     notebookOpen,
+    notebookTex,
     saveState,
     setWorkspace,
     showLeftTab,
@@ -87,6 +89,12 @@
       <Icon name="import" size={14} />
       <span>Import</span>
     </button>
+    {#if $notebookOpen && $notebookTex}
+      <button class="action-btn" onclick={openInTex} title="Open {$notebookTex} in TeXbrain">
+        <Icon name="tex" size={14} />
+        <span>TeXbrain</span>
+      </button>
+    {/if}
     <span class="separator"></span>
     <button
       class="action-btn icon-only"
