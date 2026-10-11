@@ -1,5 +1,7 @@
 <script lang="ts">
   import { actions } from '$lib/editor/actions';
+  import { disconnectBridge } from '$lib/bridge/connection';
+  import { bridge } from '$lib/bridge/state';
   import {
     inputType,
     itemCount,
@@ -30,6 +32,30 @@
   };
 
   const pageWord = $derived($notebookKind === 'board' ? 'board' : 'page');
+
+  const bridgeColors: Record<string, string> = {
+    off: 'var(--text-muted)',
+    connecting: 'var(--warning)',
+    connected: 'var(--success)'
+  };
+
+  // what the bridge segment says: the last command while connected,
+  // otherwise where the connection stands
+  const bridgeText = $derived(
+    $bridge.state === 'connected'
+      ? ($bridge.lastAction ?? 'connected')
+      : $bridge.state === 'connecting'
+        ? `waiting for brainbridge on port ${$bridge.port}`
+        : 'another tab has it'
+  );
+
+  const bridgeTitle = $derived(
+    $bridge.state === 'connected'
+      ? `Connected to brainbridge on port ${$bridge.port}. Click to switch the bridge off`
+      : $bridge.state === 'connecting'
+        ? `brainbridge is not running on port ${$bridge.port}. It starts with the MCP client it is added to, or run brainbridge in a terminal. If the browser asks whether this site may connect to apps on this device, allow it. Click to switch the bridge off`
+        : 'Another tab took over the bridge, Bridge: connect in the palette takes it back. Click to switch it off'
+  );
 </script>
 
 <div class="status-bar">
@@ -55,6 +81,17 @@
       <span class="sep"></span>
       <button class="status-item toggle" onclick={() => actions.zoomReset()} title="Fit the page width (Ctrl+0)">
         {$zoomPercent}%
+      </button>
+      <span class="sep"></span>
+    {/if}
+    {#if $bridge.on}
+      <button class="status-item toggle bridge" onclick={disconnectBridge} title={bridgeTitle}>
+        <span
+          class="dot"
+          class:pulse={$bridge.state === 'connecting'}
+          style="background: {bridgeColors[$bridge.state]}"></span>
+        Bridge
+        <span class="action">{bridgeText}</span>
       </button>
       <span class="sep"></span>
     {/if}
@@ -127,6 +164,13 @@
 
   .pulse {
     animation: pulse 1.5s infinite;
+  }
+
+  .bridge .action {
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-secondary);
   }
 
   .credit a {
