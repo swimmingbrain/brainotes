@@ -1,6 +1,10 @@
 <script lang="ts">
   import Field from '../../Field.svelte';
+  import NumberField from '../../NumberField.svelte';
   import SelectField from '../../SelectField.svelte';
+  import ToggleField from '../../ToggleField.svelte';
+  import { connectBridge, disconnectBridge, setBridgePort } from '$lib/bridge/connection';
+  import { bridge } from '$lib/bridge/state';
   import { PDF_LAYOUTS } from '$lib/pdf/layout';
   import { preferences, setPreference, type Preferences } from '$lib/stores/preferences';
 
@@ -47,6 +51,27 @@
     onchange={(v) => setPreference('pdfLayout', v as Preferences['pdfLayout'])} />
 </Field>
 <p class="help">A full page, or the pdf page with lined room for notes below or beside it.</p>
+
+<h3 class="section">Bridge</h3>
+<Field label="Bridge">
+  <ToggleField value={$bridge.on} label="Bridge" onchange={(v) => (v ? connectBridge() : disconnectBridge())} />
+</Field>
+<p class="help">
+  Lets Claude Code or another coding agent read and write your notebooks through brainbridge, a small server running on this machine.
+  The tab talks to it over 127.0.0.1 only and the status bar shows what it does. Opening the app with ?bridge in the address switches it
+  on for that tab.
+</p>
+<Field label="Port">
+  <NumberField
+    value={$bridge.port}
+    min={1}
+    max={65535}
+    step={1}
+    precision={0}
+    label="Bridge port"
+    onchange={(v) => setBridgePort(Math.round(v))} />
+</Field>
+<p class="help">The port brainbridge listens on, 7332 unless it was started with another one.</p>
 
 <h3 class="section">About</h3>
 <p class="about">braiNOTES is open source under the MIT license. Your notes stay in this browser.</p>
