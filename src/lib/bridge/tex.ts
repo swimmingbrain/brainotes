@@ -29,3 +29,14 @@ export function askForProject(): void {
   }
   dialog.set({ kind: 'link', tex: get(notebookTex) });
 }
+
+// a new tab with the project, and a connected server may bring it up in the texbrain tab it has
+export function openInTex(): void {
+  const project = get(notebookTex);
+  if (!project) {
+    askForProject();
+    return;
+  }
+  window.open(texUrl(project, get(bridge).port), '_blank', 'noopener');
+  bridgeEvent('switch', { to: 'tex', project });
+}
