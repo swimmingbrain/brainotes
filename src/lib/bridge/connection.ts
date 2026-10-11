@@ -19,6 +19,12 @@ let retry: ReturnType<typeof setTimeout> | null = null;
 let replaced = false;
 let announced = false;
 let documentQueued = false;
+// a public site needs the browser's permission to reach 127.0.0.1 and chrome
+// asks for it while the socket waits. a page served from this machine is never asked
+const LOOPBACK = /^(localhost|127\.0\.0\.1|\[::1\])$/;
+const HINT_AFTER = 4000;
+let hinted = false;
+let hint: ReturnType<typeof setTimeout> | null = null;
 // ?bridge in the address switches it on for this tab only, with this port.
 // null means the tab follows the preference
 const tabPort = writable<number | null>(null);
@@ -72,6 +78,22 @@ async function handleCall(call: CallMessage): Promise<void> {
   }
 }
 
+// once per tab, a few seconds into waiting
+function startHint(): void {
+  if (hinted || hint || LOOPBACK.test(location.hostname)) return;
+  hint = setTimeout(() => {
+    hint = null;
+    if (get(bridge).state !== 'connecting') return;
+    hinted = true;
+    addToast('If the browser asks whether this site may connect to apps on this device, allow it, the bridge needs that', 'info', 10000);
+  }, HINT_AFTER);
+}
+
+function stopHint(): void {
+  if (hint) clearTimeout(hint);
+  hint = null;
+}
+
 function onMessage(event: MessageEvent): void {
   let message: ServerMessage;
   try {
@@ -82,6 +104,7 @@ function onMessage(event: MessageEvent): void {
   switch (message?.type) {
     case 'welcome':
       attempts = 0;
+      stopHint();
       bridge.update((b) => ({ ...b, state: 'connected', port }));
       if (!announced) addToast('Bridge connected', 'success');
       announced = true;
@@ -119,6 +142,7 @@ function connect(): void {
   }
   replaced = false;
   bridge.update((b) => ({ ...b, state: 'connecting', port }));
+  startHint();
   let ws: WebSocket;
   try {
     ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
@@ -158,6 +182,7 @@ function disconnect(): void {
   }
   attempts = 0;
   announced = false;
+  stopHint();
   bridge.update((b) => ({ ...b, state: 'off', lastAction: null }));
   if (open) addToast('Bridge disconnected', 'info');
 }
