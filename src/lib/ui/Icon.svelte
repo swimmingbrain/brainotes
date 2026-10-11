@@ -20,6 +20,7 @@
     board: '<rect x="1.8" y="2.2" width="12.4" height="8.6" rx="1"/><path d="M5.2 14 6.6 10.8M10.8 14 9.4 10.8M4.5 5.5h4M4.5 7.8h6"/>',
     pdf: '<path d="M3.5 2.5a1 1 0 0 1 1-1h5l3 3v9a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1z"/><path d="M9.5 1.5v3h3"/><path d="M6.3 12V7.2h1.6a1.4 1.4 0 0 1 0 2.8H6.3"/>',
     library: '<path d="M2.8 2.5v11M5.6 4.5v9M8.4 3.5v10M10.6 3.9l2.6 9.6"/>',
+    tex: '<path d="M12.5 4.5V2.8H3.5L8.2 8l-4.7 5.2h9v-1.7"/>',
     blank: '<rect x="2.5" y="2" width="11" height="12" rx="1"/>',
     lines: '<rect x="2.5" y="2" width="11" height="12" rx="1"/><path d="M5 5.5h6M5 8h6M5 10.5h6"/>',
     grid: '<rect x="2.5" y="2" width="11" height="12" rx="1"/><path d="M6.2 2v12M9.8 2v12M2.5 6h11M2.5 10h11"/>',
