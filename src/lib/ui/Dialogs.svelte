@@ -4,6 +4,7 @@
   import RenameDialog from './dialogs/RenameDialog.svelte';
   import ConfirmDialog from './dialogs/ConfirmDialog.svelte';
   import PdfDialog from './dialogs/PdfDialog.svelte';
+  import LinkDialog from './dialogs/LinkDialog.svelte';
   import { dialog } from '$lib/stores/app';
 
   function close() {
@@ -29,6 +30,8 @@
         onclose={close} />
     {:else if $dialog.kind === 'pdf'}
       <PdfDialog files={$dialog.files} onclose={close} />
+    {:else if $dialog.kind === 'link'}
+      <LinkDialog tex={$dialog.tex} onclose={close} />
     {/if}
   {/key}
 {/if}

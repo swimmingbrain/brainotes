@@ -19,6 +19,7 @@ import {
 } from '$lib/stores/app';
 import type { PaperColor, PaperStyle } from '$lib/stores/preferences';
 import { connectBridge, disconnectBridge } from '$lib/bridge/connection';
+import { askForProject } from '$lib/bridge/tex';
 
 export interface Command {
   id: string;
@@ -86,6 +87,7 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
     c('export-pdf-page', 'Export this page as PDF', 'Notebook', () => actions.exportNotebook('pdf', 'page')),
     c('export-png', 'Export this page as PNG', 'Notebook', () => actions.exportNotebook('png', 'page')),
     c('export-file', 'Export a .brainotes file', 'Notebook', () => actions.exportNotebook('brainotes')),
+    c('link-tex', 'Link TeXbrain project', 'Notebook', askForProject),
 
     c('new-page', 'New page', 'Pages', () => actions.newPage(), 'Ctrl+Enter'),
     c('next-page', 'Next page', 'Pages', () => actions.nextPage(), 'PageDown'),

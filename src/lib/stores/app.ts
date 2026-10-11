@@ -38,7 +38,9 @@ export type Dialog =
   | { kind: 'rename'; target: 'notebook'; id?: string; name: string }
   | { kind: 'confirm'; title: string; message: string; confirm: string; danger?: boolean; onconfirm: () => void }
   // read the pdfs on the side or write on them
-  | { kind: 'pdf'; files: File[] };
+  | { kind: 'pdf'; files: File[] }
+  // the texbrain project of the open notebook
+  | { kind: 'link'; tex: string };
 
 export const dialog = writable<Dialog | null>(null);
 
