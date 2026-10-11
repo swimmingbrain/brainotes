@@ -331,8 +331,6 @@ const commands: Record<string, Command> = {
   }
 };
 
-export const commandNames = Object.keys(commands);
-
 export async function runCommand(name: string, args: CommandArgs): Promise<unknown> {
   // own keys only, a call named toString must not find the one every object has
   const command = Object.hasOwn(commands, name) ? commands[name] : undefined;
