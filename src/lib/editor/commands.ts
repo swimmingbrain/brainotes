@@ -18,6 +18,7 @@ import {
   type NotebookSummary
 } from '$lib/stores/app';
 import type { PaperColor, PaperStyle } from '$lib/stores/preferences';
+import { connectBridge, disconnectBridge } from '$lib/bridge/connection';
 
 export interface Command {
   id: string;
@@ -110,7 +111,9 @@ export function buildCommands(visible: Record<ToolId, boolean>): Command[] {
     c('toggle-right', 'Toggle the reference panel', 'View', toggleRightPanel, 'Ctrl+Alt+B'),
     c('present', 'Present (fullscreen)', 'View', togglePresent, 'Ctrl+Shift+F'),
     c('shortcuts', 'Keyboard shortcuts', 'View', () => dialog.set({ kind: 'shortcuts' }), 'Shift+/'),
-    c('preferences', 'Preferences', 'View', () => dialog.set({ kind: 'preferences' }), 'Ctrl+,')
+    c('preferences', 'Preferences', 'View', () => dialog.set({ kind: 'preferences' }), 'Ctrl+,'),
+    c('bridge-connect', 'Bridge: connect', 'View', connectBridge),
+    c('bridge-disconnect', 'Bridge: disconnect', 'View', disconnectBridge)
   ];
 
   for (const ws of WORKSPACES) {
