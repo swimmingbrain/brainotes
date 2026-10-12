@@ -301,10 +301,10 @@ const commands: Record<string, Command> = {
     return { id: item.id };
   },
 
-  // blank like the page before it, after the page on screen unless after says which
+  // blank like the page before it, at the end unless after says which page it follows
   async new_page({ after }) {
     const ed = await requireEditor();
-    const at = pageIndex(ed.doc, after);
+    const at = after === undefined || after === null ? ed.doc.pageCount - 1 : pageIndex(ed.doc, after);
     const like = ed.doc.notebook.pages[at];
     addPages(at + 1, [{ id: newId(), w: like.w, h: like.h, paper: { ...like.paper } }]);
     return { index: at + 1 };
