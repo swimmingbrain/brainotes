@@ -29,6 +29,24 @@ braiNOTES is an open source app for writing by hand, like OneNote or GoodNotes, 
 - `.brainotes` files to back up a notebook or share it
 - Saves by itself and works offline once it has been opened
 
+The fountain pen and the highlighter on dotted paper:
+
+<p align="center">
+  <img src="docs/pen.gif" alt="A heading and two lines of an integration written with the fountain pen on dotted paper, the result marked with the highlighter" width="800" />
+</p>
+
+A lecture pdf on the side, a part of a slide snipped into the notes, its page badge leading back to the slide:
+
+<p align="center">
+  <img src="docs/study.gif" alt="A drawing snipped from a slide into the notes, the p. 2 badge jumps back to the slide, a line written under it" width="800" />
+</p>
+
+A whiteboard on dark paper, circles that snap when the pen holds still, the laser pointer:
+
+<p align="center">
+  <img src="docs/board.gif" alt="The board turns dark, two rough circles snap into clean ones, the laser circles the overlap" width="800" />
+</p>
+
 ## Shortcuts
 
 | Key | What it does |
