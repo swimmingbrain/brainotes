@@ -104,6 +104,13 @@
       with it.
     </p>
     <p>
+      <strong>Bridge.</strong> Off unless you switch it on in the preferences or open the app with
+      <code>?bridge</code> in the address. Then the tab keeps a WebSocket open to brainbridge, a program on your
+      own computer, at <code>127.0.0.1</code> (port 7332 unless you change it), and answers what it asks for: the
+      list of notebooks, pages as pictures or strokes, a PDF of a notebook. It only ever talks to that address on
+      your computer. What brainbridge does with it is up to you and the program you connect it to.
+    </p>
+    <p>
       That is the complete list. There is no backend, no account, no error reporting and no upload. Once the
       page has loaded, the app works with the network switched off.
     </p>
