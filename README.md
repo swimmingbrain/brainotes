@@ -62,6 +62,20 @@ A whiteboard on dark paper, circles that snap when the pen holds still, the lase
 | `Ctrl+K` | Command palette |
 | `?` | All shortcuts |
 
+## Bridge
+
+The bridge connects braiNOTES to [brainBRIDGE](https://github.com/swimmingbrain/brainbridge), a small server on your computer, so a coding agent can read your pages, write on them and write them up in [TeXbrain](https://github.com/swimmingbrain/texbrain).
+
+<p align="center">
+  <img src="docs/bridge.gif" alt="The bridge switched on in the preferences turns green, a line of text from the server lands on the page and goes again with one undo, the TeXbrain button opens the linked project" width="800" />
+</p>
+
+- Open [notes.swimmingbrain.dev/?bridge](https://notes.swimmingbrain.dev/?bridge) or switch on Bridge in Preferences, General. Allow the local connection when the browser asks and the Bridge segment in the status bar turns green.
+- `Bridge: connect` and `Bridge: disconnect` in the command palette do the same.
+- `Link TeXbrain project` in the palette ties the notebook to a TeXbrain project, the TeXbrain button in the top bar then opens it.
+- Every edit that comes over the bridge is one undo step.
+- The socket only goes to 127.0.0.1, nothing leaves your computer.
+
 ## Running locally
 
 ```bash
